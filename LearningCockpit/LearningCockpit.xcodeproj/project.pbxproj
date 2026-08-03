@@ -1,0 +1,312 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A2E2257C918343C59923D636 /* LearningCockpitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C3EC0008F4F74D748B99FE32 /* LearningCockpitApp.swift */; };
+		E3AB5701556A400E9B7B7766 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FA74480D0C6490D829512B2 /* ContentView.swift */; };
+		2257FCB5640D4601ACF42CF6 /* ComparisonRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83B664CADFA74567B91F5549 /* ComparisonRow.swift */; };
+		691BB88374D946399E5D1FCF /* LearningStage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CB2415F0F14EF8A46991DD /* LearningStage.swift */; };
+		E806E4986E6940D29AA58537 /* ProgressStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6ACD8E584AF497FB15B2602 /* ProgressStore.swift */; };
+		D4FD74C188644B15A4203AD7 /* RoadmapData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58FDEF572E0A4D80BFC588D0 /* RoadmapData.swift */; };
+		00D19B75B59440D9AF49EA1D /* SidebarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA1FD7F05EE4EDB90E141EE /* SidebarView.swift */; };
+		F25E04B819604F908375380D /* StageDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C46E6E423B6A413F8B7388B3 /* StageDetailView.swift */; };
+		8A0305B1D8BE4A50BE4B6C78 /* ComparisonTableView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAA856A0D0E34762A2237B53 /* ComparisonTableView.swift */; };
+		6DA6F7EE72334909942623B1 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DAF9B7F62C73400597F03558 /* HomeView.swift */; };
+		A953DE5681D04693A4907524 /* ProgressBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 455B39303B15455C958F3767 /* ProgressBadge.swift */; };
+		C814AD602D374A7393D1398F /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE925DA46AD43D492E5A607 /* AppTheme.swift */; };
+		28EB8B39E27340969EF84E30 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 34C61304D89A4BA68410B9E3 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		51CDF59BB4DA4C908A66906E /* LearningCockpit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LearningCockpit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C3EC0008F4F74D748B99FE32 /* LearningCockpitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningCockpitApp.swift; sourceTree = "<group>"; };
+		8FA74480D0C6490D829512B2 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		83B664CADFA74567B91F5549 /* ComparisonRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComparisonRow.swift; sourceTree = "<group>"; };
+		12CB2415F0F14EF8A46991DD /* LearningStage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LearningStage.swift; sourceTree = "<group>"; };
+		B6ACD8E584AF497FB15B2602 /* ProgressStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressStore.swift; sourceTree = "<group>"; };
+		58FDEF572E0A4D80BFC588D0 /* RoadmapData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoadmapData.swift; sourceTree = "<group>"; };
+		EFA1FD7F05EE4EDB90E141EE /* SidebarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarView.swift; sourceTree = "<group>"; };
+		C46E6E423B6A413F8B7388B3 /* StageDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StageDetailView.swift; sourceTree = "<group>"; };
+		AAA856A0D0E34762A2237B53 /* ComparisonTableView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ComparisonTableView.swift; sourceTree = "<group>"; };
+		DAF9B7F62C73400597F03558 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		455B39303B15455C958F3767 /* ProgressBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressBadge.swift; sourceTree = "<group>"; };
+		DDE925DA46AD43D492E5A607 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		34C61304D89A4BA68410B9E3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		5E5FF93D328343398F1506E9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		3D9FDDF5B04B45548906030D = {
+			isa = PBXGroup;
+			children = (
+				A70FA041684E4C81B35F2E15 /* LearningCockpit */,
+				3F9F1DE55AA64ED1B18BE201 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3F9F1DE55AA64ED1B18BE201 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				51CDF59BB4DA4C908A66906E /* LearningCockpit.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A70FA041684E4C81B35F2E15 /* LearningCockpit */ = {
+			isa = PBXGroup;
+			children = (
+				C3EC0008F4F74D748B99FE32 /* LearningCockpitApp.swift */,
+				8FA74480D0C6490D829512B2 /* ContentView.swift */,
+				F747B521C41E469593858A02 /* Models */,
+				49787F617456421C90E1BA91 /* Data */,
+				4117FBF130ED416882FB3E11 /* Views */,
+				B15A1E0564B0426F91DCB096 /* Theme */,
+				34C61304D89A4BA68410B9E3 /* Assets.xcassets */,
+			);
+			path = LearningCockpit;
+			sourceTree = "<group>";
+		};
+		B15A1E0564B0426F91DCB096 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				DDE925DA46AD43D492E5A607 /* AppTheme.swift */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		F747B521C41E469593858A02 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				83B664CADFA74567B91F5549 /* ComparisonRow.swift */,
+				12CB2415F0F14EF8A46991DD /* LearningStage.swift */,
+				B6ACD8E584AF497FB15B2602 /* ProgressStore.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		49787F617456421C90E1BA91 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				58FDEF572E0A4D80BFC588D0 /* RoadmapData.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		4117FBF130ED416882FB3E11 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				EFA1FD7F05EE4EDB90E141EE /* SidebarView.swift */,
+				C46E6E423B6A413F8B7388B3 /* StageDetailView.swift */,
+				AAA856A0D0E34762A2237B53 /* ComparisonTableView.swift */,
+				DAF9B7F62C73400597F03558 /* HomeView.swift */,
+				455B39303B15455C958F3767 /* ProgressBadge.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		14CDAE9B343948B795BA6BFA /* LearningCockpit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 73420EBE68C74DCAA3728595 /* Build configuration list for PBXNativeTarget "LearningCockpit" */;
+			buildPhases = (
+				2E7B243C75DC41E9BF5ECD1B /* Sources */,
+				5E5FF93D328343398F1506E9 /* Frameworks */,
+				1730E6F6AEB94628849A8E1A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LearningCockpit;
+			productName = LearningCockpit;
+			productReference = 51CDF59BB4DA4C908A66906E /* LearningCockpit.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		DF9370657E984C6FAFF6E652 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					14CDAE9B343948B795BA6BFA = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = BE16ECB389304CCC8E89AEFD /* Build configuration list for PBXProject "LearningCockpit" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 3D9FDDF5B04B45548906030D;
+			productRefGroup = 3F9F1DE55AA64ED1B18BE201 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				14CDAE9B343948B795BA6BFA /* LearningCockpit */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1730E6F6AEB94628849A8E1A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28EB8B39E27340969EF84E30 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		2E7B243C75DC41E9BF5ECD1B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A2E2257C918343C59923D636 /* LearningCockpitApp.swift in Sources */,
+				E3AB5701556A400E9B7B7766 /* ContentView.swift in Sources */,
+				2257FCB5640D4601ACF42CF6 /* ComparisonRow.swift in Sources */,
+				691BB88374D946399E5D1FCF /* LearningStage.swift in Sources */,
+				E806E4986E6940D29AA58537 /* ProgressStore.swift in Sources */,
+				D4FD74C188644B15A4203AD7 /* RoadmapData.swift in Sources */,
+				00D19B75B59440D9AF49EA1D /* SidebarView.swift in Sources */,
+				F25E04B819604F908375380D /* StageDetailView.swift in Sources */,
+				8A0305B1D8BE4A50BE4B6C78 /* ComparisonTableView.swift in Sources */,
+				6DA6F7EE72334909942623B1 /* HomeView.swift in Sources */,
+				A953DE5681D04693A4907524 /* ProgressBadge.swift in Sources */,
+				C814AD602D374A7393D1398F /* AppTheme.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		70138E127E164628B88EE9CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		9DB95124E3884223A4BB124F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		29E17AB5AC8343ACAAC3504B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "学习驾驶舱";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.study.LearningCockpit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		D2FBC1E922B845809396BCEC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_HARDENED_RUNTIME = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "学习驾驶舱";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.study.LearningCockpit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		BE16ECB389304CCC8E89AEFD /* Build configuration list for PBXProject "LearningCockpit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				70138E127E164628B88EE9CF /* Debug */,
+				9DB95124E3884223A4BB124F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		73420EBE68C74DCAA3728595 /* Build configuration list for PBXNativeTarget "LearningCockpit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				29E17AB5AC8343ACAAC3504B /* Debug */,
+				D2FBC1E922B845809396BCEC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = DF9370657E984C6FAFF6E652 /* Project object */;
+}
