@@ -1,8 +1,9 @@
 import SwiftUI
 
+/// 驾驶舱首页：品牌说明、速查表、练习节奏与开始按钮。
 struct HomeView: View {
     @Binding var selection: SidebarSelection?
-    @Environment(ProgressStore.self) private var progressStore
+    @Environment(AppViewModel.self) private var app
     @State private var appeared = false
 
     var body: some View {
@@ -20,8 +21,9 @@ struct HomeView: View {
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 10)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AtmosphereBackground())
-        .navigationTitle("Android → iOS")
+        .navigationTitle(L10n.tr("home.title"))
         .onAppear {
             withAnimation(.easeOut(duration: 0.45)) {
                 appeared = true
@@ -44,19 +46,19 @@ struct HomeView: View {
             }
             .tracking(1.2)
 
-            Text("学习驾驶舱")
+            Text(L10n.tr("home.brand"))
                 .font(AppTheme.display(36))
                 .foregroundStyle(AppTheme.ink)
 
-            Text("从 Kotlin 迁移到 Swift。一次只看一个阶段——对照是核心，进度留在本地。")
+            Text(L10n.tr("home.subtitle"))
                 .font(AppTheme.body(15))
                 .foregroundStyle(AppTheme.inkMuted)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: 520, alignment: .leading)
 
             ProgressBadge(
-                completed: progressStore.mainPathCompletedCount(from: RoadmapData.stages),
-                total: progressStore.mainPathTotal(from: RoadmapData.stages)
+                completed: app.progress.mainPathCompletedCount(from: app.roadmap.stages),
+                total: app.progress.mainPathTotal(from: app.roadmap.stages)
             )
             .padding(.top, 6)
             .frame(maxWidth: 280)
@@ -65,34 +67,34 @@ struct HomeView: View {
 
     private var howToUse: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "怎么用")
+            SectionHeader(title: L10n.tr("home.how"))
             VStack(alignment: .leading, spacing: 10) {
-                guideRow(index: "01", text: "已会 Android：每阶段重点看 iOS 列和「迁移注意」")
-                guideRow(index: "02", text: "两端都在学：先 Android 模块，再立刻学 iOS 对应模块")
-                guideRow(index: "03", text: "主路径按序学完；进阶可后补")
+                guideRow(index: "01", text: L10n.tr("home.guide.01"))
+                guideRow(index: "02", text: L10n.tr("home.guide.02"))
+                guideRow(index: "03", text: L10n.tr("home.guide.03"))
             }
         }
     }
 
     private var cheatSheet: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "迁移者速查")
-            Text("你会 X，重点学 Y")
+            SectionHeader(title: L10n.tr("home.cheatsheet"))
+            Text(L10n.tr("home.cheatsheet.hint"))
                 .font(AppTheme.body(13))
                 .foregroundStyle(AppTheme.inkMuted)
             ComparisonTableView(
-                rows: RoadmapData.cheatSheet,
-                androidHeader: "你已掌握",
-                iosHeader: "iOS 优先补"
+                rows: app.roadmap.cheatSheet,
+                androidHeader: L10n.tr("home.cheatsheet.android"),
+                iosHeader: L10n.tr("home.cheatsheet.ios")
             )
         }
     }
 
     private var weeks: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "建议实践节奏", accent: AppTheme.iosTint)
+            SectionHeader(title: L10n.tr("home.pace"), accent: AppTheme.iosTint)
             VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(RoadmapData.practiceWeeks.enumerated()), id: \.offset) { index, week in
+                ForEach(Array(app.roadmap.practiceWeeks.enumerated()), id: \.offset) { index, week in
                     HStack(alignment: .top, spacing: 14) {
                         Text(String(format: "%02d", index + 1))
                             .font(AppTheme.mono(12, weight: .bold))
@@ -104,7 +106,7 @@ struct HomeView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.vertical, 10)
-                    if index < RoadmapData.practiceWeeks.count - 1 {
+                    if index < app.roadmap.practiceWeeks.count - 1 {
                         Rectangle()
                             .fill(AppTheme.hairline.opacity(0.7))
                             .frame(height: 1)
@@ -117,13 +119,13 @@ struct HomeView: View {
     private var startButton: some View {
         Button {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                selection = .stage(RoadmapData.mainPathStages[0].id)
+                selection = .stage(app.roadmap.mainPathStages[0].id)
             }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: "play.fill")
                     .font(.system(size: 12, weight: .bold))
-                Text("从第 1 阶段开始")
+                Text(L10n.tr("home.start"))
                     .font(AppTheme.body(14, weight: .semibold))
             }
             .foregroundStyle(.white)

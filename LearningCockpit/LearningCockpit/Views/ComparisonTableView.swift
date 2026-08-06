@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// Android ↔ iOS 对照表（学习卡与驾驶舱共用）。
 struct ComparisonTableView: View {
     let rows: [ComparisonRow]
     var androidHeader: String = "Android"
@@ -30,7 +31,7 @@ struct ComparisonTableView: View {
             headerCell(androidHeader, tint: AppTheme.androidTint, soft: AppTheme.androidSoft)
             headerCell(iosHeader, tint: AppTheme.iosTint, soft: AppTheme.iosSoft)
             if hasNotes {
-                headerCell("说明", tint: AppTheme.inkMuted, soft: Color.clear)
+                headerCell(L10n.tr("table.note"), tint: AppTheme.inkMuted, soft: Color.clear)
                     .frame(maxWidth: 168, alignment: .leading)
             }
         }
@@ -41,7 +42,7 @@ struct ComparisonTableView: View {
             cell(row.android, emphasis: AppTheme.androidTint.opacity(0.85))
             cell(row.ios, emphasis: AppTheme.iosTint.opacity(0.85))
             if hasNotes {
-                Text(row.note ?? "—")
+                Text(row.note ?? L10n.tr("table.dash"))
                     .font(AppTheme.body(12))
                     .foregroundStyle(AppTheme.inkMuted)
                     .textSelection(.enabled)

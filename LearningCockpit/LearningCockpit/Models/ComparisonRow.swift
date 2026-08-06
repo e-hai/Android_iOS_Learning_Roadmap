@@ -1,5 +1,6 @@
 import Foundation
 
+/// Android / iOS 对照表中的一行。
 struct ComparisonRow: Identifiable, Hashable {
     let id: String
     let android: String

@@ -1,15 +1,16 @@
 import SwiftUI
 
+/// 驾驶舱侧栏：进度徽章 + 主线 / 进阶阶段列表。
 struct SidebarView: View {
-    @Environment(ProgressStore.self) private var progressStore
+    @Environment(AppViewModel.self) private var app
     @Binding var selection: SidebarSelection?
 
     var body: some View {
         List(selection: $selection) {
             Section {
                 ProgressBadge(
-                    completed: progressStore.mainPathCompletedCount(from: RoadmapData.stages),
-                    total: progressStore.mainPathTotal(from: RoadmapData.stages)
+                    completed: app.progress.mainPathCompletedCount(from: app.roadmap.stages),
+                    total: app.progress.mainPathTotal(from: app.roadmap.stages)
                 )
                 .padding(.vertical, 4)
                 .listRowInsets(EdgeInsets(top: 10, leading: 12, bottom: 10, trailing: 12))
@@ -18,7 +19,7 @@ struct SidebarView: View {
 
             Section {
                 Label {
-                    Text("开始学习")
+                    Text(L10n.tr("sidebar.start"))
                         .font(AppTheme.body(13, weight: .semibold))
                 } icon: {
                     Image(systemName: "house.fill")
@@ -28,35 +29,34 @@ struct SidebarView: View {
             }
 
             Section {
-                ForEach(RoadmapData.mainPathStages) { stage in
+                ForEach(app.roadmap.mainPathStages) { stage in
                     stageRow(stage)
                 }
             } header: {
-                Text("主路径")
+                Text(L10n.tr("sidebar.main"))
                     .font(AppTheme.label(10))
                     .foregroundStyle(AppTheme.accent)
                     .textCase(nil)
             }
 
             Section {
-                ForEach(RoadmapData.advancedStages) { stage in
+                ForEach(app.roadmap.advancedStages) { stage in
                     stageRow(stage)
                 }
             } header: {
-                Text("进阶")
+                Text(L10n.tr("sidebar.advanced"))
                     .font(AppTheme.label(10))
                     .foregroundStyle(AppTheme.warn)
                     .textCase(nil)
             }
         }
         .listStyle(.sidebar)
-        .navigationTitle("学习驾驶舱")
-        .frame(minWidth: 240)
+        .navigationTitle(L10n.tr("sidebar.cockpit"))
     }
 
     @ViewBuilder
     private func stageRow(_ stage: LearningStage) -> some View {
-        let done = progressStore.isStageFullyComplete(stage.id)
+        let done = app.progress.isStageFullyComplete(stage.id)
         HStack(spacing: 10) {
             ZStack {
                 Circle()

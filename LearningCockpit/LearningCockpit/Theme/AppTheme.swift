@@ -1,7 +1,8 @@
 import SwiftUI
 
+/// 应用视觉令牌：石板灰 + 青绿，偏技术冷静风。
 enum AppTheme {
-    // Slate + teal — technical, calm; avoids purple / cream-terracotta defaults
+    // 主文字 / 表面
     static let ink = Color(red: 0.12, green: 0.16, blue: 0.20)
     static let inkMuted = Color(red: 0.35, green: 0.40, blue: 0.45)
     static let surface = Color(red: 0.97, green: 0.98, blue: 0.985)
@@ -102,7 +103,7 @@ struct PlatformChip: View {
     let kind: Kind
 
     var body: some View {
-        Text(kind == .path ? "主路径" : "进阶")
+        Text(kind == .path ? L10n.tr("badge.main") : L10n.tr("badge.advanced"))
             .font(AppTheme.label(10))
             .foregroundStyle(kind == .path ? AppTheme.accent : AppTheme.warn)
             .padding(.horizontal, 8)

@@ -1,8 +1,9 @@
 import SwiftUI
 
+/// 驾驶舱阶段详情：进度勾选与完整学习内容。
 struct StageDetailView: View {
     let stage: LearningStage
-    @Environment(ProgressStore.self) private var progressStore
+    @Environment(AppViewModel.self) private var app
     @State private var appeared = false
 
     var body: some View {
@@ -26,6 +27,7 @@ struct StageDetailView: View {
             .opacity(appeared ? 1 : 0)
             .offset(y: appeared ? 0 : 8)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AtmosphereBackground())
         .navigationTitle(stage.displayTitle)
         .id(stage.id)
@@ -59,17 +61,17 @@ struct StageDetailView: View {
     private var progressToggles: some View {
         HStack(spacing: 24) {
             Toggle(isOn: Binding(
-                get: { progressStore.isReadComplete(stage.id) },
-                set: { progressStore.setReadComplete(stage.id, $0) }
+                get: { app.progress.isReadComplete(stage.id) },
+                set: { app.progress.setReadComplete(stage.id, $0) }
             )) {
-                Text("已读完本阶段")
+                Text(L10n.tr("detail.read"))
                     .font(AppTheme.body(13, weight: .medium))
             }
             Toggle(isOn: Binding(
-                get: { progressStore.isPracticeComplete(stage.id) },
-                set: { progressStore.setPracticeComplete(stage.id, $0) }
+                get: { app.progress.isPracticeComplete(stage.id) },
+                set: { app.progress.setPracticeComplete(stage.id, $0) }
             )) {
-                Text("练手已完成")
+                Text(L10n.tr("detail.practice"))
                     .font(AppTheme.body(13, weight: .medium))
             }
             Spacer()
@@ -86,7 +88,7 @@ struct StageDetailView: View {
 
     private var goalSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "目标")
+            SectionHeader(title: L10n.tr("detail.section.goal"))
             Text(stage.goal)
                 .font(AppTheme.body(14.5))
                 .foregroundStyle(AppTheme.ink)
@@ -97,7 +99,7 @@ struct StageDetailView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "迁移注意", accent: AppTheme.warn)
+            SectionHeader(title: L10n.tr("detail.section.notes"), accent: AppTheme.warn)
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(stage.notes, id: \.self) { note in
                     HStack(alignment: .top, spacing: 10) {
@@ -122,14 +124,14 @@ struct StageDetailView: View {
 
     private var comparisonSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SectionHeader(title: "对照")
+            SectionHeader(title: L10n.tr("detail.section.compare"))
             ComparisonTableView(rows: stage.rows)
         }
     }
 
     private func hintSection(_ hint: String) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "结构 / 路径", accent: AppTheme.iosTint)
+            SectionHeader(title: L10n.tr("detail.section.structure"), accent: AppTheme.iosTint)
             Text(hint)
                 .font(AppTheme.mono(12))
                 .foregroundStyle(AppTheme.ink)
@@ -148,7 +150,7 @@ struct StageDetailView: View {
 
     private var practiceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionHeader(title: "练手", accent: AppTheme.androidTint)
+            SectionHeader(title: L10n.tr("detail.section.practice"), accent: AppTheme.androidTint)
             HStack(alignment: .top, spacing: 12) {
                 Image(systemName: "hammer.fill")
                     .font(.system(size: 13, weight: .semibold))

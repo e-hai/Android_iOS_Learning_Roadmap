@@ -1,5 +1,6 @@
 import SwiftUI
 
+/// 主线进度徽章（已完成 / 总数 + 进度条）。
 struct ProgressBadge: View {
     let completed: Int
     let total: Int
@@ -12,7 +13,7 @@ struct ProgressBadge: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text("主路径")
+                Text(L10n.tr("progress.main"))
                     .font(AppTheme.label(11))
                     .foregroundStyle(AppTheme.inkMuted)
                 Spacer()
