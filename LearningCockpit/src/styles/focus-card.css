@@ -1,0 +1,176 @@
+/* Focus Card Modal Overlay */
+.focus-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.focus-card {
+  width: 100%;
+  max-width: 580px;
+  max-height: 88vh;
+  background: var(--color-surface-raised);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  animation: modalScaleUp 0.25s var(--transition-spring);
+  border: 1px solid var(--color-border);
+}
+
+@keyframes modalScaleUp {
+  from { opacity: 0; transform: scale(0.94) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.focus-card-top-strip {
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-android), var(--color-accent), var(--color-ios));
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* Header */
+.focus-card-header {
+  padding: 16px 20px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.focus-card-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.focus-card-num-badge {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 800;
+  color: white;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-android), var(--color-accent));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.3);
+}
+
+.focus-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.focus-card-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.focus-card-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-ink);
+  line-height: 1.3;
+}
+
+.focus-card-close-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-muted);
+  transition: all var(--transition-fast);
+}
+.focus-card-close-btn:hover {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
+}
+
+/* Body */
+.focus-card-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.focus-all-done-banner {
+  padding: 12px 16px;
+  background: var(--color-done-soft);
+  border: 1px solid rgba(5, 150, 105, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--color-done);
+  font-size: 13.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Footer */
+.focus-card-footer {
+  padding: 14px 20px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.focus-footer-checks {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.focus-footer-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.focus-shortcut-hint {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.focus-shortcut-hint kbd {
+  font-family: var(--font-mono);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-size: 10px;
+}
