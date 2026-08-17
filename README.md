@@ -42,34 +42,43 @@
 
 ---
 
-## ① 开发环境与项目结构 ★★★★☆
+## ① 开发环境与工程结构 ★★★★☆
 
-**目标：** 认识 App 怎么组织。本阶段不用写业务代码。
+**阶段目标：** 掌握 Xcode 与 Android Studio 的工程映射体系，理解 Project、Target、SPM 依赖、Info.plist 与 Assets 资产管理。
 
-| Android | iOS | 学习重点 |
-| --- | --- | --- |
-| Android Studio | Xcode | IDE、模拟器、调试 |
-| Gradle | Xcode Project + SPM | 依赖与构建 |
-| `AndroidManifest.xml` | `Info.plist` | 应用配置 / 权限声明入口 |
-| `app/build.gradle(.kts)` | Xcode Target 设置 | 项目配置（非 Package.swift） |
-| Module | Target / Framework | 工程拆分 |
-| APK / AAB | IPA | 产物形态 |
+| 维度 | Android 体系 | iOS 体系 | 核心学习重点 |
+| --- | --- | --- | --- |
+| 核心 IDE | Android Studio (IntelliJ 体系) | Xcode (macOS 原生) | 开发环境、模拟器管理与代码调试 |
+| 构建与依赖 | Gradle (Kotlin / Groovy DSL) | Xcode Build System + SPM (SwiftPM) | 依赖管理与编译构建系统（优先原生 SPM） |
+| 应用清单 | `AndroidManifest.xml` | `Info.plist` + Target Capabilities | 应用元数据、权限声明与系统能力开关 |
+| 编译配置 | `app/build.gradle(.kts)` | Xcode Target Build Settings | Bundle ID、版本号、签名与编译选项 |
+| 模块化拆分 | Module (`app` / `library`) | Target / Framework / SPM Package | 子模块拆分与工程组件化架构 |
+| 资源管理 | `res/` (`drawable`, `values/strings.xml`) | `Assets.xcassets` (`Images`, `Color Sets`) | 图片资源、自适应色彩集与多语言本地化 |
+| 代码签名 | Keystore (`.jks`) / Play App Signing | Apple Certificate + Provisioning Profile | 开发者证书、描述文件与代码签名流程 |
+| 打包产物 | APK / AAB | IPA / Xcode Archive | 产物形态与归档分发结构 |
 
-> `Package.swift` 主要用于 SPM 库工程；普通 App 以 Xcode Project / Target 为准。
-
-**项目结构对照：**
+**目录与工程结构全景对照：**
 
 ```
-Android                         iOS
-Project                         Project
- ├── app                         ├── App
- ├── AndroidManifest              ├── Assets.xcassets
- ├── res                          ├── Preview Content
- └── java/kotlin                 ├── Info.plist
-                                 └── Sources / 各 Target
+【Android 工程结构】                【iOS Xcode 工程结构】
+MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
+ ├── build.gradle.kts                ├── MyApplication/
+ ├── settings.gradle.kts             │    ├── MyApplicationApp.swift (@main 入口)
+ └── app/                            │    ├── ContentView.swift (首屏 View)
+      ├── build.gradle.kts           │    ├── Info.plist (权限与配置元数据)
+      └── src/main/                  │    ├── Assets.xcassets (图标/颜色/图片)
+           ├── AndroidManifest.xml   │    └── Preview Content/ (预览 Mock 资产)
+           ├── java/ or kotlin/      └── MyApplicationTests/ (单元测试 Target)
+           └── res/
 ```
 
-**练手：** 各建一个空工程，弄清入口文件、资源目录、Run 到模拟器。
+**迁移避坑指南：**
+1. **文件索引机制**：Xcode 是**索引制**（Project-based），在 Finder 中直接拷入文件不会自动出现在工程中；必须拖入 Xcode 并勾选 `Add to targets` 与 `Copy items if needed`。
+2. **多 Target 体系**：一个 Xcode Project 可挂载多个 Target（主 App、Widget 小组件、Notification Extension、测试 Target），类似 Android 的多 Module。
+3. **现代依赖管理**：现代 iOS 优先使用 Xcode 内置的 Swift Package Manager (SPM)，通过 GitHub URL 直接添加依赖，无需再维护第三方 CocoaPods 与 `pod install`。
+4. **权限必填描述**：所有敏感权限（相机、相册、定位、通知等）必须在 `Info.plist` 中配置明确的 Privacy Usage Description（如 `NSCameraUsageDescription`），否则调用时系统会**直接崩溃闪退**。
+
+**练手实战任务：** 在 Xcode 中新建一个 SwiftUI App 工程，观察 Target 设置与 Signing 签名，体验 SPM 引入一个开源库（如 Alamofire），并将代码 Run 到 iOS 模拟器。
 
 ---
 
