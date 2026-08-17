@@ -6,7 +6,6 @@ import './styles/search.css';
 
 import { stages } from './data/roadmap-data';
 import { i18n } from './services/i18n';
-import { progressStorage } from './services/storage';
 import { renderHeader } from './components/Header';
 import { renderSidebar } from './components/Sidebar';
 import { renderHomeView } from './components/HomeView';
@@ -49,6 +48,9 @@ class AppController {
     };
 
     window.addEventListener('hashchange', () => {
+      // If modal is open, don't flash background re-render on hashchange
+      if (this.focusModalElement) return;
+
       parseHash();
       this.closeSidebar();
       this.render();
@@ -66,13 +68,9 @@ class AppController {
   }
 
   private setupSubscribers() {
-    // When language or progress updates, re-render the view
+    // When language updates, re-render the view
     i18n.subscribe(() => {
       document.title = i18n.t('app.display_name');
-      this.render();
-    });
-
-    progressStorage.subscribe(() => {
       this.render();
     });
   }
@@ -115,6 +113,7 @@ class AppController {
   }
 
   private openFocusModal(stageId?: string) {
+    // Remove any existing modal without flash
     document.querySelectorAll('.focus-modal-backdrop, #focus-card-backdrop').forEach((el) => {
       if (typeof el.remove === 'function') el.remove();
       else el.parentNode?.removeChild(el);
@@ -133,13 +132,34 @@ class AppController {
           if (typeof el.remove === 'function') el.remove();
           else el.parentNode?.removeChild(el);
         });
+        // Sync background content smoothly when modal is closed
+        this.render();
       },
       (newStageId) => {
         this.currentTarget = newStageId;
-        window.location.hash = newStageId;
+        // Use replaceState to update URL bar smoothly without triggering hashchange event or background flash
+        history.replaceState(null, '', '#' + newStageId);
+        this.updateSidebarActive(newStageId);
       }
     );
     document.body.appendChild(this.focusModalElement);
+  }
+
+  private updateSidebarActive(stageId: string) {
+    const sidebar = document.getElementById('app-sidebar');
+    if (!sidebar) return;
+    sidebar.querySelectorAll('.sidebar-item').forEach((item) => {
+      item.classList.remove('active');
+    });
+    // Find the item matching this stage and highlight it
+    const activeIndex = stages.findIndex((s) => s.id === stageId);
+    if (activeIndex !== -1) {
+      const items = sidebar.querySelectorAll('.sidebar-item');
+      // items[0] is home, items[1..] are stages
+      if (items[activeIndex + 1]) {
+        items[activeIndex + 1].classList.add('active');
+      }
+    }
   }
 
   private openSearchModal() {

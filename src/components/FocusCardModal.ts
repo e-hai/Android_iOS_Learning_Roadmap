@@ -1,9 +1,7 @@
 import { LearningStage } from '../models/types';
 import { i18n } from '../services/i18n';
-import { progressStorage } from '../services/storage';
 import { stages } from '../data/roadmap-data';
 import { renderComparisonTable } from './ComparisonTable';
-import { showToast } from './Toast';
 
 export function renderFocusCardModal(
   currentStageId: string,
@@ -17,12 +15,6 @@ export function renderFocusCardModal(
   let currentStage: LearningStage =
     stages.find((s) => s.id === currentStageId) || stages[0];
 
-  const updateCardContent = (stage: LearningStage) => {
-    currentStage = stage;
-    card.innerHTML = '';
-    buildCard(card, stage);
-  };
-
   const card = document.createElement('div');
   card.className = 'focus-card';
   card.addEventListener('click', (e) => {
@@ -30,65 +22,104 @@ export function renderFocusCardModal(
   });
   backdrop.appendChild(card);
 
-  const buildCard = (container: HTMLElement, stage: LearningStage) => {
-    const isRead = progressStorage.isReadComplete(stage.id);
-    const isPracticed = progressStorage.isPracticeComplete(stage.id);
-    const isFullyDone = progressStorage.isStageFullyComplete(stage.id);
-    const isAllDone = progressStorage.getNextIncompleteStage(stages) === null && isFullyDone;
+  // 1. Top color strip (created once)
+  const topStrip = document.createElement('div');
+  topStrip.className = 'focus-card-top-strip';
+  card.appendChild(topStrip);
 
-    const currentIndex = stages.findIndex((s) => s.id === stage.id);
-    const prevStage = currentIndex > 0 ? stages[currentIndex - 1] : null;
-    const nextStage = currentIndex < stages.length - 1 ? stages[currentIndex + 1] : null;
-
-    // Top color strip
-    const topStrip = document.createElement('div');
-    topStrip.className = 'focus-card-top-strip';
-    container.appendChild(topStrip);
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'focus-card-header';
-    header.innerHTML = `
-      <div class="focus-card-header-left">
-        <div class="focus-card-num-badge">${String(stage.number).padStart(2, '0')}</div>
-        <div class="focus-card-meta">
-          <div class="focus-card-chips">
-            <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}">
-              ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
-            </span>
-            <span style="color:var(--color-ink-muted);font-size:10px;">${stage.stars}</span>
-            <span style="color:var(--color-ink-faint);">·</span>
-            <span style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink-muted);">
-              ${stage.number}/${stages.length}
-            </span>
-          </div>
-          <h2 class="focus-card-title">${i18n.t(stage.titleKey)}</h2>
-        </div>
+  // 2. Header (created once, updated dynamically)
+  const header = document.createElement('div');
+  header.className = 'focus-card-header';
+  header.innerHTML = `
+    <div class="focus-card-header-left">
+      <div class="focus-card-num-badge" id="focus-num-badge">01</div>
+      <div class="focus-card-meta">
+        <div class="focus-card-chips" id="focus-chips"></div>
+        <h2 class="focus-card-title" id="focus-title"></h2>
       </div>
-      <button class="focus-card-close-btn" id="btn-close-focus" title="${i18n.t('web.close')}">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </div>
+    <button class="focus-card-close-btn" id="btn-close-focus" title="${i18n.t('web.close')}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  `;
+  header.querySelector('#btn-close-focus')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  });
+  card.appendChild(header);
+
+  // 3. Scrollable Body (created once, populated dynamically)
+  const body = document.createElement('div');
+  body.className = 'focus-card-body';
+  card.appendChild(body);
+
+  // 4. Footer (created once, buttons updated dynamically)
+  const footer = document.createElement('div');
+  footer.className = 'focus-card-footer';
+  footer.innerHTML = `
+    <div class="focus-shortcut-hint">
+      <kbd>←</kbd> <kbd>→</kbd> ${i18n.t('web.prev_stage')} / ${i18n.t('web.next_stage')}
+    </div>
+    <div class="focus-footer-nav" id="focus-footer-nav">
+      <button class="btn btn-secondary btn-sm" id="btn-focus-prev">
+        ← ${i18n.t('web.prev_stage')}
       </button>
-    `;
-    header.querySelector('#btn-close-focus')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      onClose();
-    });
-    container.appendChild(header);
+      <button class="btn btn-primary btn-sm" id="btn-focus-next">
+        ${i18n.t('web.next_stage')} →
+      </button>
+    </div>
+  `;
+  card.appendChild(footer);
 
-    // Body
-    const body = document.createElement('div');
-    body.className = 'focus-card-body';
+  const prevBtn = footer.querySelector('#btn-focus-prev') as HTMLButtonElement;
+  const nextBtn = footer.querySelector('#btn-focus-next') as HTMLButtonElement;
 
-    if (isAllDone) {
-      const banner = document.createElement('div');
-      banner.className = 'focus-all-done-banner';
-      banner.innerHTML = `
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-        <span>${i18n.t('web.all_completed')}</span>
-      `;
-      body.appendChild(banner);
+  prevBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const idx = stages.findIndex((s) => s.id === currentStage.id);
+    if (idx > 0) {
+      setStage(stages[idx - 1]);
     }
+  });
+
+  nextBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const idx = stages.findIndex((s) => s.id === currentStage.id);
+    if (idx < stages.length - 1) {
+      setStage(stages[idx + 1]);
+    }
+  });
+
+  // Function to smoothly update card content without flashing
+  const setStage = (stage: LearningStage) => {
+    currentStage = stage;
+
+    // Update Header
+    const numBadge = header.querySelector('#focus-num-badge') as HTMLElement;
+    const chipsContainer = header.querySelector('#focus-chips') as HTMLElement;
+    const titleEl = header.querySelector('#focus-title') as HTMLElement;
+
+    if (numBadge) numBadge.textContent = String(stage.number).padStart(2, '0');
+    if (chipsContainer) {
+      chipsContainer.innerHTML = `
+        <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}">
+          ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
+        </span>
+        <span style="color:var(--color-ink-muted);font-size:10px;">${stage.stars}</span>
+        <span style="color:var(--color-ink-faint);">·</span>
+        <span style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink-muted);">
+          ${stage.number}/${stages.length}
+        </span>
+      `;
+    }
+    if (titleEl) titleEl.textContent = i18n.t(stage.titleKey);
+
+    // Update Body smoothly
+    body.innerHTML = '';
+    body.scrollTop = 0;
 
     // Goal
     const goalBox = document.createElement('div');
@@ -136,81 +167,20 @@ export function renderFocusCardModal(
     practiceBox.innerHTML = `<strong>${i18n.t('detail.section.practice')}:</strong> ${i18n.t(stage.practiceKey)}`;
     body.appendChild(practiceBox);
 
-    container.appendChild(body);
+    // Update Footer Buttons
+    const currentIndex = stages.findIndex((s) => s.id === stage.id);
+    const hasPrev = currentIndex > 0;
+    const hasNext = currentIndex < stages.length - 1;
 
-    // Footer
-    const footer = document.createElement('div');
-    footer.className = 'focus-card-footer';
-    footer.innerHTML = `
-      <div class="focus-footer-checks">
-        <label class="toggle-label" style="font-size:12.5px;">
-          <input type="checkbox" class="toggle-checkbox" id="focus-read-check" ${isRead ? 'checked' : ''}>
-          <span>${i18n.t('card.check.read')}</span>
-        </label>
-        <label class="toggle-label" style="font-size:12.5px;">
-          <input type="checkbox" class="toggle-checkbox" id="focus-practice-check" ${isPracticed ? 'checked' : ''}>
-          <span>${i18n.t('card.check.practice')}</span>
-        </label>
-      </div>
+    prevBtn.style.visibility = hasPrev ? 'visible' : 'hidden';
+    nextBtn.style.visibility = hasNext ? 'visible' : 'hidden';
 
-      <div class="focus-footer-nav">
-        ${
-          prevStage
-            ? `<button class="btn btn-secondary btn-sm" id="btn-focus-prev" title="←">
-                ← ${i18n.t('web.prev_stage')}
-              </button>`
-            : ''
-        }
-        <button class="btn btn-primary btn-sm" id="btn-focus-next">
-          ${isAllDone ? i18n.t('card.next.done') : i18n.t('card.next.stage')} →
-        </button>
-      </div>
-    `;
-
-    // Checkbox events
-    const readBox = footer.querySelector('#focus-read-check') as HTMLInputElement;
-    const practiceBoxInput = footer.querySelector('#focus-practice-check') as HTMLInputElement;
-
-    readBox.addEventListener('change', () => {
-      progressStorage.setReadComplete(stage.id, readBox.checked);
-      if (readBox.checked) showToast(`✓ ${i18n.t('card.check.read')}`);
-    });
-
-    practiceBoxInput.addEventListener('change', () => {
-      progressStorage.setPracticeComplete(stage.id, practiceBoxInput.checked);
-      if (practiceBoxInput.checked) showToast(`✓ ${i18n.t('card.check.practice')}`);
-    });
-
-    footer.querySelector('#btn-focus-prev')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (prevStage) {
-        updateCardContent(prevStage);
-        onStageChange(prevStage.id);
-      }
-    });
-
-    footer.querySelector('#btn-focus-next')?.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      // Advance to next incomplete stage or next index
-      const laterIncomplete = stages.find(
-        (s) => s.number > stage.number && !progressStorage.isStageFullyComplete(s.id)
-      );
-      const next = laterIncomplete || progressStorage.getNextIncompleteStage(stages) || nextStage;
-
-      if (next && next.id !== stage.id) {
-        updateCardContent(next);
-        onStageChange(next.id);
-      } else {
-        showToast(i18n.t('web.all_completed'));
-      }
-    });
-
-    container.appendChild(footer);
+    // Notify stage change to main controller
+    onStageChange(stage.id);
   };
 
-  buildCard(card, currentStage);
+  // Initial populate
+  setStage(currentStage);
 
   // Close on backdrop click
   backdrop.addEventListener('click', (e) => {
@@ -219,21 +189,19 @@ export function renderFocusCardModal(
     }
   });
 
-  // Keyboard navigation
+  // Keyboard navigation (← / → / Escape)
   const keyHandler = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onClose();
     } else if (e.key === 'ArrowLeft') {
       const idx = stages.findIndex((s) => s.id === currentStage.id);
       if (idx > 0) {
-        updateCardContent(stages[idx - 1]);
-        onStageChange(stages[idx - 1].id);
+        setStage(stages[idx - 1]);
       }
     } else if (e.key === 'ArrowRight') {
       const idx = stages.findIndex((s) => s.id === currentStage.id);
       if (idx < stages.length - 1) {
-        updateCardContent(stages[idx + 1]);
-        onStageChange(stages[idx + 1].id);
+        setStage(stages[idx + 1]);
       }
     }
   };

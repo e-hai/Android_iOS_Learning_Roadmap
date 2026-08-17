@@ -11,9 +11,9 @@
 ## 架构准则
 
 1. **分层清晰**：
-   - `src/models/`：纯类型定义（`LearningStage`, `ComparisonRow`, `UserProgress`）。
+   - `src/models/`：纯类型定义（`LearningStage`, `ComparisonRow`）。
    - `src/data/`：16 个阶段结构化路线数据与多语言字典（`zh-Hans.ts`, `en.ts`）。
-   - `src/services/`：持久化与工具服务（`storage.ts` 提供 localStorage 存储，`i18n.ts` 提供国际化）。
+   - `src/services/`：多语言国际化服务（`i18n.ts`）。
    - `src/components/`：轻量、无框架绑定的原生 DOM 组件。
    - `src/styles/`：Vanilla CSS 设计系统与主题令牌。
 2. **零第三方重型 UI 依赖**：保持轻量、极简与高响应性能，避免引入重型 UI 组件库。

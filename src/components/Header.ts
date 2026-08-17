@@ -1,6 +1,4 @@
 import { i18n } from '../services/i18n';
-import { progressStorage } from '../services/storage';
-import { stages } from '../data/roadmap-data';
 
 export function renderHeader(
   onToggleSidebar: () => void,
@@ -10,10 +8,6 @@ export function renderHeader(
 ): HTMLElement {
   const header = document.createElement('header');
   header.className = 'app-header';
-
-  const completed = progressStorage.getMainPathCompletedCount(stages);
-  const total = progressStorage.getMainPathTotalCount(stages);
-  const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
 
   header.innerHTML = `
     <div class="header-left">
@@ -40,13 +34,6 @@ export function renderHeader(
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
         <span>${i18n.t('web.focus_mode')}</span>
       </button>
-
-      <div class="progress-pill" style="display:none;" id="header-progress-pill">
-        <span>${completed}/${total}</span>
-        <div class="progress-bar-bg">
-          <div class="progress-bar-fill" style="width:${percent}%;"></div>
-        </div>
-      </div>
 
       <button class="btn btn-ghost btn-sm" id="btn-lang-toggle" title="${i18n.t('web.switch_lang')}">
         🌐 ${i18n.getLanguage() === 'zh-Hans' ? 'EN' : '中'}
@@ -92,12 +79,6 @@ export function renderHeader(
     document.documentElement.setAttribute('data-theme', nextTheme);
     localStorage.setItem('learning_cockpit_theme', nextTheme);
   });
-
-  // Show progress pill on wider screens
-  if (window.innerWidth > 768) {
-    const pill = header.querySelector('#header-progress-pill') as HTMLElement;
-    if (pill) pill.style.display = 'inline-flex';
-  }
 
   return header;
 }

@@ -1,9 +1,7 @@
 import { LearningStage } from '../models/types';
 import { i18n } from '../services/i18n';
-import { progressStorage } from '../services/storage';
 import { renderComparisonTable } from './ComparisonTable';
 import { stages } from '../data/roadmap-data';
-import { showToast } from './Toast';
 
 export function renderStageDetail(
   stage: LearningStage,
@@ -30,57 +28,6 @@ export function renderStageDetail(
     <h1 class="stage-detail-title">${i18n.t(stage.titleKey)}</h1>
   `;
   container.appendChild(header);
-
-  // Progress Toggles Card
-  const togglesCard = document.createElement('div');
-  togglesCard.className = 'progress-toggles-card';
-
-  const isRead = progressStorage.isReadComplete(stage.id);
-  const isPracticed = progressStorage.isPracticeComplete(stage.id);
-
-  togglesCard.innerHTML = `
-    <div class="toggle-group">
-      <label class="toggle-label">
-        <input type="checkbox" class="toggle-checkbox" id="read-toggle" ${isRead ? 'checked' : ''}>
-        <span>${i18n.t('detail.read')}</span>
-      </label>
-      <label class="toggle-label">
-        <input type="checkbox" class="toggle-checkbox" id="practice-toggle" ${isPracticed ? 'checked' : ''}>
-        <span>${i18n.t('detail.practice')}</span>
-      </label>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span id="stage-status-badge" class="chip ${progressStorage.isStageFullyComplete(stage.id) ? 'chip-main' : ''}" style="${progressStorage.isStageFullyComplete(stage.id) ? '' : 'display:none;'}">
-        ✓ ${i18n.t('badge.main')}
-      </span>
-    </div>
-  `;
-
-  const readCheckbox = togglesCard.querySelector('#read-toggle') as HTMLInputElement;
-  const practiceCheckbox = togglesCard.querySelector('#practice-toggle') as HTMLInputElement;
-  const statusBadge = togglesCard.querySelector('#stage-status-badge') as HTMLElement;
-
-  const updateStatus = () => {
-    const fullyDone = progressStorage.isStageFullyComplete(stage.id);
-    if (statusBadge) {
-      statusBadge.style.display = fullyDone ? 'inline-flex' : 'none';
-      statusBadge.textContent = fullyDone ? '✓ ' + i18n.t('card.next.done') : '';
-    }
-  };
-
-  readCheckbox.addEventListener('change', () => {
-    progressStorage.setReadComplete(stage.id, readCheckbox.checked);
-    updateStatus();
-    if (readCheckbox.checked) showToast(`✓ ${i18n.t('detail.read')}`);
-  });
-
-  practiceCheckbox.addEventListener('change', () => {
-    progressStorage.setPracticeComplete(stage.id, practiceCheckbox.checked);
-    updateStatus();
-    if (practiceCheckbox.checked) showToast(`✓ ${i18n.t('detail.practice')}`);
-  });
-
-  container.appendChild(togglesCard);
 
   // Goal Section
   const goalSection = document.createElement('div');

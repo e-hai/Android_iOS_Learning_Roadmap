@@ -18,11 +18,6 @@ export interface LearningStage {
   extraHintKey?: string;
 }
 
-export interface UserProgress {
-  completedStageIDs: string[];
-  practicedStageIDs: string[];
-}
-
 export type Language = 'zh-Hans' | 'en';
 
 export type NavigationTarget = 'home' | string; // 'home' or stage id

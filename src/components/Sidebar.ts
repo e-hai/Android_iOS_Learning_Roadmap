@@ -1,6 +1,5 @@
 import { LearningStage } from '../models/types';
 import { i18n } from '../services/i18n';
-import { progressStorage } from '../services/storage';
 import { stages } from '../data/roadmap-data';
 
 export function renderSidebar(
@@ -29,17 +28,16 @@ export function renderSidebar(
   sidebar.appendChild(homeSection);
 
   const createStageRow = (stage: LearningStage) => {
-    const isDone = progressStorage.isStageFullyComplete(stage.id);
     const isActive = currentStageId === stage.id;
 
     const row = document.createElement('button');
-    row.className = `sidebar-item ${isActive ? 'active' : ''} ${isDone ? 'done' : ''}`;
+    row.className = `sidebar-item ${isActive ? 'active' : ''}`;
     row.innerHTML = `
-      <div class="sidebar-item-check">
-        ${isDone ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : ''}
-      </div>
+      <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}" style="font-size:10px;padding:1px 5px;flex-shrink:0;">
+        ${String(stage.number).padStart(2, '0')}
+      </span>
       <div class="sidebar-item-info">
-        <span class="sidebar-item-title">${stage.number}. ${i18n.t(stage.titleKey)}</span>
+        <span class="sidebar-item-title">${i18n.t(stage.titleKey)}</span>
         <span class="sidebar-item-stars">${stage.stars}</span>
       </div>
     `;
@@ -50,7 +48,7 @@ export function renderSidebar(
   // Main Path Section
   const mainSection = document.createElement('div');
   mainSection.className = 'sidebar-section';
-  mainSection.innerHTML = `<span class="sidebar-section-title main-title">${i18n.t('sidebar.main')} (${progressStorage.getMainPathCompletedCount(mainStages)}/${mainStages.length})</span>`;
+  mainSection.innerHTML = `<span class="sidebar-section-title main-title">${i18n.t('sidebar.main')}</span>`;
 
   mainStages.forEach((stage) => {
     mainSection.appendChild(createStageRow(stage));
