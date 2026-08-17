@@ -86,8 +86,8 @@ const DIAGRAMS: Record<string, string> = {
     iOS:     @SceneStorage("draft_text")
 
  6. 磁盘持久化偏好 (App 重启仍保留/设置项)
-    Android: DataStore (Flow) / SharedPreferences
-    iOS:     @AppStorage("is_dark_mode") (UserDefaults)
+    Android: DataStore (Flow 键值响应式流)
+    iOS:     @AppStorage("is_dark_mode") (声明式属性包装器)
 
  7. 树级全局环境注入 (无需层层传参获取系统属性)
     Android: CompositionLocalProvider / LocalContext.current

@@ -256,10 +256,10 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑤ 状态管理与数据流（全场景映射）★★★★★
 
-**阶段目标：** 精准掌握各状态 API 的应用场景：视图私有状态、父子双向绑定、ViewModel 业务模型、场景暂存恢复、磁盘偏好与全局环境。  
+**阶段目标：** 精准掌握 Compose 与 SwiftUI 各状态 API 的应用场景：视图私有状态、父子双向绑定、ViewModel 业务模型、场景暂存恢复、磁盘偏好与全局环境。  
 **核心认知：** 声明式 UI 的核心是**状态所有权与单向数据流**：谁拥有真实数据源（Source of Truth），谁向下分发，子组件通过引用或事件反向修改。
 
-### 模块一：组件私有状态与父子联动（局部 UI 交互）
+### 模块一：视图私有状态与父子双向绑定（局部 UI 交互）
 
 | 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
@@ -267,20 +267,19 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | **父子双向绑定传递** | `(value, onValueChange)` 状态提升 | `@Binding var value` (父传 `$value`) | 向子组件开放读写权限，子组件修改直接作用于父数据源 |
 | **派生计算与缓存** | `remember(key) { derivedStateOf { } }` | 计算属性 `var isReady: Bool { ... }` | 依赖其他状态自动重算，SwiftUI 具备自动依赖追踪 |
 
-### 模块二：业务数据模型与 ViewModel（页面级架构）
+### 模块二：业务状态流与 ViewModel 响应式模型（页面级状态）
 
 | 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
 | **现代响应式 ViewModel** | `class MyVM : ViewModel() + StateFlow` | `@Observable @MainActor class MyVM` | iOS 17+ 宏驱动，页面级复杂业务与异步数据持有者 |
 | **UI 订阅与消费流** | `collectAsStateWithLifecycle()` | 直接访问属性 / `@Bindable var vm = vm` | 属性级精准追踪，仅读取的字段变动才触发重绘 |
-| **老架构兼容对照** | `LiveData / ObservableField` | `ObservableObject + @Published + @StateObject` | 维护 iOS 13~16 老工程必备认知 |
 
-### 模块三：持久化偏好、场景恢复与全局环境（系统与持久层）
+### 模块三：持久化偏好、场景暂存与环境注入（全局与系统级）
 
 | 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
 | **场景/多窗口草稿暂存** | `rememberSaveable { mutableStateOf(...) }` | `@SceneStorage("draft_id")` | 屏幕旋转/切后台暂存恢复（退出应用可能重置） |
-| **磁盘持久化用户偏好** | `DataStore (Flow) / SharedPreferences` | `@AppStorage("setting_key")` | 直接绑定系统 `UserDefaults`，App 重启仍保留 |
+| **磁盘持久化用户偏好** | `DataStore (Flow 键值存储)` | `@AppStorage("setting_key")` | 直接绑定系统 `UserDefaults`，App 重启仍保留 |
 | **树级全局环境注入** | `CompositionLocalProvider / LocalContext` | `@Environment(\.colorScheme) / @Environment(User.self)` | 无需层层传递 Props，深层子组件直接获取环境属性 |
 
 **状态管理 API 核心应用场景选型矩阵：**
@@ -309,8 +308,8 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
     iOS:     @SceneStorage("draft_text")
 
  6. 磁盘持久化偏好 (App 重启仍保留/设置项)
-    Android: DataStore (Flow) / SharedPreferences
-    iOS:     @AppStorage("is_dark_mode") (UserDefaults)
+    Android: DataStore (Flow 键值响应式流)
+    iOS:     @AppStorage("is_dark_mode") (声明式属性包装器)
 
  7. 树级全局环境注入 (无需层层传参获取系统属性)
     Android: CompositionLocalProvider / LocalContext.current
@@ -320,8 +319,8 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 **迁移避坑指南：**
 1. **状态作用域选型黄金法则**：视图内部私有用 `@State`；子组件读写父状态用 `@Binding`；页面级复杂业务进 `@Observable ViewModel`；跨多层级全局配置用 `@Environment`。
 2. **@AppStorage vs @SceneStorage 本质区别**：`@AppStorage` 是磁盘持久化（底层 `UserDefaults`，App 重启保留，适合设置项）；`@SceneStorage` 是场景/窗口级暂存（类似 `rememberSaveable`，退出应用可能丢失）。
-3. **iOS 17 @Observable 革命性升级**：告别繁琐的 `ObservableObject` 与 `@Published`；新标准具备「属性级精准追踪」，仅被 View 实际读取的字段变动才会触发重绘，性能大幅提升。
-4. **@Binding 是双向引用指针**：Compose 习惯状态提升（传入 `value` 与 `onValueChange` 回调）；SwiftUI 传入 `$state` 绑定指针，子组件修改直接同步至父组件数据源。
+3. **SwiftUI 响应式状态模型**：`@Observable` 具备「属性级精准追踪」，仅被 View 实际读取的字段变动才会触发重绘，对应 Compose 的细粒度 Recomposition 机制。
+4. **@Binding 双向引用指针**：Compose 习惯状态提升（传入 `value` 与 `onValueChange` 回调）；SwiftUI 传入 `$state` 绑定指针，子组件修改直接同步至父组件数据源。
 
 **练手实战任务：** 编写一个用户偏好设置与计数器页面：包含 `@State` 私有计数器、`@Binding` 双向开关子组件、`@AppStorage` 夜间模式持久化，并在 `@Observable` ViewModel 中管理网络用户列表。
 
@@ -329,32 +328,29 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑥ 页面导航与路由（Nav3 & NavigationStack）★★★★☆
 
-**阶段目标：** 掌握现代第三代「数据驱动/状态列表」路由架构（Android Nav3 / 2.8+ 强类型 ↔ iOS 16+ NavigationStack），并理解两端历史演进与向后兼容。  
-**核心认知：** 两端现代路由的本质都是**「可观察的状态列表」**；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串拼接与视图级强绑定。
+**阶段目标：** 掌握纯声明式 UI 强类型与数据驱动路由架构（Compose Navigation 2.8+ / Nav3 ↔ SwiftUI NavigationStack）。  
+**核心认知：** 现代声明式路由的本质是**「可观察的状态列表」**；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串拼接与视图级强绑定。
 
-### 模块一：第三代标准（现代数据驱动 · 核心心智 · 重点）
+### 模块一：强类型路由定义与状态栈管理（核心路由机制）
 
 | 导航操作 / 维度 | Android (Nav3 / 2.8+ 强类型) | iOS (SwiftUI 16+ NavigationStack) | 核心特性说明 |
 | --- | --- | --- | --- |
-| **状态栈数据源** | `val backStack = rememberNavBackStack()` (Nav3) | `@State var path: [AppRoute] = []` | 纯状态驱动（数组列表） |
 | **强类型路由节点** | `@Serializable data class Detail(val id: String)` | `enum AppRoute: Hashable { case detail(id: String) }` | 编译期强类型，告别字符串拼写错误 |
+| **状态栈数据源** | `val backStack = rememberNavBackStack()` (Nav3) | `@State var path: [AppRoute] = []` | 纯状态驱动（数组列表） |
 | **页面跳转 (压栈)** | `backStack.add(Detail(...))` / `navigate(Detail)` | `path.append(.detail(...))` | 状态驱动压入目标路由 |
 | **页面返回 (出栈)** | `backStack.pop()` / `popBackStack()` | `path.removeLast()` | 弹出顶层路由返回上一级 |
 | **一键回首页** | `backStack.clear()` / `popBackStack(Home, false)` | `path.removeAll()` | **Pop to Root** 一键清栈回首页 |
+
+### 模块二：页面呈现容器与多端/分屏适配（容器与分栏）
+
+| 容器类型 / 场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
 | **路由呈现容器** | `NavDisplay(backStack) { route -> when(route) }` | `NavigationStack(path: $path) + .navigationDestination` | 惰性解耦构建目标 View |
 | **大屏/分屏支持** | `NavDisplay` (多窗分栏支持) | `NavigationSplitView(sidebar:detail:)` | iPad / 折叠屏双栏分栏 |
 | **底部导航选项卡** | `NavigationBar + NavDisplay` | `TabView(selection: $tab)` | 根级多分支页面容器 |
+| **模态弹窗/抽屉** | `ModalBottomSheet / Dialog` | `.sheet(isPresented:) / .fullScreenCover` | 独立弹层容器 |
 
-### 模块二：第一二代演进与跨版本兼容（避坑与老项目）
-
-| 演进代际 | Android (Jetpack Compose) | iOS (SwiftUI) | 核心缺陷与兼容方案 |
-| --- | --- | --- | --- |
-| **第一代 (早期探索)** | URL 字符串模板 `composable("detail/{id}")` | `NavigationView` + 嵌套 `NavigationLink(destination:)` | 缺陷：无强类型 / 子 View 提前初始化引发内存灾难 |
-| **第二代 (过渡演进)** | Navigation Compose 2.8+ (Kotlinx Serialization 强类型) | `NavigationStack` (iOS 16+ 引入) | 解决：全类型安全路由与惰性构建 |
-| **第三代 (现代标准)** | **Nav3 (纯 Compose 状态驱动)** | **`NavigationStack(path:)` (纯数据栈驱动)** | 终极：两端心智完全统一，状态列表即路由栈 |
-| **跨版本兼容方案** | 生产首选 `Navigation 2.8+` 官方库；KMP 跨平台选 `Voyager` | iOS 14/15 推荐开源库 **`NavigationStackBackport`** | 零重构成本抹平低版本 API 差异 |
-
-**现代第三代纯数据驱动路由架构：**
+**现代纯数据驱动路由架构：**
 
 ```
 [ 现代第三代纯数据驱动路由: Android Nav3 <-> iOS 16+ NavigationStack ]
@@ -393,10 +389,9 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 ```
 
 **迁移避坑指南：**
-1. **第三代核心心智（纯数据驱动）**：两端现代路由本质都是「可观察的状态列表」；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串与视图级嵌套。
-2. **SwiftUI 早期提前初始化陷阱**：iOS 13~15 的 `NavigationLink(destination:)` 会在列表渲染时提前初始化所有目标 View；必须升级至 iOS 16+ `NavigationStack` 或使用 `NavigationStackBackport` 避免性能灾难。
-3. **Android 路由演进路径**：老项目为字符串匹配；主流为 Navigation 2.8+ 官方 Kotlinx Serialization 强类型；下一代为纯 Compose 状态驱动的 **Nav3**。
-4. **平板与分屏适配**：单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
+1. **纯数据驱动核心心智**：现代声明式路由本质是「可观察的状态列表」；页面跳转即 `List.add`，返回即 `List.removeLast`，告别任何字符串硬编码与视图嵌套。
+2. **强类型路由与解耦**：Android 借助 Kotlinx Serialization、iOS 借助 Hashable 枚举，实现编译期全类型安全与页面按需惰性构建。
+3. **平板与多窗分栏适配**：单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
 
 **练手实战任务：** 定义强类型路由枚举/对象，使用 `NavigationStack(path:)` 与 `NavDisplay/NavHost` 实现「列表压栈跳转 ➔ 详情参数读取 ➔ 一键回首页 (Pop to Root)」完整闭环。
 
