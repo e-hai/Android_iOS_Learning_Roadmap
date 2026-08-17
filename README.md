@@ -44,12 +44,13 @@
 
 ## ① 开发环境与工程结构 ★★★★☆
 
-**阶段目标：** 掌握 Xcode 与 Android Studio 的工程映射体系，理解 Project、Target、SPM 依赖、Info.plist 与 Assets 资产管理。
+**阶段目标：** 掌握 Xcode 与 Android Studio 的工程映射体系，理解 Project、Target、SPM/CocoaPods 依赖、Info.plist 与 Assets 资产管理。
 
 | 维度 | Android 体系 | iOS 体系 | 核心学习重点 |
 | --- | --- | --- | --- |
 | 核心 IDE | Android Studio (IntelliJ 体系) | Xcode (macOS 原生) | 开发环境、模拟器管理与代码调试 |
-| 构建与依赖 | Gradle (Kotlin / Groovy DSL) | Xcode Build System + SPM (SwiftPM) | 依赖管理与编译构建系统（优先原生 SPM） |
+| 构建与依赖 | Gradle (Groovy / Kotlin DSL) | SPM (官方推荐) / CocoaPods | 依赖管理与编译构建系统（**现代优先原生 SPM**） |
+| 工程与工作区 | 根工程 (`settings.gradle`) | `.xcodeproj` (单工程) / `.xcworkspace` (工作区) | 工程索引体系与多模块/Pods 容器 |
 | 应用清单 | `AndroidManifest.xml` | `Info.plist` + Target Capabilities | 应用元数据、权限声明与系统能力开关 |
 | 编译配置 | `app/build.gradle(.kts)` | Xcode Target Build Settings | Bundle ID、版本号、签名与编译选项 |
 | 模块化拆分 | Module (`app` / `library`) | Target / Framework / SPM Package | 子模块拆分与工程组件化架构 |
@@ -73,10 +74,11 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 ```
 
 **迁移避坑指南：**
-1. **文件索引机制**：Xcode 是**索引制**（Project-based），在 Finder 中直接拷入文件不会自动出现在工程中；必须拖入 Xcode 并勾选 `Add to targets` 与 `Copy items if needed`。
-2. **多 Target 体系**：一个 Xcode Project 可挂载多个 Target（主 App、Widget 小组件、Notification Extension、测试 Target），类似 Android 的多 Module。
-3. **现代依赖管理**：现代 iOS 优先使用 Xcode 内置的 Swift Package Manager (SPM)，通过 GitHub URL 直接添加依赖，无需再维护第三方 CocoaPods 与 `pod install`。
-4. **权限必填描述**：所有敏感权限（相机、相册、定位、通知等）必须在 `Info.plist` 中配置明确的 Privacy Usage Description（如 `NSCameraUsageDescription`），否则调用时系统会**直接崩溃闪退**。
+1. **依赖管理（SPM vs CocoaPods）**：现代 iOS 优先使用 Xcode 原生内置的 **Swift Package Manager (SPM)**（直接在 Xcode 粘贴 GitHub 仓库 URL，免装命令行与 Ruby 环境）；若维护包含 CocoaPods (`Podfile`) 的老项目，运行 `pod install` 后**必须打开白色图标的 `.xcworkspace`**，切勿打开蓝色 `.xcodeproj`，否则会报找不到依赖库的编译错误！
+2. **Gradle DSL 语法说明**：Android 老项目常见 `build.gradle` (Groovy 语法)，现代新项目默认采用 `build.gradle.kts` (Kotlin DSL，具代码补全与强类型检查)，其 `dependencies { ... }` 对应 iOS 的 SPM Package 依赖声明。
+3. **文件索引机制**：Xcode 是**索引制**（Project-based），在 Finder 中直接拷入文件不会自动出现在工程中；必须拖入 Xcode 并勾选 `Add to targets` 与 `Copy items if needed`。
+4. **多 Target 体系**：一个 Xcode Project 可挂载多个 Target（主 App、Widget 小组件、Notification Extension、测试 Target），类似 Android 根工程下的多 Module。
+5. **权限必填描述**：所有敏感权限（相机、相册、定位、通知等）必须在 `Info.plist` 中配置明确的 Privacy Usage Description（如 `NSCameraUsageDescription`），否则调用时系统会**直接崩溃闪退**。
 
 **练手实战任务：** 在 Xcode 中新建一个 SwiftUI App 工程，观察 Target 设置与 Signing 签名，体验 SPM 引入一个开源库（如 Alamofire），并将代码 Run 到 iOS 模拟器。
 
