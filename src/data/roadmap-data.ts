@@ -69,21 +69,47 @@ export const stages: LearningStage[] = [
     practiceKey: 'stage.lifecycle.practice',
     extraHintKey: 'stage.lifecycle.hint',
     rows: [
-      // 传统时代对照 (Imperative UI)
-      { id: 'app_trad', android: 'Application (传统)', ios: 'UIApplicationDelegate (UIKit)' },
-      { id: 'activity_trad', android: 'Activity (传统控制器)', ios: 'UIViewController (UIKit)' },
-      { id: 'fragment_trad', android: 'Fragment (子页面)', ios: 'Child UIViewController (UIKit)' },
+      // 保持全量 rows 兼容
+      { id: 'app_trad', android: 'Application (全局应用)', ios: 'UIApplicationDelegate / AppDelegate' },
+      { id: 'activity_trad', android: 'Activity (页面控制器)', ios: 'UIViewController' },
+      { id: 'fragment_trad', android: 'Fragment (子页面)', ios: 'Child UIViewController' },
       { id: 'create_trad', android: 'onCreate / setContentView', ios: 'viewDidLoad / loadView' },
       { id: 'resume_trad', android: 'onStart / onResume', ios: 'viewWillAppear / viewDidAppear' },
       { id: 'pause_trad', android: 'onPause / onStop', ios: 'viewWillDisappear / viewDidDisappear' },
       { id: 'destroy_trad', android: 'onDestroy', ios: 'deinit' },
-      // 现代声明式时代对照 (Compose ↔ SwiftUI)
       { id: 'app_mod', android: 'Single Activity + setContent', ios: '@main struct App: App (WindowGroup)' },
       { id: 'view_mod', android: '@Composable fun Screen() (函数)', ios: 'struct ScreenView: View (值类型结构体)' },
       { id: 'task_mod', android: 'LaunchedEffect (挂载异步协程)', ios: '.task { } (进入启动，离开自动取消)' },
       { id: 'appear_mod', android: 'DisposableEffect / onDispose', ios: '.onAppear / .onDisappear' },
       { id: 'phase_mod', android: 'LifecycleEventObserver (前后台)', ios: '@Environment(\\.scenePhase) (active/background)' },
       { id: 'vm_mod', android: 'ViewModel (onCleared)', ios: '@Observable class ViewModel (deinit)' },
+    ],
+    sections: [
+      {
+        id: 'imperative',
+        titleKey: 'stage.lifecycle.sec.imperative',
+        rows: [
+          { id: 'app_trad', android: 'Application (全局应用)', ios: 'UIApplicationDelegate / AppDelegate' },
+          { id: 'activity_trad', android: 'Activity (页面控制器)', ios: 'UIViewController' },
+          { id: 'fragment_trad', android: 'Fragment (子页面)', ios: 'Child UIViewController' },
+          { id: 'create_trad', android: 'onCreate() / setContentView()', ios: 'viewDidLoad() / loadView()' },
+          { id: 'resume_trad', android: 'onStart() ➔ onResume()', ios: 'viewWillAppear() ➔ viewDidAppear()' },
+          { id: 'pause_trad', android: 'onPause() ➔ onStop()', ios: 'viewWillDisappear() ➔ viewDidDisappear()' },
+          { id: 'destroy_trad', android: 'onDestroy()', ios: 'deinit' },
+        ],
+      },
+      {
+        id: 'declarative',
+        titleKey: 'stage.lifecycle.sec.declarative',
+        rows: [
+          { id: 'app_mod', android: 'Single Activity + setContent', ios: '@main struct App: App (WindowGroup)' },
+          { id: 'view_mod', android: '@Composable fun Screen() (函数)', ios: 'struct ScreenView: View (值类型结构体)' },
+          { id: 'task_mod', android: 'LaunchedEffect (挂载异步协程)', ios: '.task { } (进入启动，离开自动取消)' },
+          { id: 'appear_mod', android: 'DisposableEffect / onDispose', ios: '.onAppear / .onDisappear' },
+          { id: 'phase_mod', android: 'LifecycleEventObserver (前后台)', ios: '@Environment(\\.scenePhase) (active/background)' },
+          { id: 'vm_mod', android: 'ViewModel (onCleared)', ios: '@Observable class ViewModel (deinit)' },
+        ],
+      },
     ],
   },
   {

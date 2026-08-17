@@ -5,6 +5,13 @@ export interface ComparisonRow {
   note?: string;
 }
 
+export interface ComparisonSection {
+  id: string;
+  titleKey: string;
+  badgeKey?: string;
+  rows: ComparisonRow[];
+}
+
 export interface LearningStage {
   id: string;
   number: number;
@@ -15,6 +22,7 @@ export interface LearningStage {
   noteKeys: string[];
   practiceKey: string;
   rows: ComparisonRow[];
+  sections?: ComparisonSection[];
   extraHintKey?: string;
 }
 

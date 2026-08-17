@@ -123,7 +123,7 @@ iOS:      protocol Animal { ... } → struct/class Dog: Animal
 
 不要拿 Activity 去硬套 SwiftUI！必须**分代横向对齐**：传统时代对标 UIKit，现代时代对标 Compose。
 
-### 1. 传统时代（命令式 UI）对齐
+### 3.1 模块一：传统时代（命令式 UI：Activity / Fragment ↔ UIKit）
 
 | 职责 / 阶段 | Android (传统 View 体系) | iOS (传统 UIKit 体系) |
 | --- | --- | --- |
@@ -135,7 +135,7 @@ iOS:      protocol Animal { ... } → struct/class Dog: Animal
 | 页面离开/不可见 | `onPause()` ➔ `onStop()` | `viewWillDisappear()` ➔ `viewDidDisappear()` |
 | 销毁与释放 | `onDestroy()` | `deinit` |
 
-### 2. 现代时代（声明式 UI）对齐
+### 3.2 模块二：现代时代（声明式 UI：Jetpack Compose ↔ SwiftUI）
 
 | 职责 / 概念 | Android (Jetpack Compose) | iOS (SwiftUI) |
 | --- | --- | --- |

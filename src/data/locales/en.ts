@@ -214,6 +214,8 @@ export const en: Record<string, string> = {
   "stage.lifecycle.note.2": "Check page visibility via .onAppear / .onDisappear; check app lifecycle via @Environment(\\.scenePhase) (.active/.inactive/.background).",
   "stage.lifecycle.note.3": "Actual business and data lifecycles belong to @Observable ViewModel classes, not UI view tree nodes.",
   "stage.lifecycle.practice": "Use .task to fetch async data, .onAppear/.onDisappear for visibility, and scenePhase for background/foreground. Compare logs with Compose LaunchedEffect/DisposableEffect.",
+  "stage.lifecycle.sec.imperative": "Section 1: Classic Era (Imperative UI: Activity / Fragment ↔ UIKit)",
+  "stage.lifecycle.sec.declarative": "Section 2: Modern Era (Declarative UI: Jetpack Compose ↔ SwiftUI)",
   "stage.lifecycle.title": "Lifecycle (Generational Alignment)",
   "stage.navigation.goal": "Map Navigation Compose to NavigationStack.",
   "stage.navigation.note.0": "Use Hashable routes or NavigationPath for the back stack.",

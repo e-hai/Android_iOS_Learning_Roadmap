@@ -59,18 +59,35 @@ export function renderStageDetail(
     container.appendChild(notesSection);
   }
 
-  // Comparison Table Section
-  const tableSection = document.createElement('div');
-  tableSection.innerHTML = `
-    <div class="section-header">
-      <div class="section-header-bar ios-bar"></div>
-      <span class="section-header-title">${i18n.t('detail.section.comparison')}</span>
-    </div>
-  `;
-  tableSection.appendChild(
-    renderComparisonTable(stage.rows, i18n.t('detail.col.android'), i18n.t('detail.col.ios'))
-  );
-  container.appendChild(tableSection);
+  // Comparison Table Sections
+  if (stage.sections && stage.sections.length > 0) {
+    stage.sections.forEach((section, idx) => {
+      const sectionContainer = document.createElement('div');
+      sectionContainer.style.marginBottom = '28px';
+      sectionContainer.innerHTML = `
+        <div class="section-header" style="margin-top:${idx === 0 ? '16px' : '28px'};">
+          <div class="section-header-bar ${idx === 0 ? '' : 'ios-bar'}"></div>
+          <span class="section-header-title">${i18n.t(section.titleKey)}</span>
+        </div>
+      `;
+      sectionContainer.appendChild(
+        renderComparisonTable(section.rows, i18n.t('detail.col.android'), i18n.t('detail.col.ios'))
+      );
+      container.appendChild(sectionContainer);
+    });
+  } else {
+    const tableSection = document.createElement('div');
+    tableSection.innerHTML = `
+      <div class="section-header">
+        <div class="section-header-bar ios-bar"></div>
+        <span class="section-header-title">${i18n.t('detail.section.comparison')}</span>
+      </div>
+    `;
+    tableSection.appendChild(
+      renderComparisonTable(stage.rows, i18n.t('detail.col.android'), i18n.t('detail.col.ios'))
+    );
+    container.appendChild(tableSection);
+  }
 
   // Extra Hint Section (if any)
   if (stage.extraHintKey) {
