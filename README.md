@@ -86,47 +86,63 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 
 ## ② 语言与类型系统 ★★★★★
 
-先按同一主题顺序过一遍 Kotlin，再对照 Swift。  
-**迁移最大坑：** Swift 以 **值类型（struct）+ ARC** 为主，不是 Java/Kotlin 那套「万物皆引用 + GC」。
+**阶段目标：** 深入掌握 Kotlin ↔ Swift 语法映射，透彻理解 `struct` 值语义、ARC 引用计数弱引用、POP 面向协议编程与 `enum` 关联值。  
+**迁移最大坑：** Swift 以 **值类型（struct）+ ARC** 为主，不是 Java/Kotlin 那套「万物皆引用 + JVM GC」。
 
-| 主题 | Kotlin | Swift |
-| --- | --- | --- |
-| 变量 | `val` / `var` | `let` / `var` |
-| 函数 | `fun` | `func` |
-| 引用类型 | `class` / `object` | `class` / `actor` |
-| 值类型 | `data class`（仍是引用语义的类） | **`struct`（拷贝语义）** |
-| 空安全 | Nullable `?` | Optional `?` / `!` |
-| 集合 | `List` / `Map` / `Set` | `Array` / `Dictionary` / `Set` |
-| 高阶函数 | Lambda | Closure |
-| 扩展 | 扩展函数 | Extension |
-| 泛型 | Generics | Generics |
-| 接口 | `interface` | `protocol` |
-| 密封类型 | `sealed class` | `enum`（可关联值） |
-| 分支 | `when` | `switch`（须穷尽） |
-| 错误 | 异常 / `Result` | `throws` / `Result` |
-| 内存 | GC | **ARC（注意循环引用 / `[weak self]`）** |
+### 模块一：变量、函数与空安全（基础语法）
 
-**面向对象风格差异：**
+| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| --- | --- | --- | --- |
+| 常量与变量 | `val` (只读) / `var` (可变) | `let` (常量绑定) / `var` (可变变量) | 变量可变性控制（Swift 推荐优先使用 `let`） |
+| 函数声明 | `fun foo(x: Int): String` | `func foo(x: Int) -> String` | 函数签名语法与 Swift 外部参数标签支持 |
+| 空安全体系 | Nullable `?` / Elvis `?:` / `!!` | Optional `?` / `??` / `if let` / `guard let` / `!` | 可选类型安全解包（**强烈推崇 `guard let` 卫语句**） |
+| 集合与可变性 | `List` / `MutableList` / `Map` / `Set` | `Array` / `Dictionary` / `Set` | Swift 通过 `let` / `var` 统一控制集合可变性 |
+| 分支模式匹配 | `when (x) { is Int -> ... }` | `switch x { case ... }` | Swift `switch` 必须穷尽匹配，原生支持复杂模式解构 |
 
-| Android 常见写法 | iOS 更常见写法 |
-| --- | --- |
-| 继承 + 抽象类 | Protocol + Extension |
-| `interface` | `protocol` |
-| 类委托 `by` | 无直接等价；组合 / 包装类型 |
-| `object` 单例 | `static` / 共享实例 |
+### 模块二：面向对象与值语义（核心心智差异）
+
+| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| --- | --- | --- | --- |
+| 核心值类型 | `data class`（仍是引用语义/堆分配） | **`struct`（值类型/栈分配/自动深拷贝）** | **Swift 核心基石**：UI State、Model 与 View 全是 struct |
+| 引用与并发类 | `class` / `object` (单例) | `class` (引用类型) / `actor` (并发隔离类) | 跨组件共享可变状态用 class，线程安全状态用 actor |
+| 接口与协议 | `interface` (接口多继承) | `protocol` (面向协议编程 POP) | 协议组合与基于协议的抽象设计 |
+| 扩展能力 | `fun String.foo()` (扩展函数) | `extension String { ... }` | Swift 扩展支持扩展方法、计算属性与协议实现 |
+| 委托机制 | 类委托 `by delegate` | 协议扩展默认实现 / 组合包装 | 优先通过 `protocol extension` 提供默认实现 |
+
+### 模块三：高级类型、枚举与泛型
+
+| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| --- | --- | --- | --- |
+| 密封/代数类型 | `sealed class` / `sealed interface` | **`enum`（支持携带关联值 Associated Values）** | Swift 枚举可为每个 case 携带不同类型元组数据 |
+| 泛型与约束 | `fun <T> foo()` / `out` / `in` 协变逆变 | `<T: Constraint>` / `some View` (不透明) / `any` (存在) | Swift `some` 隐藏具体类型，`any` 运行时装箱 |
+| 属性访问器 | `val prop get() = ...` (自定义 getter) | `var prop: Type { get { ... } }` (计算属性) | 计算属性与只读属性声明语法 |
+| 访问控制 | `private` / `protected` / `internal` / `public` | `private` / `fileprivate` / `internal` / `public` / `open` | Swift 模块内外可见性与可继承权限控制 |
+
+### 模块四：闭包、错误处理与内存模型（避坑重点）
+
+| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| --- | --- | --- | --- |
+| 高阶函数闭包 | Lambda: `{ a -> ... }` (尾随闭包) | Closure: `{ a in ... }` (尾随闭包 / `$0` 简写) | Swift 闭包语法与参数隐式简写 |
+| 错误处理 | `try-catch` / `runCatching` / `Result` | `do-try-catch` / `throws` / `try?` / `Result<T, Error>` | Swift 显式错误抛出与 `try?` 可选值转换 |
+| 内存管理 | JVM GC (垃圾回收器，无强引用循环断裂) | **ARC (自动引用计数，闭包必须 `[weak self]`)** | **最大内存泄漏坑**：循环引用与弱引用破环 |
+
+**语言特性与心智体系全景对照：**
 
 ```
-Android:  open class Animal → class Dog : Animal()
-iOS:      protocol Animal { ... } → struct/class Dog: Animal
+【数据模型】Kotlin: data class User(...) (引用语义) ↔ Swift: struct User(...) (值类型/自动深拷贝)
+【多态机制】Kotlin: open class Base → class Child : Base() ↔ Swift: protocol Identifiable → extension Identifiable
+【状态枚举】Kotlin: sealed class UiState ↔ Swift: enum UiState { case loading, success(Data), error(Error) }
+【内存回收】Kotlin: JVM GC (无循环引用强断裂) ↔ Swift: ARC (闭包必须 [weak self] 避免循环引用)
 ```
 
-**迁移注意**
+**迁移避坑指南：**
+1. **值类型主导 vs 引用类型**：Swift 中 `struct` 是第一等公民（UI State、数据模型、SwiftUI View 均为 struct），传参与赋值为自动深拷贝，天生线程安全；只有需要跨组件共享可变状态时才使用 `class`。
+2. **ARC 内存管理与闭包循环引用**：Swift 采用自动引用计数 (ARC) 而非 JVM GC！当闭包持有 `self` 且 `self` 也持有该闭包时，必须使用 `[weak self]` 弱引用打破循环引用，否则将导致严重内存泄漏。
+3. **Optional 可空性最佳实践**：优先使用 `guard let ... else { return }` 卫语句提前返回，或 `if let` 可选绑定；严禁在生产代码滥用强行解包运算符 `!`。
+4. **面向协议编程 (POP) vs 类继承**：Android 习惯用抽象基类继承；iOS 体系强烈推崇 `protocol` + `extension` 默认实现，通过协议拼装与组合实现多态与解耦。
+5. **强大的 Enum 关联值**：Swift 的 `enum` 支持为每个分支绑定不同类型的关联值 (Associated Values)，能原生替代 Kotlin 中绝大多数 `sealed class` 状态机建模场景。
 
-- 优先用 `struct` 建模 UI State / Model；需要共享可变状态再用 `class` / `@Observable`
-- 闭包捕获 `self` 时警惕循环引用
-- `enum` 关联值 ≈ 很多 `sealed class` 场景
-
-**练手：** 用 Swift 写一套 User / Result / Repository 协议，刻意对比 `struct` 与 `class` 的拷贝行为。
+**练手实战任务：** 用 Swift 实现一套带关联值的 Result 枚举与 User Model（对比 struct 与 class 拷贝行为），定义一个 Repository 协议并用 extension 提供默认实现，最后在异步闭包中使用 `[weak self]` 模拟网络回调解包数据。
 
 ---
 
