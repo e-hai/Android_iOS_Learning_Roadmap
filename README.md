@@ -119,31 +119,52 @@ iOS:      protocol Animal { ... } → struct/class Dog: Animal
 
 ---
 
-## ③ 生命周期 ★★★★★
+## ③ 生命周期（分代横向对齐）★★★★★
 
-Android 生命周期更细；SwiftUI 没有同等粒度的 `onStart` / `onResume` 拆分，多用 **`onAppear` / `onDisappear` + `scenePhase`**。
+不要拿 Activity 去硬套 SwiftUI！必须**分代横向对齐**：传统时代对标 UIKit，现代时代对标 Compose。
 
-| Android | iOS（更贴近的理解） |
-| --- | --- |
-| Application | `@main` App |
-| Activity | Scene + 根 View（不是简单等于 Window） |
-| Fragment | Navigation 中的一页 View |
-| View | View |
-| `onCreate` | `init` / 首次 `onAppear` |
-| `onStart` / `onResume` | `onAppear` + `scenePhase == .active` |
-| `onPause` / `onStop` | `onDisappear` + `scenePhase`（`.inactive` / `.background`） |
-| `onDestroy` | `deinit`（仅 class；struct View 无此概念） |
+### 1. 传统时代（命令式 UI）对齐
 
-层级对照：
+| 职责 / 阶段 | Android (传统 View 体系) | iOS (传统 UIKit 体系) |
+| --- | --- | --- |
+| 全局应用 | `Application` | `UIApplicationDelegate` / `AppDelegate` |
+| 页面级控制器 | **`Activity`** | **`UIViewController`** |
+| 子页面/片段 | **`Fragment`** | **`Child UIViewController`** |
+| 视图初始化 | `onCreate()` / `setContentView()` | `viewDidLoad()` / `loadView()` |
+| 页面即将/已经可见 | `onStart()` ➔ `onResume()` | `viewWillAppear()` ➔ `viewDidAppear()` |
+| 页面离开/不可见 | `onPause()` ➔ `onStop()` | `viewWillDisappear()` ➔ `viewDidDisappear()` |
+| 销毁与释放 | `onDestroy()` | `deinit` |
+
+### 2. 现代时代（声明式 UI）对齐
+
+| 职责 / 概念 | Android (Jetpack Compose) | iOS (SwiftUI) |
+| --- | --- | --- |
+| 应用根入口 | `Single Activity` + `setContent { App() }` | `@main struct App: App` (`WindowGroup`) |
+| UI 基本单元 | **`@Composable fun Screen()`**（函数） | **`struct ScreenView: View`**（值类型结构体） |
+| 挂载异步任务 | `LaunchedEffect(key) { ... }` | **`.task { ... }`**（进入启动协程，离开自动取消） |
+| 视图出现 / 消失 | `DisposableEffect` 的 `onDispose` | **`.onAppear { }`** / **`.onDisappear { }`** |
+| 系统前后台状态 | `LifecycleEventObserver` (ON_RESUME / ON_PAUSE) | **`@Environment(\.scenePhase)`** (`.active` / `.background`) |
+| 业务状态持有者 | `ViewModel` (`onCleared`) | **`@Observable class ViewModel`** (`deinit`) |
+
+**代际与层级对照：**
 
 ```
+【传统命令式】
 Android: Application → Activity → Fragment → View
-iOS:     App → Scene → View 层级（Window 由系统管理）
+iOS:     UIApplication → UIWindow → UIViewController → UIView
+
+【现代声明式】
+Android: Single Activity → Compose @Composable 函数
+iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 ```
 
-**迁移注意：** 不要把 Activity 回调一对一硬套到 SwiftUI；先问「页面可见？App 前后台？」再选 `onAppear` 或 `scenePhase`。
+**迁移注意：**
+- **分代对齐**：Activity 对应的是传统 UIKit 的 UIViewController，绝不要拿 Activity 概念硬套 SwiftUI View！
+- SwiftUI `View` 是短命结构体（如 Compose 函数），没有 `onCreate` 回调；进入异步任务用 `.task`，离开自动取消。
+- 页面可见性看 `.onAppear` / `.onDisappear`；系统前后台看 `@Environment(\.scenePhase)`。
+- 真正的业务与数据生命周期属于 `@Observable ViewModel` 类，而不是依附在 UI 视图树上。
 
-**练手：** 打印 `onAppear` / `onDisappear` / `scenePhase`，对比 Activity 日志，建立体感。
+**练手：** 分别用 `.task` 加载异步数据、用 `.onAppear/.onDisappear` 监听视图出现、用 `scenePhase` 监听应用切前后台，对比 Compose 的 `LaunchedEffect` / `DisposableEffect` 日志。
 
 ---
 
