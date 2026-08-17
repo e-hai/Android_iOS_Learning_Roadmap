@@ -4,102 +4,121 @@ import { i18n } from '../services/i18n';
  * Stage-specific Unicode Box-drawing architecture and hierarchy diagrams.
  */
 const DIAGRAMS: Record<string, string> = {
-  env: `┌──────────────────────────────────────────────┐       ┌──────────────────────────────────────────────┐
-│ 🤖 Android (Gradle 多模块工程)                │       │ 🍎 iOS (Xcode Project / Target 体系)         │
-├──────────────────────────────────────────────┤  映射  ├──────────────────────────────────────────────┤
-│ 📁 Root Project/                             │ ◄───► │ 📁 MyApp.xcodeproj / .xcworkspace           │
-│  ├── ⚙️ settings.gradle.kts (模块清单声明)    │       │  ├── 📦 Package.swift / SPM (原生依赖管理)   │
-│  └── 📁 app/ (主 Application 模块)           │       │  └── 🎯 MyApp Target (主构建产物目标)        │
-│       ├── 📜 build.gradle.kts (依赖与编译)    │       │       ├── 🚀 @main App.swift (程序声明入口)   │
-│       ├── 📄 AndroidManifest.xml (组件清单)   │       │       ├── ⚙️ Info.plist (系统权限与配置)      │
-│       ├── 📁 res/ (drawable, values)         │       │       ├── 🎨 Assets.xcassets (矢量图与色板)   │
-│       └── 📁 kotlin/ (业务源码)              │       │       └── 📁 Preview Content/ (SwiftUI 预览)  │
-└──────────────────────────────────────────────┘       └──────────────────────────────────────────────┘`,
+  env: `[ Android: Gradle 多模块工程 ]
+ Root Project/
+  |-- settings.gradle.kts      (模块清单声明)
+  \\-- app/                     (主 Application 模块)
+       |-- build.gradle.kts    (依赖与编译配置)
+       |-- AndroidManifest.xml (组件清单与权限)
+       |-- res/                (资源目录: drawable/values)
+       \\-- kotlin/             (业务源码)
 
-  language: `┌─────────────────────────────┬───────────────────────────────────┬────────────────────────────────────┐
-│ 核心维度                    │ 🤖 Kotlin (Android)               │ 🍎 Swift (iOS)                     │
-├─────────────────────────────┼───────────────────────────────────┼────────────────────────────────────┤
-│ 1. 数据模型与内存语义        │ data class User(...) [引用类型]   │ struct User(...) [值类型 · 深拷贝] │
-│ 2. 抽象与多态机制            │ open class Base ➔ Child [单继承]  │ protocol + extension [面向协议 POP]│
-│ 3. 状态机与枚举建模          │ sealed class UiState [密封类分层] │ enum UiState { case ... } [关联值] │
-│ 4. 内存回收与闭包防漏        │ JVM GC [垃圾收集器自动回收]       │ ARC [引用计数 · 闭包须 weak self]  │
-└─────────────────────────────┴───────────────────────────────────┴────────────────────────────────────┘`,
+[ iOS: Xcode Workspace / Target 体系 ]
+ MyApp.xcodeproj / .xcworkspace (工程文件)
+  |-- Package.swift / SPM      (原生依赖管理)
+  \\-- MyApp Target             (主构建产物目标)
+       |-- App.swift           (@main 程序声明入口)
+       |-- Info.plist          (系统权限与配置)
+       |-- Assets.xcassets     (矢量图与色彩集)
+       \\-- Preview Content/    (SwiftUI 预览数据)`,
 
-  lifecycle: `【传统时代 · 命令式 UI 体系】
- 🤖 Android: Application ──▶ Activity ──▶ Fragment ──▶ View
- 🍎 iOS:     UIApplication ──▶ UIWindow ──▶ UIViewController ──▶ UIView
-                     ▲                             ▲
-                     └────── 页面级生命周期容器 ───┘
+  language: `[ 语言基础与心智模型对照 ]
 
-【现代时代 · 声明式 UI 体系】
- 🤖 Android: Single Activity ──▶ @Composable fun Screen() ──▶ LaunchedEffect / onDispose
- 🍎 iOS:     @main App ──▶ WindowGroup (Scene) ──▶ SwiftUI struct View (.task / .onAppear)`,
+1. 数据模型与内存语义
+   Android: data class User(...)  [引用类型 / 指针传递]
+   iOS:     struct User(...)      [值类型 / 自动深拷贝 / 线程安全]
 
-  ui: `【1. 核心容器映射】
- ┌─────────────────┬─────────────────┬───────────────────────────────────────────┐
- │ 维度            │ 🤖 Compose      │ 🍎 SwiftUI                                │
- ├─────────────────┼─────────────────┼───────────────────────────────────────────┤
- │ 一维线性        │ Column / Row    │ VStack / HStack                           │
- │ 二维层叠        │ Box             │ ZStack                                    │
- │ 惰性复用列表    │ LazyColumn      │ List (系统样式) / LazyVStack (自定义瀑布流)│
- │ 惰性复用网格    │ LazyVerticalGrid│ LazyVGrid(columns:)                       │
- └─────────────────┴─────────────────┴───────────────────────────────────────────┘
+2. 抽象与多态机制
+   Android: open class Base -> Child  [单根基类继承 OOP]
+   iOS:     protocol + extension      [面向协议组合 POP]
 
-【2. Modifier 逐层包装机制 (洋葱模型)】
+3. 状态机与枚举建模
+   Android: sealed class UiState      [密封类分层继承]
+   iOS:     enum UiState { case ... } [带关联值枚举]
+
+4. 内存回收模型
+   Android: JVM GC                    [垃圾收集器后台自动回收]
+   iOS:     ARC                       [引用计数即时释放 / 闭包须 weak self]`,
+
+  lifecycle: `[ 传统时代: 命令式 UI 体系 ]
+ Android: Application -> Activity -> Fragment -> View
+ iOS:     UIApplication -> UIWindow -> UIViewController -> UIView
+                             ^
+                             |-- 页面级生命周期容器
+
+[ 现代时代: 声明式 UI 体系 ]
+ Android: Single Activity -> Compose @Composable 函数 -> LaunchedEffect / onDispose
+ iOS:     @main App       -> WindowGroup (Scene)       -> SwiftUI struct View (.task / .onAppear)`,
+
+  ui: `[ 1. 核心容器对照 ]
+ 一维线性排列:  Column / Row     <->  VStack / HStack
+ 二维层叠覆盖:  Box              <->  ZStack
+ 惰性复用列表:  LazyColumn       <->  List (系统样式) / LazyVStack (自定义流)
+ 惰性复用网格:  LazyVerticalGrid <->  LazyVGrid(columns:)
+
+[ 2. Modifier 逐层包装机制 (洋葱模型) ]
  Text("Hello")
-   │
-   ├──▶ .padding(16)        ──▶ [生成外层 PaddingView]
-   ├──▶ .background(.blue)  ──▶ [生成更外层 BackgroundView]
-   └──▶ .cornerRadius(8)    ──▶ [生成最外层 ClipShapeView]
-   (注：从上至下依次向外嵌套，顺序不同视觉结果截然不同！)`,
+   |-- .padding(16)        -> [包装外层 PaddingView]
+   |-- .background(.blue)  -> [包装更外层 BackgroundView]
+   \\-- .cornerRadius(8)    -> [包装最外层 ClipShapeView]
+ (注: 从上至下依次向外嵌套，修饰符顺序不同会导致截然不同的视觉结果)`,
 
-  state: `【声明式 UI 单向数据流向图】
+  state: `[ 声明式 UI 状态与数据流向 ]
 
- 🤖 Android (Compose):
-   remember / mutableStateOf ──▶ StateFlow (ViewModel) ──▶ collectAsState() ──▶ UI 触发重组
-         [ 视图私有状态 ]             [ 业务状态流 ]             [ 状态消费 ]
+ Android (Compose):
+   remember / mutableStateOf -> StateFlow (ViewModel) -> collectAsState() -> UI 重组刷新
+         [ 视图私有状态 ]              [ 业务状态流 ]             [ 状态消费 ]
 
- 🍎 iOS (SwiftUI):
-   @State / @Binding ─────────▶ @Observable (@MainActor) ──▶ @Environment ────▶ 自动按需刷新
-      [ 私有与双向指针 ]            [ 业务数据模型 ]             [ 全局依赖注入 ]`,
+ iOS (SwiftUI):
+   @State / @Binding         -> @Observable Class     -> @Environment     -> 自动按需刷新
+      [ 私有与双向指针 ]            [ 业务数据模型 ]           [ 全局环境注入 ]`,
 
-  async: `【并发与异步演进路线】
+  async: `[ 异步与并发演进路线 ]
 
- 🤖 Android:  Thread ──▶ Coroutine (launch/async) ──▶ Flow (冷流) ──▶ Channel (热流) ──▶ Mutex (互斥锁)
- 🍎 iOS:      Thread ──▶ Task (async/await)      ──▶ AsyncSequence ──▶ AsyncStream  ──▶ actor (线程隔离)`,
+ Android: Thread -> Coroutine (launch/async) -> Flow (冷流) -> Channel (热流) -> Mutex (互斥锁)
+ iOS:     Thread -> Task (async/await)      -> AsyncSequence -> AsyncStream  -> actor (编译器隔离)`,
 
-  storage: `【存储场景分级金字塔】
+  storage: `[ 本地存储场景与安全分级 ]
 
- ┌───────────────────────────────────┬──────────────────────────────────┬─────────────────────────────────┐
- │ 存储层级 / 安全场景               │ 🤖 Android                       │ 🍎 iOS                          │
- ├───────────────────────────────────┼──────────────────────────────────┼─────────────────────────────────┤
- │ 🟢 层级 1：轻量键值与用户偏好     │ SharedPreferences / DataStore    │ UserDefaults / @AppStorage      │
- │ 🔐 层级 2：敏感 Token / 密码凭据  │ EncryptedPrefs / AndroidKeyStore │ Keychain (硬件加密安全芯片)     │
- │ 🗄️ 层级 3：结构化数据与本地数据库 │ Room (SQLite ORM)                │ SwiftData (宏 ORM) / GRDB       │
- └───────────────────────────────────┴──────────────────────────────────┴─────────────────────────────────┘`,
+ 1. 轻量键值与用户偏好
+    Android: SharedPreferences / DataStore
+    iOS:     UserDefaults / @AppStorage
 
-  architecture: `【MVVM + Repository 单向数据流全景架构】
+ 2. 敏感凭据与 Token (硬件级加密)
+    Android: EncryptedSharedPreferences / AndroidKeyStore (TEE 安全芯片)
+    iOS:     Keychain Services (Secure Enclave 硬件加密)
 
-   ┌──────────────────────────────────────────────────────────────┐
-   │ 🖥️ UI Layer (视图层)                                         │
-   │    Android: Compose @Composable   │  iOS: SwiftUI View       │
-   └──────────────────────────────┬───────────────────────────────┘
-                                  │ ⬇️ 用户意图 / 操作事件 (User Action)
-   ┌──────────────────────────────▼───────────────────────────────┐
-   │ 🧠 ViewModel Layer (状态与业务层)                            │
-   │    Android: ViewModel + StateFlow │  iOS: @Observable ViewModel
-   └──────────────────────────────┬───────────────────────────────┘
-                                  │ ⬇️ 调用异步数据接口 (suspend / async)
-   ┌──────────────────────────────▼───────────────────────────────┐
-   │ 🏛️ Repository Layer (数据仓储层 · 单向数据源仲裁)             │
-   │    Repository Interface / Protocol (内存缓存策略与数据规整)   │
-   └──────────────┬───────────────────────────────┬───────────────┘
-                  │                               │
-                  ▼ 分发至远端网络                 ▼ 分发至本地存储
-   ┌──────────────────────────────┐ ┌──────────────────────────────┐
-   │ 🌐 Remote Data Source        │ │ 💾 Local Data Source         │
-   │    Retrofit ↔ URLSession     │ │    Room ↔ SwiftData/Keychain │
-   └──────────────────────────────┘ └──────────────────────────────┘`,
+ 3. 结构化数据与关系型数据库
+    Android: Room (SQLite ORM)
+    iOS:     SwiftData (宏声明式 ORM) / GRDB`,
+
+  architecture: `[ MVVM + Repository 单向数据流全景架构 ]
+
+ +----------------------------------------------------------------+
+ | 视图层 (View Layer)                                            |
+ |   Android: Compose @Composable   |  iOS: SwiftUI struct View   |
+ +----------------------------------------------------------------+
+                                |
+                                | 用户意图 / 操作事件 (User Action)
+                                v
+ +----------------------------------------------------------------+
+ | 状态与业务层 (ViewModel Layer)                                 |
+ |   Android: ViewModel + StateFlow |  iOS: @Observable ViewModel |
+ +----------------------------------------------------------------+
+                                |
+                                | 调用异步接口 (suspend / async)
+                                v
+ +----------------------------------------------------------------+
+ | 数据仓储层 (Repository Layer)                                  |
+ |   Repository Interface / Protocol (内存缓存策略与单向数据源仲裁)|
+ +----------------------------------------------------------------+
+                |                               |
+                | 分发至网络接口                 | 分发至本地存储
+                v                               v
+ +------------------------------+ +-------------------------------+
+ | 远端数据源 (Remote API)      | | 本地数据源 (Local Storage)    |
+ |   Retrofit <-> URLSession    | |   Room <-> SwiftData/Keychain |
+ +------------------------------+ +-------------------------------+`,
 };
 
 /**
