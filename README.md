@@ -254,30 +254,76 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ⑤ 状态管理 ★★★★★
+## ⑤ 状态管理与数据流（全场景映射）★★★★★
 
-本质是 **声明式 UI 的状态归属**：谁拥有状态、谁观察、谁双向绑定。
+**阶段目标：** 精准掌握各状态 API 的应用场景：视图私有状态、父子双向绑定、ViewModel 业务模型、场景暂存恢复、磁盘偏好与全局环境。  
+**核心认知：** 声明式 UI 的核心是**状态所有权与单向数据流**：谁拥有真实数据源（Source of Truth），谁向下分发，子组件通过引用或事件反向修改。
 
-| Android (Compose) | iOS (SwiftUI) | 说明 |
-| --- | --- | --- |
-| `remember` + `mutableStateOf` | `@State` | 视图本地状态 |
-| 子组件改父状态 | `@Binding` | 双向绑定向下传 |
-| `rememberSaveable` | `@SceneStorage` | 进程/场景级轻量恢复（≠ 偏好存储） |
-| SharedPreferences 读写 | `@AppStorage` | 键值偏好 |
-| `collectAsState()` | 观察 `@Observable` / 用 `task` 消费 `AsyncSequence` | 把异步数据接到 UI |
-| ViewModel + StateFlow | `@Observable` 类 / `@State` 持有模型 | 页面级状态容器 |
-| 全局依赖 | `@Environment` / `@EnvironmentObject` | 环境注入 |
+### 模块一：组件私有状态与父子联动（局部 UI 交互）
 
-学习路径：
+| 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
+| **视图内部私有状态** | `remember { mutableStateOf(x) }` | `@State private var x` | 仅限本组件内部使用（展开/开关/计数/临时输入） |
+| **父子双向绑定传递** | `(value, onValueChange)` 状态提升 | `@Binding var value` (父传 `$value`) | 向子组件开放读写权限，子组件修改直接作用于父数据源 |
+| **派生计算与缓存** | `remember(key) { derivedStateOf { } }` | 计算属性 `var isReady: Bool { ... }` | 依赖其他状态自动重算，SwiftUI 具备自动依赖追踪 |
+
+### 模块二：业务数据模型与 ViewModel（页面级架构）
+
+| 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
+| **现代响应式 ViewModel** | `class MyVM : ViewModel() + StateFlow` | `@Observable @MainActor class MyVM` | iOS 17+ 宏驱动，页面级复杂业务与异步数据持有者 |
+| **UI 订阅与消费流** | `collectAsStateWithLifecycle()` | 直接访问属性 / `@Bindable var vm = vm` | 属性级精准追踪，仅读取的字段变动才触发重绘 |
+| **老架构兼容对照** | `LiveData / ObservableField` | `ObservableObject + @Published + @StateObject` | 维护 iOS 13~16 老工程必备认知 |
+
+### 模块三：持久化偏好、场景恢复与全局环境（系统与持久层）
+
+| 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
+| **场景/多窗口草稿暂存** | `rememberSaveable { mutableStateOf(...) }` | `@SceneStorage("draft_id")` | 屏幕旋转/切后台暂存恢复（退出应用可能重置） |
+| **磁盘持久化用户偏好** | `DataStore (Flow) / SharedPreferences` | `@AppStorage("setting_key")` | 直接绑定系统 `UserDefaults`，App 重启仍保留 |
+| **树级全局环境注入** | `CompositionLocalProvider / LocalContext` | `@Environment(\.colorScheme) / @Environment(User.self)` | 无需层层传递 Props，深层子组件直接获取环境属性 |
+
+**状态管理 API 核心应用场景选型矩阵：**
 
 ```
-Android: remember → mutableStateOf → StateFlow → ViewModel
-iOS:     @State → @Binding → @Observable → @Environment
+[ 状态管理 API 核心应用场景选型矩阵 ]
+
+ 1. 视图私有状态 (组件内临时变量/展开/计数)
+    Android: remember { mutableStateOf(x) }
+    iOS:     @State private var x
+
+ 2. 父子双向绑定 (向子组件开放数据读写权限)
+    Android: (value, onValueChange) 状态提升下发
+    iOS:     @Binding var value  <-- 父组件传递 $value 引用指针
+
+ 3. 派生状态计算 (基于其他状态自动缓存)
+    Android: remember(key) { derivedStateOf { ... } }
+    iOS:     计算属性 var isReady: Bool { ... } (自动追踪依赖)
+
+ 4. 页面级 ViewModel (跨组件业务模型与状态流)
+    Android: class MyVM : ViewModel() + StateFlow
+    iOS:     @Observable @MainActor class MyVM (iOS 17+ 属性级追踪)
+
+ 5. 场景与进程级暂存恢复 (屏幕旋转/切后台草稿恢复)
+    Android: rememberSaveable { mutableStateOf(...) }
+    iOS:     @SceneStorage("draft_text")
+
+ 6. 磁盘持久化偏好 (App 重启仍保留/设置项)
+    Android: DataStore (Flow) / SharedPreferences
+    iOS:     @AppStorage("is_dark_mode") (UserDefaults)
+
+ 7. 树级全局环境注入 (无需层层传参获取系统属性)
+    Android: CompositionLocalProvider / LocalContext.current
+    iOS:     @Environment(\.colorScheme) / @Environment(UserSession.self)
 ```
 
-**迁移注意：** `@AppStorage` 不是 `rememberSaveable`；`@Bindable` 也不是 `collectAsState`。
+**迁移避坑指南：**
+1. **状态作用域选型黄金法则**：视图内部私有用 `@State`；子组件读写父状态用 `@Binding`；页面级复杂业务进 `@Observable ViewModel`；跨多层级全局配置用 `@Environment`。
+2. **@AppStorage vs @SceneStorage 本质区别**：`@AppStorage` 是磁盘持久化（底层 `UserDefaults`，App 重启保留，适合设置项）；`@SceneStorage` 是场景/窗口级暂存（类似 `rememberSaveable`，退出应用可能丢失）。
+3. **iOS 17 @Observable 革命性升级**：告别繁琐的 `ObservableObject` 与 `@Published`；新标准具备「属性级精准追踪」，仅被 View 实际读取的字段变动才会触发重绘，性能大幅提升。
+4. **@Binding 是双向引用指针**：Compose 习惯状态提升（传入 `value` 与 `onValueChange` 回调）；SwiftUI 传入 `$state` 绑定指针，子组件修改直接同步至父组件数据源。
 
-**练手：** 做一个计数器 + 可编辑文本框，再升级成带 ViewModel 的列表筛选。
+**练手实战任务：** 编写一个用户偏好设置与计数器页面：包含 `@State` 私有计数器、`@Binding` 双向开关子组件、`@AppStorage` 夜间模式持久化，并在 `@Observable` ViewModel 中管理网络用户列表。
 
 ---
 

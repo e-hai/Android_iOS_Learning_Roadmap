@@ -63,15 +63,35 @@ const DIAGRAMS: Record<string, string> = {
    \\-- .cornerRadius(8)    -> [包装最外层 ClipShapeView]
  (注: 从上至下依次向外嵌套，修饰符顺序不同会导致截然不同的视觉结果)`,
 
-  state: `[ 声明式 UI 状态与数据流向 ]
+  state: `[ 状态管理 API 核心应用场景选型矩阵 ]
 
- Android (Compose):
-   remember / mutableStateOf -> StateFlow (ViewModel) -> collectAsState() -> UI 重组刷新
-         [ 视图私有状态 ]              [ 业务状态流 ]             [ 状态消费 ]
+ 1. 视图私有状态 (组件内临时变量/展开/计数)
+    Android: remember { mutableStateOf(x) }
+    iOS:     @State private var x
 
- iOS (SwiftUI):
-   @State / @Binding         -> @Observable Class     -> @Environment     -> 自动按需刷新
-      [ 私有与双向指针 ]            [ 业务数据模型 ]           [ 全局环境注入 ]`,
+ 2. 父子双向绑定 (向子组件开放数据读写权限)
+    Android: (value, onValueChange) 状态提升下发
+    iOS:     @Binding var value  <-- 父组件传递 $value 引用指针
+
+ 3. 派生状态计算 (基于其他状态自动缓存)
+    Android: remember(key) { derivedStateOf { ... } }
+    iOS:     计算属性 var isReady: Bool { ... } (自动追踪依赖)
+
+ 4. 页面级 ViewModel (跨组件业务模型与状态流)
+    Android: class MyVM : ViewModel() + StateFlow
+    iOS:     @Observable @MainActor class MyVM (iOS 17+ 属性级追踪)
+
+ 5. 场景与进程级暂存恢复 (屏幕旋转/切后台草稿恢复)
+    Android: rememberSaveable { mutableStateOf(...) }
+    iOS:     @SceneStorage("draft_text")
+
+ 6. 磁盘持久化偏好 (App 重启仍保留/设置项)
+    Android: DataStore (Flow) / SharedPreferences
+    iOS:     @AppStorage("is_dark_mode") (UserDefaults)
+
+ 7. 树级全局环境注入 (无需层层传参获取系统属性)
+    Android: CompositionLocalProvider / LocalContext.current
+    iOS:     @Environment(\\.colorScheme) / @Environment(UserSession.self)`,
 
   navigation: `[ 现代第三代纯数据驱动路由: Android Nav3 <-> iOS 16+ NavigationStack ]
 
