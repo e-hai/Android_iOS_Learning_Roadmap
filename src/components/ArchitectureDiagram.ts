@@ -73,6 +73,40 @@ const DIAGRAMS: Record<string, string> = {
    @State / @Binding         -> @Observable Class     -> @Environment     -> 自动按需刷新
       [ 私有与双向指针 ]            [ 业务数据模型 ]           [ 全局环境注入 ]`,
 
+  navigation: `[ 现代第三代纯数据驱动路由: Android Nav3 <-> iOS 16+ NavigationStack ]
+
+ 1. 路由节点定义 (强类型模型):
+    Android: @Serializable data class DetailRoute(val id: String)
+    iOS:     enum AppRoute: Hashable { case detail(id: String) }
+
+ 2. 状态栈管理 (纯 List 数据源):
+    Android (Nav3):  val backStack = rememberNavBackStack(HomeRoute)
+    iOS (SwiftUI):   @State var path: [AppRoute] = []
+
+ 3. 核心栈操作映射 (压栈 / 出栈 / 回首页):
+    跳转压栈:   backStack.add(DetailRoute("101"))   <->  path.append(.detail("101"))
+    返回出栈:   backStack.pop()                     <->  path.removeLast()
+    一键回首页: backStack.clear()                   <->  path.removeAll()
+
+ 4. 路由呈现容器:
+    Android (Nav3):
+      NavDisplay(backStack) { route ->
+          when (route) {
+              is HomeRoute   -> HomeScreen(...)
+              is DetailRoute -> DetailScreen(route.id)
+          }
+      }
+
+    iOS (SwiftUI):
+      NavigationStack(path: $path) {
+          HomeView()
+              .navigationDestination(for: AppRoute.self) { route in
+                  switch route {
+                  case .detail(let id): DetailView(id: id)
+                  }
+              }
+      }`,
+
   async: `[ 异步与并发演进路线 ]
 
  Android: Thread -> Coroutine (launch/async) -> Flow (冷流) -> Channel (热流) -> Mutex (互斥锁)

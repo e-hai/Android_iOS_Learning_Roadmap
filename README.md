@@ -281,19 +281,78 @@ iOS:     @State → @Binding → @Observable → @Environment
 
 ---
 
-## ⑥ 页面导航 ★★★★☆
+## ⑥ 页面导航与路由（Nav3 & NavigationStack）★★★★☆
 
-| Android | iOS |
-| --- | --- |
-| Navigation Compose | NavigationStack |
-| NavHost | NavigationStack 的根 |
-| NavController / 路由 | NavigationPath / 可 Hashable 路由 |
-| `navigate()` | `path.append()` |
-| `popBackStack()` | `path.removeLast()` |
-| 参数传递 | 路由关联值 / 初始化参数 |
-| BottomNav | `TabView` |
+**阶段目标：** 掌握现代第三代「数据驱动/状态列表」路由架构（Android Nav3 / 2.8+ 强类型 ↔ iOS 16+ NavigationStack），并理解两端历史演进与向后兼容。  
+**核心认知：** 两端现代路由的本质都是**「可观察的状态列表」**；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串拼接与视图级强绑定。
 
-**练手：** 列表 → 详情 → 返回，带一个简单参数。
+### 模块一：第三代标准（现代数据驱动 · 核心心智 · 重点）
+
+| 导航操作 / 维度 | Android (Nav3 / 2.8+ 强类型) | iOS (SwiftUI 16+ NavigationStack) | 核心特性说明 |
+| --- | --- | --- | --- |
+| **状态栈数据源** | `val backStack = rememberNavBackStack()` (Nav3) | `@State var path: [AppRoute] = []` | 纯状态驱动（数组列表） |
+| **强类型路由节点** | `@Serializable data class Detail(val id: String)` | `enum AppRoute: Hashable { case detail(id: String) }` | 编译期强类型，告别字符串拼写错误 |
+| **页面跳转 (压栈)** | `backStack.add(Detail(...))` / `navigate(Detail)` | `path.append(.detail(...))` | 状态驱动压入目标路由 |
+| **页面返回 (出栈)** | `backStack.pop()` / `popBackStack()` | `path.removeLast()` | 弹出顶层路由返回上一级 |
+| **一键回首页** | `backStack.clear()` / `popBackStack(Home, false)` | `path.removeAll()` | **Pop to Root** 一键清栈回首页 |
+| **路由呈现容器** | `NavDisplay(backStack) { route -> when(route) }` | `NavigationStack(path: $path) + .navigationDestination` | 惰性解耦构建目标 View |
+| **大屏/分屏支持** | `NavDisplay` (多窗分栏支持) | `NavigationSplitView(sidebar:detail:)` | iPad / 折叠屏双栏分栏 |
+| **底部导航选项卡** | `NavigationBar + NavDisplay` | `TabView(selection: $tab)` | 根级多分支页面容器 |
+
+### 模块二：第一二代演进与跨版本兼容（避坑与老项目）
+
+| 演进代际 | Android (Jetpack Compose) | iOS (SwiftUI) | 核心缺陷与兼容方案 |
+| --- | --- | --- | --- |
+| **第一代 (早期探索)** | URL 字符串模板 `composable("detail/{id}")` | `NavigationView` + 嵌套 `NavigationLink(destination:)` | 缺陷：无强类型 / 子 View 提前初始化引发内存灾难 |
+| **第二代 (过渡演进)** | Navigation Compose 2.8+ (Kotlinx Serialization 强类型) | `NavigationStack` (iOS 16+ 引入) | 解决：全类型安全路由与惰性构建 |
+| **第三代 (现代标准)** | **Nav3 (纯 Compose 状态驱动)** | **`NavigationStack(path:)` (纯数据栈驱动)** | 终极：两端心智完全统一，状态列表即路由栈 |
+| **跨版本兼容方案** | 生产首选 `Navigation 2.8+` 官方库；KMP 跨平台选 `Voyager` | iOS 14/15 推荐开源库 **`NavigationStackBackport`** | 零重构成本抹平低版本 API 差异 |
+
+**现代第三代纯数据驱动路由架构：**
+
+```
+[ 现代第三代纯数据驱动路由: Android Nav3 <-> iOS 16+ NavigationStack ]
+
+ 1. 路由节点定义 (强类型模型):
+    Android: @Serializable data class DetailRoute(val id: String)
+    iOS:     enum AppRoute: Hashable { case detail(id: String) }
+
+ 2. 状态栈管理 (纯 List 数据源):
+    Android (Nav3):  val backStack = rememberNavBackStack(HomeRoute)
+    iOS (SwiftUI):   @State var path: [AppRoute] = []
+
+ 3. 核心栈操作映射 (压栈 / 出栈 / 回首页):
+    跳转压栈:   backStack.add(DetailRoute("101"))   <->  path.append(.detail("101"))
+    返回出栈:   backStack.pop()                     <->  path.removeLast()
+    一键回首页: backStack.clear()                   <->  path.removeAll()
+
+ 4. 路由呈现容器:
+    Android (Nav3):
+      NavDisplay(backStack) { route ->
+          when (route) {
+              is HomeRoute   -> HomeScreen(...)
+              is DetailRoute -> DetailScreen(route.id)
+          }
+      }
+
+    iOS (SwiftUI):
+      NavigationStack(path: $path) {
+          HomeView()
+              .navigationDestination(for: AppRoute.self) { route in
+                  switch route {
+                  case .detail(let id): DetailView(id: id)
+                  }
+              }
+      }
+```
+
+**迁移避坑指南：**
+1. **第三代核心心智（纯数据驱动）**：两端现代路由本质都是「可观察的状态列表」；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串与视图级嵌套。
+2. **SwiftUI 早期提前初始化陷阱**：iOS 13~15 的 `NavigationLink(destination:)` 会在列表渲染时提前初始化所有目标 View；必须升级至 iOS 16+ `NavigationStack` 或使用 `NavigationStackBackport` 避免性能灾难。
+3. **Android 路由演进路径**：老项目为字符串匹配；主流为 Navigation 2.8+ 官方 Kotlinx Serialization 强类型；下一代为纯 Compose 状态驱动的 **Nav3**。
+4. **平板与分屏适配**：单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
+
+**练手实战任务：** 定义强类型路由枚举/对象，使用 `NavigationStack(path:)` 与 `NavDisplay/NavHost` 实现「列表压栈跳转 ➔ 详情参数读取 ➔ 一键回首页 (Pop to Root)」完整闭环。
 
 ---
 
