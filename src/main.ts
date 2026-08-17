@@ -1,7 +1,6 @@
 import './styles/theme.css';
 import './styles/layout.css';
 import './styles/components.css';
-import './styles/focus-card.css';
 import './styles/search.css';
 
 import { stages } from './data/roadmap-data';
@@ -10,13 +9,11 @@ import { renderHeader } from './components/Header';
 import { renderSidebar } from './components/Sidebar';
 import { renderHomeView } from './components/HomeView';
 import { renderStageDetail } from './components/StageDetailView';
-import { renderFocusCardModal } from './components/FocusCardModal';
 import { renderGlobalSearch } from './components/GlobalSearch';
 
 class AppController {
   private currentTarget: string = 'home';
   private sidebarOpen = false;
-  private focusModalElement: HTMLElement | null = null;
   private searchModalElement: HTMLElement | null = null;
 
   constructor() {
@@ -48,9 +45,6 @@ class AppController {
     };
 
     window.addEventListener('hashchange', () => {
-      // If modal is open, don't flash background re-render on hashchange
-      if (this.focusModalElement) return;
-
       parseHash();
       this.closeSidebar();
       this.render();
@@ -82,12 +76,6 @@ class AppController {
         e.preventDefault();
         this.openSearchModal();
       }
-      // ⌘L or Ctrl+L for Focus Card
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
-        const stageId = this.currentTarget === 'home' ? (stages[0]?.id || 'env') : this.currentTarget;
-        this.openFocusModal(stageId);
-      }
       // ⌘D or Ctrl+D for Cockpit Overview
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
@@ -110,56 +98,6 @@ class AppController {
     const backdrop = document.getElementById('sidebar-backdrop');
     if (sidebar) sidebar.classList.remove('open');
     if (backdrop) backdrop.classList.remove('open');
-  }
-
-  private openFocusModal(stageId?: string) {
-    // Remove any existing modal without flash
-    document.querySelectorAll('.focus-modal-backdrop, #focus-card-backdrop').forEach((el) => {
-      if (typeof el.remove === 'function') el.remove();
-      else el.parentNode?.removeChild(el);
-    });
-    this.focusModalElement = null;
-
-    const targetStageId = stageId || (this.currentTarget === 'home' ? (stages[0]?.id || 'env') : this.currentTarget);
-    this.focusModalElement = renderFocusCardModal(
-      targetStageId,
-      () => {
-        if (this.focusModalElement) {
-          this.focusModalElement.remove();
-          this.focusModalElement = null;
-        }
-        document.querySelectorAll('.focus-modal-backdrop, #focus-card-backdrop').forEach((el) => {
-          if (typeof el.remove === 'function') el.remove();
-          else el.parentNode?.removeChild(el);
-        });
-        // Sync background content smoothly when modal is closed
-        this.render();
-      },
-      (newStageId) => {
-        this.currentTarget = newStageId;
-        // Use replaceState to update URL bar smoothly without triggering hashchange event or background flash
-        history.replaceState(null, '', '#' + newStageId);
-        this.updateSidebarActive(newStageId);
-      }
-    );
-    document.body.appendChild(this.focusModalElement);
-  }
-
-  private updateSidebarActive(stageId: string) {
-    const sidebar = document.getElementById('app-sidebar');
-    if (!sidebar) return;
-    sidebar.querySelectorAll('.sidebar-item').forEach((item) => {
-      item.classList.remove('active');
-    });
-    // Find the item matching this stage and highlight it
-    const activeIndex = stages.findIndex((s) => s.id === stageId);
-    if (activeIndex !== -1) {
-      const items = sidebar.querySelectorAll('.sidebar-item');
-      // items[0] is home, items[1..] are stages
-      if (items[activeIndex + 1]) {
-        items[activeIndex + 1].classList.add('active');
-      }
-    }
   }
 
   private openSearchModal() {
@@ -202,7 +140,6 @@ class AppController {
     const header = renderHeader(
       () => this.toggleSidebar(),
       () => this.openSearchModal(),
-      () => this.openFocusModal(),
       () => this.navigate('home')
     );
     app.appendChild(header);
@@ -228,10 +165,7 @@ class AppController {
 
     if (this.currentTarget === 'home') {
       content.appendChild(
-        renderHomeView(
-          (id) => this.navigate(id),
-          (id) => this.openFocusModal(id)
-        )
+        renderHomeView((id) => this.navigate(id))
       );
     } else {
       const stage = stages.find((s) => s.id === this.currentTarget);
@@ -241,10 +175,7 @@ class AppController {
         );
       } else {
         content.appendChild(
-          renderHomeView(
-            (id) => this.navigate(id),
-            (id) => this.openFocusModal(id)
-          )
+          renderHomeView((id) => this.navigate(id))
         );
       }
     }

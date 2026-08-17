@@ -3,8 +3,7 @@ import { cheatSheetKeys, practiceWeekKeys, stages } from '../data/roadmap-data';
 import { renderComparisonTable } from './ComparisonTable';
 
 export function renderHomeView(
-  onNavigate: (targetId: string) => void,
-  onOpenFocusMode: (stageId?: string) => void
+  onNavigate: (targetId: string) => void
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = 'content-container';
@@ -26,10 +25,6 @@ export function renderHomeView(
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
         ${i18n.t('home.start')}
       </button>
-      <button class="btn btn-secondary btn-lg" id="home-focus-btn">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
-        ${i18n.t('web.focus_mode')}
-      </button>
     </div>
   `;
   container.appendChild(hero);
@@ -39,13 +34,6 @@ export function renderHomeView(
     e.preventDefault();
     e.stopPropagation();
     onNavigate(stages[0].id);
-  });
-
-  const focusBtn = hero.querySelector('#home-focus-btn') as HTMLButtonElement;
-  focusBtn?.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onOpenFocusMode(stages[0].id);
   });
 
   // How to use / Guide cards

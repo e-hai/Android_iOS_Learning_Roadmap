@@ -3,7 +3,6 @@ import { i18n } from '../services/i18n';
 export function renderHeader(
   onToggleSidebar: () => void,
   onOpenSearch: () => void,
-  onOpenFocusMode: () => void,
   onNavigateHome: () => void
 ): HTMLElement {
   const header = document.createElement('header');
@@ -28,11 +27,6 @@ export function renderHeader(
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <span class="search-trigger-label" style="font-size:12.5px;">${i18n.t('search.placeholder').split('(')[0].trim() || '搜索...'}</span>
         <span class="kbd-shortcut">⌘K</span>
-      </button>
-
-      <button class="btn btn-secondary btn-sm" id="btn-header-focus">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
-        <span>${i18n.t('web.focus_mode')}</span>
       </button>
 
       <button class="btn btn-ghost btn-sm" id="btn-lang-toggle" title="${i18n.t('web.switch_lang')}">
@@ -60,11 +54,6 @@ export function renderHeader(
     e.preventDefault();
     e.stopPropagation();
     onOpenSearch();
-  });
-  header.querySelector('#btn-header-focus')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    onOpenFocusMode();
   });
 
   const langBtn = header.querySelector('#btn-lang-toggle') as HTMLButtonElement;
