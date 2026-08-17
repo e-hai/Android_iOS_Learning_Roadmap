@@ -709,3 +709,532 @@
   }
 }
 
+/* ==========================================================================
+   Architecture & Hierarchy Visual Diagrams
+   ========================================================================== */
+.arch-diagram-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin: 12px 0 24px 0;
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+
+/* Tree Grid for Stage 1 (Env) */
+.diagram-split-grid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 16px;
+  align-items: center;
+}
+
+.diagram-tree-card {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.diagram-tree-card.android-card {
+  border-top: 3px solid var(--color-android);
+}
+
+.diagram-tree-card.ios-card {
+  border-top: 3px solid var(--color-ios);
+}
+
+.diagram-tree-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.diagram-platform-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  text-transform: uppercase;
+}
+.diagram-platform-badge.android {
+  background: var(--color-android-soft);
+  color: var(--color-android);
+}
+.diagram-platform-badge.ios {
+  background: var(--color-ios-soft);
+  color: var(--color-ios);
+}
+
+.diagram-tree-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.diagram-tree-body {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.7;
+}
+
+.tree-node {
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 3px 0;
+}
+.tree-node.root {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.tree-children {
+  padding-left: 14px;
+  border-left: 1px dashed var(--color-border);
+  margin-left: 6px;
+}
+.tree-sub-children {
+  padding-left: 14px;
+  border-left: 1px dashed var(--color-border);
+  margin-left: 6px;
+}
+
+.tree-tag {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--color-ink-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  padding: 0 5px;
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
+.diagram-mapping-divider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.mapping-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  padding: 4px 10px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+/* Matrix Grid for Stage 2 & 9 */
+.diagram-matrix-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.matrix-card {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.matrix-card-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-bottom: 8px;
+}
+
+.matrix-compare-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.matrix-platform {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--color-surface);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.matrix-platform.android {
+  border-left: 3px solid var(--color-android);
+}
+.matrix-platform.ios {
+  border-left: 3px solid var(--color-ios);
+}
+
+.matrix-platform .p-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+}
+.matrix-platform code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.matrix-platform .p-desc {
+  font-size: 10.5px;
+  color: var(--color-ink-secondary);
+}
+
+.matrix-vs {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-ink-muted);
+}
+
+/* Dual Generation Flow for Stage 3 (Lifecycle) */
+.diagram-dual-generation {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.generation-card {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.generation-card.imperative {
+  border-left: 4px solid var(--color-ink-muted);
+}
+.generation-card.declarative {
+  border-left: 4px solid var(--color-accent);
+}
+
+.generation-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.gen-badge {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+}
+.gen-badge.classic {
+  background: var(--color-surface-raised);
+  color: var(--color-ink-secondary);
+}
+.gen-badge.modern {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+
+.gen-desc {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+}
+
+/* Pipeline Track Rows (Stages 3, 5, 7) */
+.track-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.track-tag {
+  font-size: 11px;
+  font-weight: 700;
+  width: 82px;
+  flex-shrink: 0;
+  padding: 4px 6px;
+  border-radius: var(--radius-xs);
+  text-align: center;
+}
+.track-tag.android {
+  background: var(--color-android-soft);
+  color: var(--color-android);
+}
+.track-tag.ios {
+  background: var(--color-ios-soft);
+  color: var(--color-ios);
+}
+
+.pipeline-track {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.pipe-node {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-ink);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  box-shadow: var(--shadow-xs);
+}
+.pipe-node.highlight {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+}
+.pipe-node .sub-lbl {
+  font-family: var(--font-sans);
+  font-size: 9.5px;
+  font-weight: normal;
+  color: var(--color-ink-muted);
+}
+
+.pipe-arrow {
+  color: var(--color-accent);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+/* Flow Card for Stage 5 & 7 */
+.diagram-flow-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.flow-track-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.flow-track-divider {
+  height: 1px;
+  background: var(--color-border-subtle);
+  margin: 2px 0;
+}
+
+/* UI Layout & Onion Model for Stage 4 */
+.diagram-ui-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ui-dimension-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ui-box {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+.ui-box-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-bottom: 8px;
+}
+.ui-box-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ui-pair {
+  font-size: 11.5px;
+  color: var(--color-ink-secondary);
+}
+.ui-pair code {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.modifier-onion-card {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+.modifier-onion-header {
+  margin-bottom: 10px;
+}
+.onion-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.onion-flow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.onion-step {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.onion-step .step-lbl {
+  font-size: 9.5px;
+  color: var(--color-ink-muted);
+}
+.onion-step code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+.onion-arrow {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+/* Full MVVM Architecture Vertical Flow for Stage 10 */
+.diagram-arch-vertical {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.arch-layer {
+  width: 100%;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.layer-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.layer-boxes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.arch-box {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-ink);
+}
+.arch-box.android {
+  border-left: 3px solid var(--color-android);
+}
+.arch-box.ios {
+  border-left: 3px solid var(--color-ios);
+}
+
+.layer-box-single {
+  background: var(--color-surface);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-ink);
+}
+.layer-box-single .sub-text {
+  font-size: 10.5px;
+  color: var(--color-ink-muted);
+}
+
+.arch-flow-connector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 0;
+}
+.connector-line {
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+.connector-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* Universal Fallback */
+.diagram-universal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.universal-line-row {
+  display: flex;
+  align-items: center;
+}
+.universal-raw-text {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-ink-secondary);
+}
+
+@media (max-width: 768px) {
+  .diagram-split-grid,
+  .ui-dimension-grid,
+  .layer-boxes {
+    grid-template-columns: 1fr;
+  }
+  .diagram-mapping-divider {
+    padding: 8px 0;
+  }
+  .onion-flow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .onion-arrow {
+    text-align: center;
+  }
+  .track-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+

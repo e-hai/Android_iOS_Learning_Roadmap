@@ -1,6 +1,7 @@
 import { LearningStage } from '../models/types';
 import { i18n } from '../services/i18n';
 import { renderComparisonTable } from './ComparisonTable';
+import { renderArchitectureDiagram } from './ArchitectureDiagram';
 import { stages } from '../data/roadmap-data';
 
 export function renderStageDetail(
@@ -72,18 +73,16 @@ export function renderStageDetail(
     container.appendChild(tableSection);
   }
 
-  // Extra Hint Section (if any)
+  // Extra Architecture & Hierarchy Visual Diagram (if any)
   if (stage.extraHintKey) {
     const hintSection = document.createElement('div');
     hintSection.innerHTML = `
-      <div class="section-header">
+      <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar" style="background:var(--color-warn);"></div>
         <span class="section-header-title">${i18n.t('detail.section.hint')}</span>
       </div>
-      <div class="callout-box hint-box">
-        ${i18n.t(stage.extraHintKey)}
-      </div>
     `;
+    hintSection.appendChild(renderArchitectureDiagram(stage.id, stage.extraHintKey));
     container.appendChild(hintSection);
   }
 
