@@ -10,11 +10,11 @@ export function renderHeader(
 
   header.innerHTML = `
     <div class="header-left">
-      <button class="sidebar-toggle-btn" id="btn-sidebar-toggle" aria-label="Toggle Sidebar">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      <button class="sidebar-toggle-btn" id="btn-sidebar-toggle" aria-label="Toggle Sidebar" title="${i18n.t('web.toggle_sidebar')}">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
       </button>
       <div class="header-logo" id="header-logo-btn">
-        <div class="brand-icon">LC</div>
+        <div class="brand-icon">AR</div>
         <div class="brand-text">
           <span class="brand-title">${i18n.t('app.display_name')}</span>
           <span class="brand-badge">Android ➔ iOS</span>

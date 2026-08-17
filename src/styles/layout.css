@@ -121,6 +121,23 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
+  transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+              padding 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.2s ease,
+              transform 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.2s ease;
+}
+
+/* Desktop Collapsed Sidebar State */
+.sidebar-collapsed .app-sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  border-right-color: transparent !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateX(-16px);
 }
 
 .sidebar-section {
@@ -153,6 +170,7 @@
   padding: 32px 48px 80px 48px;
   display: flex;
   justify-content: center;
+  transition: padding 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .content-container {
@@ -166,18 +184,25 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* Sidebar Toggle for Mobile */
+/* Sidebar Toggle Button (Desktop & Mobile) */
 .sidebar-toggle-btn {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 36px;
   height: 36px;
   border-radius: var(--radius-sm);
   color: var(--color-ink-secondary);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
+
 .sidebar-toggle-btn:hover {
   background: var(--color-surface-sunken);
+  color: var(--color-ink);
+  border-color: var(--color-border-hover);
 }
 
 .sidebar-backdrop {
@@ -197,7 +222,12 @@
   }
 
   .app-sidebar.open {
-    left: 0;
+    left: 0 !important;
+    width: 280px !important;
+    padding: 16px 12px !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: none !important;
   }
 
   .sidebar-backdrop.open {
@@ -210,10 +240,6 @@
     background: rgba(0, 0, 0, 0.4);
     z-index: 35;
     backdrop-filter: blur(2px);
-  }
-
-  .sidebar-toggle-btn {
-    display: inline-flex;
   }
 
   .app-content {

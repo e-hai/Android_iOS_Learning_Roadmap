@@ -14,9 +14,14 @@ import { renderGlobalSearch } from './components/GlobalSearch';
 class AppController {
   private currentTarget: string = 'home';
   private sidebarOpen = false;
+  private desktopSidebarCollapsed = false;
   private searchModalElement: HTMLElement | null = null;
 
   constructor() {
+    this.desktopSidebarCollapsed = localStorage.getItem('learning_sidebar_collapsed') === 'true';
+    if (this.desktopSidebarCollapsed) {
+      document.body.classList.add('sidebar-collapsed');
+    }
     this.initTheme();
     this.initRouting();
     this.initGlobalShortcuts();
@@ -76,7 +81,12 @@ class AppController {
         e.preventDefault();
         this.openSearchModal();
       }
-      // ⌘D or Ctrl+D for Cockpit Overview
+      // ⌘B or Ctrl+B for sidebar toggle
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        this.toggleSidebar();
+      }
+      // ⌘D or Ctrl+D for Home Overview
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         this.navigate('home');
@@ -85,19 +95,27 @@ class AppController {
   }
 
   private toggleSidebar() {
-    this.sidebarOpen = !this.sidebarOpen;
-    const sidebar = document.getElementById('app-sidebar');
-    const backdrop = document.getElementById('sidebar-backdrop');
-    if (sidebar) sidebar.classList.toggle('open', this.sidebarOpen);
-    if (backdrop) backdrop.classList.toggle('open', this.sidebarOpen);
+    if (window.innerWidth <= 960) {
+      this.sidebarOpen = !this.sidebarOpen;
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (sidebar) sidebar.classList.toggle('open', this.sidebarOpen);
+      if (backdrop) backdrop.classList.toggle('open', this.sidebarOpen);
+    } else {
+      this.desktopSidebarCollapsed = !this.desktopSidebarCollapsed;
+      document.body.classList.toggle('sidebar-collapsed', this.desktopSidebarCollapsed);
+      localStorage.setItem('learning_sidebar_collapsed', String(this.desktopSidebarCollapsed));
+    }
   }
 
   private closeSidebar() {
-    this.sidebarOpen = false;
-    const sidebar = document.getElementById('app-sidebar');
-    const backdrop = document.getElementById('sidebar-backdrop');
-    if (sidebar) sidebar.classList.remove('open');
-    if (backdrop) backdrop.classList.remove('open');
+    if (window.innerWidth <= 960) {
+      this.sidebarOpen = false;
+      const sidebar = document.getElementById('app-sidebar');
+      const backdrop = document.getElementById('sidebar-backdrop');
+      if (sidebar) sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('open');
+    }
   }
 
   private openSearchModal() {
