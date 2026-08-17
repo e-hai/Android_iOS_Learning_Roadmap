@@ -42,30 +42,13 @@ export function renderStageDetail(
   `;
   container.appendChild(goalSection);
 
-  // Notes Section (if any)
-  if (stage.noteKeys && stage.noteKeys.length > 0) {
-    const notesSection = document.createElement('div');
-    notesSection.innerHTML = `
-      <div class="section-header">
-        <div class="section-header-bar"></div>
-        <span class="section-header-title">${i18n.t('detail.section.notes')}</span>
-      </div>
-      <div class="callout-box" style="margin-bottom:24px;">
-        <ul class="notes-list">
-          ${stage.noteKeys.map((k) => `<li>${i18n.t(k)}</li>`).join('')}
-        </ul>
-      </div>
-    `;
-    container.appendChild(notesSection);
-  }
-
-  // Comparison Table Sections
+  // Comparison Table Sections (Directly visible)
   if (stage.sections && stage.sections.length > 0) {
     stage.sections.forEach((section, idx) => {
       const sectionContainer = document.createElement('div');
-      sectionContainer.style.marginBottom = '28px';
+      sectionContainer.style.marginBottom = '24px';
       sectionContainer.innerHTML = `
-        <div class="section-header" style="margin-top:${idx === 0 ? '16px' : '28px'};">
+        <div class="section-header" style="margin-top:${idx === 0 ? '16px' : '24px'};">
           <div class="section-header-bar ${idx === 0 ? '' : 'ios-bar'}"></div>
           <span class="section-header-title">${i18n.t(section.titleKey)}</span>
         </div>
@@ -102,6 +85,23 @@ export function renderStageDetail(
       </div>
     `;
     container.appendChild(hintSection);
+  }
+
+  // Notes Section (if any)
+  if (stage.noteKeys && stage.noteKeys.length > 0) {
+    const notesSection = document.createElement('div');
+    notesSection.innerHTML = `
+      <div class="section-header">
+        <div class="section-header-bar"></div>
+        <span class="section-header-title">${i18n.t('detail.section.notes')}</span>
+      </div>
+      <div class="callout-box" style="margin-bottom:24px;">
+        <ul class="notes-list">
+          ${stage.noteKeys.map((k) => `<li>${i18n.t(k)}</li>`).join('')}
+        </ul>
+      </div>
+    `;
+    container.appendChild(notesSection);
   }
 
   // Practice Section

@@ -195,25 +195,62 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ④ UI（Compose ↔ SwiftUI）★★★★★
+## ④ UI 布局（Compose ↔ SwiftUI）★★★★★
 
-建议直接学 **Compose → SwiftUI**，不必先深挖 XML / UIKit（维护老项目时再补 UIKit）。
+**阶段目标：** 直接从 Jetpack Compose 迁移到 SwiftUI：掌握核心容器布局、基础控件与 Modifier 链式调用。  
+**核心认知：** 两者皆为现代声明式 UI，思想高度一致；最大区别在于 **SwiftUI Modifier 的包装顺序**与**容器闭包子视图数量约束**。
 
-| Compose | SwiftUI |
-| --- | --- |
-| Column | VStack |
-| Row | HStack |
-| Box | ZStack |
-| Text | Text |
-| Image | Image |
-| Button | Button |
-| Spacer | Spacer |
-| LazyColumn | **LazyVStack**（自定义列表）/ **List**（系统列表） |
-| LazyRow | LazyHStack |
-| Modifier | modifier 链式调用 |
-| `padding` / `fillMaxSize` | `.padding()` / `.frame(maxWidth: .infinity)` |
+### 模块一：核心容器与流式列表（布局骨架）
 
-**练手：** 同一张列表页两端各写一版（标题 + 列表 + 点击）。
+| 布局类型 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
+| 垂直排列 | `Column` (垂直线性) | `VStack` (垂直堆叠) | 主轴纵向排列，默认包裹内容高度 |
+| 水平排列 | `Row` (水平线性) | `HStack` (水平堆叠) | 主轴横向排列，默认包裹内容宽度 |
+| 层叠覆盖 | `Box` (层叠覆盖) | `ZStack` (层叠堆叠) | Z 轴深度层叠，后声明的 View 在最上层 |
+| 惰性纵向列表 | `LazyColumn` | `List` (系统样式) / `LazyVStack` (自定义) | 列表复用（`List` 自带原生分割线与滑动删除） |
+| 惰性网格布局 | `LazyVerticalGrid` | `LazyVGrid(columns:)` | 响应式多列瀑布流与宫格布局 |
+| 基础滚动容器 | `Modifier.verticalScroll()` | `ScrollView` | 非复用型滚动视图容器 |
+| 弹性占位扩展 | `Spacer()` / `.weight(1f)` | `Spacer()` | 自动挤开剩余空间（两端弹簧效果） |
+| 分割线 | `HorizontalDivider()` | `Divider()` | 系统自适应 1px/0.5px 分割线 |
+
+### 模块二：常用基础控件（原子组件）
+
+| 控件类型 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
+| 文本显示 | `Text("...")` | `Text("...")` | 支持字号、加粗、颜色与行数截断 |
+| 文本输入 | `TextField` / `BasicTextField` | `TextField` / `SecureField` (密码框) | 绑定双向字符串状态 `$text` |
+| 交互按钮 | `Button(onClick = { })` | `Button("...", action: { })` | 原生交互与点击波纹/透明度反馈 |
+| 图标与图片 | `Image` / `Icon` | `Image("...")` / `Image(systemName:)` | iOS 原生支持 **SF Symbols 系统矢量图标** |
+| 开关与选择 | `Switch` / `Checkbox` | `Toggle(isOn: $isOn)` | 绑定 Boolean 状态并触发动画切换 |
+| 进度指示器 | `CircularProgressIndicator` | `ProgressView()` | 自适应环形/条形加载指示器 |
+
+### 模块三：Modifier 链式修饰与尺寸（样式机制）
+
+| 修饰类型 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
+| 链式包装 | `Modifier.padding().background()` | `.padding().background()` | **从上至下依次包装**（顺序不同效果截然不同） |
+| 尺寸撑满 | `fillMaxWidth()` / `fillMaxSize()` | `.frame(maxWidth: .infinity)` | 声明式弹性尺寸适配 |
+| 点击手势 | `Modifier.clickable { }` | `.onTapGesture { }` | 任意 View 挂载点击手势 |
+| 圆角裁剪 | `Modifier.clip(RoundedCornerShape(8.dp))` | `.clipShape(RoundedRectangle(cornerRadius: 8))` | 视图边框与裁剪控制 |
+| 投影阴影 | `Modifier.shadow(4.dp)` | `.shadow(radius: 4)` | 深度与高斯模糊投影 |
+| 安全区域 | `Modifier.systemBarsPadding()` | 默认遵循安全区 / `.ignoresSafeArea()` | 顶底安全区域避让机制 |
+
+**布局容器与修饰符思维映射：**
+
+```
+【核心容器】Column ➔ VStack | Row ➔ HStack | Box ➔ ZStack | LazyColumn ➔ List / LazyVStack
+【尺寸撑满】fillMaxWidth() ➔ .frame(maxWidth: .infinity) | fillMaxSize() ➔ .frame(maxWidth: .infinity, maxHeight: .infinity)
+【修饰机制】Modifier.padding().background() ➔ .padding().background() (从上至下依次包装 View)
+【系统图标】Icon(Icons.Default.Star) ➔ Image(systemName: "star.fill") (内置 SF Symbols)
+```
+
+**迁移避坑指南：**
+1. **Modifier 链式包装机制**：SwiftUI Modifier 是从上至下依次向外包装新 View（如 `.padding().background(Color.blue)` 是外层垫边距后加背景，而 `.background(Color.blue).padding()` 是先加背景再垫外边距，视觉效果截然不同）。
+2. **ViewBuilder 容器限制**：SwiftUI 容器闭包内同级直接子视图默认不能超过 10 个（TupleView 限制），超出需用 `Group` 或抽取独立子 View。
+3. **List vs LazyVStack 选型**：`List` 内置了 iOS 原生分组、分割线、侧滑操作等系统行为；若需要完全自定义流式瀑布流，使用 `ScrollView { LazyVStack { ... } }`。
+4. **SF Symbols 原生图标库**：iOS 系统内置数千款矢量图标，直接写 `Image(systemName: "heart.fill")` 即可，免除手动切图适配。
+
+**练手实战任务：** 分别用 Compose 与 SwiftUI 编写同款商品卡片（包含图片、标题、价格、SF Symbols 图标与点击按钮），体会 Modifier 链式调用差异。
 
 ---
 
