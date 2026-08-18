@@ -352,7 +352,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑥ 页面导航与路由
 
-**阶段目标：** 掌握 Nav3 纯声明式强类型数据驱动路由、状态提升跨页面结果回传闭环（Compose Navigation 3 ↔ SwiftUI NavigationStack）。  
+**阶段目标：** 掌握 Nav3 纯声明式强类型数据驱动路由、ResultEventBus 事件总线与跨页面结果回传闭环（Compose Navigation 3 ↔ SwiftUI NavigationStack）。  
 **核心认知：** 现代声明式路由的本质是**「可观察的状态列表」**；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串拼接与视图级强绑定。
 
 ### 模块一：强类型路由定义与状态栈管理
@@ -370,9 +370,10 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 数据传递场景 | Android (Nav3 体系) | iOS (SwiftUI 体系) | 核心机制与模式说明 |
 | --- | --- | --- | --- |
 | **正向参数传递** | Route 数据类构造字段：`Detail(val id: String)` | enum 关联值 / View 初始化器：`case detail(id: String)` | 强类型入参，随路由节点直接下发 |
-| **返回数据 (状态提升与回调)** | `NavDisplay` 注入 `onResult: (T) -> Unit` 回调 + `backStack.pop()` | `navigationDestination` 注入闭包 `onResult: (T) -> Void` + `path.removeLast()` | **Nav3 核心**：状态提升与函数式回调，告别隐式通道 |
-| **返回数据 (双向指针绑定)** | 父级持有状态，在回调中原地修改 | `@Binding var selected: Item`（**SwiftUI 首选**） | **SwiftUI 最地道**：传递引用指针，子页修改直接更新父数据源 |
-| **返回数据 (共享模型)** | 共享父级 ViewModel 的 `StateFlow` | 共享 `@Observable` ViewModel / `@Environment` | 跨页面共享域模型，写入单一真实数据源 |
+| **Nav3 官方结果总线** | `ResultEventBus: sendResult(data)` | `@Binding var selected: Item`（**SwiftUI 首选**） | **Nav3 最新 API**：`LocalResultEventBus.current` 发送单次结果事件 |
+| **结果监听响应** | `ResultEffect<T> { data -> ... }` / `conflateAsState()` | `@Binding` 自动刷新父 View / 闭包响应 | 声明式响应回传数据，自动处理生命周期 |
+| **函数式状态提升回调** | `NavDisplay` 注入 `onResult: (T) -> Unit` + `backStack.pop()` | `navigationDestination` 注入闭包 `onResult: (T) -> Void` + `path.removeLast()` | 经典状态提升模式，在路由容器层完成出栈 |
+| **共享域模型写入** | 共享父级 ViewModel 的 `StateFlow` | 共享 `@Observable` ViewModel / `@Environment` | 跨页面共享域模型，写入单一真实数据源 |
 | **模态弹窗选择回传** | `ModalBottomSheet { onSelect(it) }` | `.sheet(isPresented:) { Picker(result: $selected) }` | 弹层选择器闭环，关闭弹窗自动同步状态 |
 
 ### 模块三：页面呈现容器与多端适配
@@ -384,7 +385,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | **底部导航选项卡** | `NavigationBar + NavDisplay` | `TabView(selection: $tab)` | 根级多分支页面容器 |
 | **模态弹窗/抽屉** | `ModalBottomSheet / Dialog` | `.sheet(isPresented:) / .fullScreenCover` | 独立弹层容器 |
 
-**Nav3 ↔ SwiftUI 纯数据驱动路由与结果回传闭环架构：**
+**Nav3 ↔ SwiftUI 纯数据驱动路由与 ResultEventBus 结果回传闭环：**
 
 ```
 [ Nav3 与 SwiftUI 现代纯数据驱动导航与数据回传闭环 ]
@@ -402,32 +403,38 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
     返回出栈:   backStack.pop()                     <->  path.removeLast() / dismiss()
     一键回首页: backStack.clear()                   <->  path.removeAll()
 
- 4. 跨页面返回数据 (Nav3 状态提升回调 ↔ SwiftUI @Binding / 闭包):
-    【Android Nav3 方式】
-      NavDisplay(backStack = backStack) { route ->
-          when (route) {
-              is HomeRoute -> HomeScreen(
-                  selectedCity = selectedCity,
-                  onOpenPicker = { backStack.add(CityPickerRoute) }
-              )
-              is CityPickerRoute -> CityPickerScreen(
-                  onCitySelected = { city ->
-                      selectedCity = city // 状态提升在回调中更新
-                      backStack.pop()     // 出栈关闭选择器
-                  }
-              )
+ 4. 跨页面返回结果 (Nav3 ResultEventBus ↔ SwiftUI @Binding / 闭包):
+    【Android Nav3 方式：ResultEventBus】
+      // 1. 发送端 (CityPickerScreen)
+      val resultBus = LocalResultEventBus.current
+      Button(onClick = {
+          resultBus.sendResult(City("Shanghai")) // 发送结果事件
+          backStack.pop()                        // 出栈返回
+      }) { Text("选择上海") }
+
+      // 2. 接收端 (HomeScreen)
+      ResultEffect<City> { selectedCity ->
+          viewModel.onCitySelected(selectedCity) // 声明式监听回传事件
+      }
+
+    【iOS SwiftUI 方式：@Binding 指针双向绑定】
+      // 1. 目标选择页 (CityPickerView)
+      struct CityPickerView: View {
+          @Binding var selectedCity: String
+          @Environment(\.dismiss) private var dismiss
+          var body: some View {
+              Button("选择上海") {
+                  selectedCity = "Shanghai" // 原地修改父状态
+                  dismiss()                 // 关闭返回
+              }
           }
       }
 
-    【iOS SwiftUI 方式】
+      // 2. 接收端 (HomeScreen)
       NavigationStack(path: $path) {
-          HomeScreen(selectedCity: selectedCity, onOpenPicker: { path.append(.cityPicker) })
+          HomeScreen(selectedCity: selectedCity)
               .navigationDestination(for: AppRoute.self) { route in
-                  switch route {
-                  case .cityPicker:
-                      CityPickerScreen(selectedCity: $selectedCity) // @Binding 指针原地修改并 dismiss()
-                      // 或 CityPickerScreen(onCitySelected: { city in selectedCity = city; path.removeLast() })
-                  }
+                  CityPickerView(selectedCity: $selectedCity)
               }
       }
 ```
@@ -435,10 +442,10 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 **迁移避坑指南：**
 1. **纯数据驱动核心心智**：现代声明式路由本质是「可观察的状态列表」；页面跳转即 `List.add`，返回即 `List.removeLast`，告别任何字符串硬编码与视图嵌套。
 2. **强类型路由与解耦**：Android 借助 Kotlinx Serialization、iOS 借助 Hashable 枚举，实现编译期全类型安全与页面按需惰性构建。
-3. **Nav3 结果回传模式演进（Pop with Result）**：Nav3 彻底抛弃了 Nav2 时代的 `savedStateHandle` 隐式总线，回归声明式 UI 的核心本质——**状态提升（State Hoisting）与函数式回调**（在 `NavDisplay` 中向目标页注入 `onResult: (T) -> Unit` 回调，触发后更新状态并调用 `backStack.pop()`）；这与 SwiftUI 的 `@Binding` 引用指针及闭包回调完全同构，两端在声明式数据流上实现 100% 架构对齐。
+3. **Nav3 官方 ResultEventBus 体系**：在 Navigation 3 中，Google 提供了专为 `NavEntry` 设计的 `ResultEventBus`（配合 `LocalResultEventBus` 与 `ResultEffect<T>` 监听），彻底抛弃了 Nav2 的 `savedStateHandle` 字符串黑盒；而在 SwiftUI 中，最地道优雅的做法正是与其同构的 `@Binding` 双向绑定指针（原地修改父状态源并 `dismiss()`），两端均告别了传统隐式黑盒通道。
 4. **平板与多窗分栏适配**：单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
 
-**练手实战任务：** 定义强类型路由，使用 Nav3 的 `NavDisplay` 与 SwiftUI 的 `NavigationStack(path:)` 实现「列表压栈跳转 ➔ 详情选择并通过 `onResult` 回调 / `@Binding` 回传结果并出栈 ➔ 一键回首页 (Pop to Root)」完整闭环。
+**练手实战任务：** 定义强类型路由，使用 Nav3 的 `ResultEventBus` / `NavDisplay` 回调与 SwiftUI 的 `NavigationStack(path:)` / `@Binding` 实现「列表压栈跳转 ➔ 详情选择并利用 `sendResult` / `@Binding` 回传结果并出栈 ➔ 一键回首页 (Pop to Root)」完整闭环。
 
 ---
 
