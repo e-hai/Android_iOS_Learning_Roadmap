@@ -1,4 +1,8 @@
 import { i18n } from '../services/i18n';
+import { createOnionExploder3D } from '../visuals/micro/OnionExploder3D';
+import { createNavigationDeck3D } from '../visuals/micro/NavigationDeck3D';
+import { createDataFlowBeam3D } from '../visuals/micro/DataFlowBeam3D';
+import { createGenericStage3D } from '../visuals/micro/GenericStage3D';
 
 /**
  * Stage-specific Unicode Box-drawing architecture and hierarchy diagrams.
@@ -305,42 +309,94 @@ const DIAGRAMS: Record<string, string> = {
 };
 
 /**
- * Renders a clean, copyable Unicode Box-drawing architecture diagram.
+ * Renders an interactive 3D WebGL / ASCII dual-mode architecture diagram.
  */
-export function renderArchitectureDiagram(stageId: string, hintKey?: string): HTMLElement {
+export function renderArchitectureDiagram(stageId: string, fallbackHintKey?: string): HTMLElement {
   const container = document.createElement('div');
-  container.className = 'box-diagram-card';
+  container.className = 'diagram-wrapper';
 
-  const diagramContent = DIAGRAMS[stageId] || (hintKey ? i18n.t(hintKey) : '');
+  const diagramContent = (stageId && DIAGRAMS[stageId]) || (fallbackHintKey ? i18n.t(fallbackHintKey) : '');
 
   if (!diagramContent.trim()) {
     container.style.display = 'none';
     return container;
   }
 
-  container.innerHTML = `
-    <div class="box-diagram-header">
-      <div class="box-diagram-dots">
-        <span class="box-dot dot-red"></span>
-        <span class="box-dot dot-yellow"></span>
-        <span class="box-dot dot-green"></span>
-      </div>
-      <span class="box-diagram-title">架构与层级结构 · 盒线全景图</span>
-      <button class="box-copy-btn btn-ghost" title="复制图示">
+  // Active Mode from localStorage, default '3d'
+  let currentMode: '3d' | 'ascii' = (localStorage.getItem('learning_diagram_mode') as '3d' | 'ascii') || '3d';
+  let active3DInstance: { dispose: () => void } | null = null;
+
+  // Header Nav Bar
+  const navBar = document.createElement('div');
+  navBar.className = 'diagram-nav-bar';
+  navBar.innerHTML = `
+    <div class="diagram-mode-tabs">
+      <button class="diagram-tab-btn ${currentMode === '3d' ? 'active' : ''}" data-mode="3d">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+        <span>🎨 3D 空间实验台</span>
+      </button>
+      <button class="diagram-tab-btn ${currentMode === 'ascii' ? 'active' : ''}" data-mode="ascii">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <span>📟 ASCII 终端文本</span>
+      </button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="box-copy-btn btn-ghost" title="复制 ASCII 全景图">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
           <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
         </svg>
-        <span>复制</span>
+        <span>复制文本</span>
       </button>
     </div>
-    <div class="box-diagram-body">
-      <pre class="box-diagram-code"><code>${escapeHtml(diagramContent)}</code></pre>
-    </div>
   `;
+  container.appendChild(navBar);
 
-  // Copy button logic
-  const copyBtn = container.querySelector('.box-copy-btn') as HTMLButtonElement;
+  // Content Area
+  const contentBody = document.createElement('div');
+  contentBody.className = 'diagram-content-body';
+  container.appendChild(contentBody);
+
+  const renderCurrentMode = () => {
+    if (active3DInstance) {
+      active3DInstance.dispose();
+      active3DInstance = null;
+    }
+    contentBody.innerHTML = '';
+
+    if (currentMode === '3d') {
+      if (stageId === 'ui') {
+        active3DInstance = createOnionExploder3D(contentBody);
+      } else if (stageId === 'navigation') {
+        active3DInstance = createNavigationDeck3D(contentBody);
+      } else if (stageId === 'architecture') {
+        active3DInstance = createDataFlowBeam3D(contentBody);
+      } else {
+        active3DInstance = createGenericStage3D(contentBody, stageId);
+      }
+    } else {
+      const preBox = document.createElement('div');
+      preBox.className = 'box-diagram-body';
+      preBox.innerHTML = `<pre class="box-diagram-code"><code>${escapeHtml(diagramContent)}</code></pre>`;
+      contentBody.appendChild(preBox);
+    }
+  };
+
+  // Tab click listeners
+  navBar.querySelectorAll('.diagram-tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const mode = btn.getAttribute('data-mode') as '3d' | 'ascii';
+      if (mode && mode !== currentMode) {
+        currentMode = mode;
+        localStorage.setItem('learning_diagram_mode', mode);
+        navBar.querySelectorAll('.diagram-tab-btn').forEach((b) => b.classList.toggle('active', b.getAttribute('data-mode') === mode));
+        renderCurrentMode();
+      }
+    });
+  });
+
+  // Copy button listener
+  const copyBtn = navBar.querySelector('.box-copy-btn') as HTMLButtonElement;
   if (copyBtn) {
     copyBtn.addEventListener('click', async () => {
       try {
@@ -361,6 +417,9 @@ export function renderArchitectureDiagram(stageId: string, hintKey?: string): HT
     });
   }
 
+  // Initial render
+  renderCurrentMode();
+
   return container;
 }
 
@@ -374,3 +433,4 @@ function escapeHtml(text: string): string {
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
+

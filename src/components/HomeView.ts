@@ -1,6 +1,7 @@
 import { i18n } from '../services/i18n';
 import { cheatSheetKeys, practiceWeekKeys, stages } from '../data/roadmap-data';
 import { renderComparisonTable } from './ComparisonTable';
+import { createNeuralConstellation3D } from '../visuals/macro/NeuralConstellation3D';
 
 export function renderHomeView(
   onNavigate: (targetId: string) => void
@@ -45,6 +46,13 @@ export function renderHomeView(
     const matrixEl = document.getElementById('home-roadmap-matrix');
     matrixEl?.scrollIntoView({ behavior: 'smooth' });
   });
+
+  // 1.5. 3D Neural Constellation Galaxy
+  const constellationWrapper = document.createElement('div');
+  createNeuralConstellation3D(constellationWrapper, (stageId) => {
+    onNavigate(stageId);
+  });
+  container.appendChild(constellationWrapper);
 
   // 2. Core Mindset Shifts Section
   const mindsetSection = document.createElement('div');

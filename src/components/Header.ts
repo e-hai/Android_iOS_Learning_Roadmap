@@ -1,4 +1,5 @@
 import { i18n } from '../services/i18n';
+import { openMemoryFlashcardsModal } from '../visuals/cards/MemoryFlashcardModal3D';
 
 export function renderHeader(
   onToggleSidebar: () => void,
@@ -29,6 +30,10 @@ export function renderHeader(
         <span class="kbd-shortcut">⌘K</span>
       </button>
 
+      <button class="btn btn-ghost btn-sm" id="btn-flashcard-trigger" title="3D 避坑记忆闪卡" style="color:var(--color-accent);font-weight:700;">
+        ⚡ 3D 闪卡
+      </button>
+
       <button class="btn btn-ghost btn-sm" id="btn-lang-toggle" title="${i18n.t('web.switch_lang')}">
         🌐 ${i18n.getLanguage() === 'zh-Hans' ? 'EN' : '中'}
       </button>
@@ -54,6 +59,11 @@ export function renderHeader(
     e.preventDefault();
     e.stopPropagation();
     onOpenSearch();
+  });
+  header.querySelector('#btn-flashcard-trigger')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openMemoryFlashcardsModal();
   });
 
   const langBtn = header.querySelector('#btn-lang-toggle') as HTMLButtonElement;

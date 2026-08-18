@@ -11,7 +11,10 @@ export default defineConfig({
     minify: 'esbuild',
     rollupOptions: {
       output: {
-        manualChunks: undefined,
+        manualChunks: {
+          three: ['three'],
+          gsap: ['gsap', 'canvas-confetti'],
+        },
       },
     },
   },

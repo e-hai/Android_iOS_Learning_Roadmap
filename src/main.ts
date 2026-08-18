@@ -2,6 +2,7 @@ import './styles/theme.css';
 import './styles/layout.css';
 import './styles/components.css';
 import './styles/search.css';
+import './styles/visuals.css';
 
 import { stages } from './data/roadmap-data';
 import { i18n } from './services/i18n';
