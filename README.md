@@ -627,23 +627,110 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑨ 本地数据存储
 
-| 存储维度 | Android 体系 | iOS 体系 | 核心说明 |
+**阶段目标：** 掌握本地存储与数据持久化全景：UserDefaults 偏好、Keychain 硬件级加密、SwiftData 声明式 ORM 与沙盒文件读写。  
+**核心认知：** 持久化分层选型清晰：轻量配置用 `@AppStorage`，敏感凭据入 `Keychain`，大表数据用 `SwiftData`，大文件/图片存沙盒 `Documents`。
+
+### 模块一：键值偏好与安全加密（偏好与安全）
+
+| 存储维度 / 场景 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
-| 轻量偏好存储 | `SharedPreferences` | `UserDefaults / @AppStorage` | 轻量键值偏好存储 |
-| 响应式数据存储 | `DataStore` | `UserDefaults / 文件缓存` | 响应式偏好存储 |
-| 敏感安全加密 | `EncryptedSharedPreferences / Keystore` | `Keychain` | 安全加密存储（存 Token） |
-| 对象关系数据库 | `Room` | `SwiftData / CoreData` | 数据库 ORM（存大表） |
-| 底层 SQL 操作 | `SQLDelight / SQLite` | `GRDB / SQLite.swift` | 原生 SQL 操作 |
-| 沙盒文件读写 | `Context.filesDir / cacheDir` | `FileManager` | 沙盒文件与缓存目录 |
+| 传统键值偏好 | `SharedPreferences` | `UserDefaults.standard` | 轻量键值偏好存储 |
+| 声明式偏好绑定 | `DataStore (Preferences)` | `@AppStorage("key")` | 轻量设置持久化（重启还在） |
+| 跨扩展/App 共享 | `ContentProvider 跨进程` | `UserDefaults(suiteName:)` | 组件与多 App 共享数据 |
+| 硬件加密凭据 | `EncryptedSharedPreferences / KeyStore` | `Keychain (SecItem)` | 安全加密存储（存 Token） |
+| 生物识别解锁 | `BiometricPrompt + KeyStore` | `LocalAuthentication + Keychain` | 生物识别解锁凭据 |
 
-学习路径：
+### 模块二：对象关系数据库（ORM 与 SQL）
+
+| 数据库特性 / 场景 | Android (Room 体系) | iOS (SwiftData / CoreData) | 核心说明 |
+| --- | --- | --- | --- |
+| 实体模型注解 | `@Entity data class Item` | `@Model class Item` | 数据库实体模型注解 |
+| 主键与唯一约束 | `@PrimaryKey` | `@Attribute(.unique)` | 主键与唯一性约束 |
+| 数据库容器注入 | `Room.databaseBuilder()` | `.modelContainer(for:)` | 数据库容器与上下文配置 |
+| 响应式数据查询 | `@Dao @Query(...) Flow<List<T>>` | `@Query var items: [Item]` | 响应式自动刷新数据查询 |
+| 增删改查操作 | `dao.insert(item) / dao.delete(item)` | `modelContext.insert() / delete()` | 增删改查实体操作 |
+| 关系与级联删除 | `@Relation / foreignKeys` | `@Relationship(deleteRule:)` | 实体关联与级联删除 |
+| 原生 SQL 查询 | `Room RawQuery / SQLDelight` | `GRDB.swift / SQLite.swift` | 原生 SQL 灵活查询 |
+
+### 模块三：沙盒文件系统与缓存（文件与目录）
+
+| 文件系统操作 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 用户专属文档目录 | `context.filesDir` | `FileManager (.documentDirectory)` | 用户专属持久化文档目录 |
+| 系统可清缓存目录 | `context.cacheDir` | `FileManager (.cachesDirectory)` | 系统可清理临时缓存目录 |
+| 磁盘文件直接读写 | `file.writeText() / file.readBytes()` | `data.write(to:) / Data(contentsOf:)` | 磁盘文件直接读写 |
+| 文件与目录管理 | `file.mkdirs() / file.delete()` | `FileManager.createDirectory() / removeItem()` | 文件与文件夹增删管理 |
+
+**本地持久化与数据库全景对照：**
 
 ```
-Android: SharedPreferences → DataStore → Room
-iOS:     UserDefaults → Keychain → SwiftData（需要时再补 CoreData）
+[ 本地持久化与数据库全景选型对照 ]
+
+ 1. 声明式键值偏好 (@AppStorage ↔ DataStore):
+    Android:
+      val THEME_KEY = booleanPreferencesKey("is_dark_mode")
+      val isDarkMode: Flow<Boolean> = context.dataStore.data.map { it[THEME_KEY] ?: false }
+
+    iOS (SwiftUI 原生绑定，变动自动重绘):
+      @AppStorage("is_dark_mode") private var isDarkMode: Bool = false
+
+ 2. Keychain 硬件安全加密存储 (存储 Token 与敏感凭据):
+    【Keychain 写入与读取 (建议使用 KeychainAccess 等封装或原生 SecItem)】
+      // 写入 Token
+      let query: [String: Any] = [
+          kSecClass as String: kSecClassGenericPassword,
+          kSecAttrAccount as String: "authToken",
+          kSecValueData as String: "token_abc123".data(using: .utf8)!
+      ]
+      SecItemAdd(query as CFDictionary, nil)
+
+ 3. SwiftData 现代声明式数据库 (iOS 17+ vs Android Room):
+    【实体模型定义】
+      @Model
+      final class TodoItem {
+          @Attribute(.unique) var id: String
+          var title: String
+          var isDone: Bool
+          var createdAt: Date
+
+          init(id: String = UUID().uuidString, title: String, isDone: Bool = false) {
+              self.id = id
+              self.title = title
+              self.isDone = isDone
+              self.createdAt = Date()
+          }
+      }
+
+    【View 内部直接响应式查询与操作】
+      struct TodoListView: View {
+          @Environment(\.modelContext) private var modelContext
+          @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
+
+          var body: some View {
+              List {
+                  ForEach(todos) { todo in
+                      Text(todo.title)
+                  }
+                  .onDelete { indexSet in
+                      for index in indexSet {
+                          modelContext.delete(todos[index])
+                      }
+                  }
+              }
+              Button("添加任务") {
+                  modelContext.insert(TodoItem(title: "新任务"))
+              }
+          }
+      }
 ```
 
-**练手：** 登录 token 存 Keychain + 用户设置存 UserDefaults + 一个简单本地列表用 SwiftData。
+**迁移避坑指南：**
+1. **持久化选型黄金法则**：UI 设置项用 `@AppStorage` / `UserDefaults`；敏感 Token 必须入 `Keychain` 硬件加密；大表结构化数据用 `SwiftData` / `Room`；大体积文件/图片放沙盒 `Documents`/`Caches`。
+2. **SwiftData 极简开发体验**：基于 Swift 宏直接在纯 class 上标记 `@Model`，View 内部直接写 `@Query` 声明式自动监听数据变化，无需编写任何 SQL、DAO 或编译期注解处理器 (KSP)。
+3. **Keychain 独立于沙盒**：与 Android KeyStore 类似，Keychain 独立于 App 沙盒，即使卸载重装 App 凭据也不会丢失，并原生支持 Face ID / Touch ID 生物识别授权。
+4. **沙盒目录分工**：`.documentDirectory` 用户生成数据会被 iCloud 自动备份；`.cachesDirectory` 系统可在空间不足时自动清空，切勿将核心不可再生数据存入缓存区。
+
+**练手实战任务：** 使用 `Keychain` 存取用户 Token、使用 `@AppStorage` 保存夜间模式偏好、使用 SwiftData (`@Model` + `@Query`) 实现本地待办清单增删改查，并使用 `FileManager` 保存一张头像图片至 `Documents` 目录。
 
 ---
 
