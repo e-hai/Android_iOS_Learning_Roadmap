@@ -86,16 +86,37 @@ export function renderStageDetail(
   // Notes Section (if any)
   if (stage.noteKeys && stage.noteKeys.length > 0) {
     const notesSection = document.createElement('div');
+    const noteCardsHtml = stage.noteKeys
+      .map((k) => {
+        const text = i18n.t(k);
+        const tagMatch = text.match(/^【([^】]+)】\s*(.*)$/) || text.match(/^\[([^\]]+)\]\s*(.*)$/);
+        if (tagMatch) {
+          const [, tag, body] = tagMatch;
+          return `
+            <li class="note-item-card">
+              <div class="note-item-header">
+                <span class="note-item-badge">【${escapeHtml(tag)}】</span>
+              </div>
+              <div class="note-item-text">${escapeHtml(body)}</div>
+            </li>
+          `;
+        }
+        return `
+          <li class="note-item-card">
+            <div class="note-item-text">${escapeHtml(text)}</div>
+          </li>
+        `;
+      })
+      .join('');
+
     notesSection.innerHTML = `
-      <div class="section-header">
+      <div class="section-header" style="margin-top:28px;">
         <div class="section-header-bar"></div>
         <span class="section-header-title">${i18n.t('detail.section.notes')}</span>
       </div>
-      <div class="callout-box" style="margin-bottom:24px;">
-        <ul class="notes-list">
-          ${stage.noteKeys.map((k) => `<li>${i18n.t(k)}</li>`).join('')}
-        </ul>
-      </div>
+      <ul class="notes-grid" style="margin-bottom:28px;">
+        ${noteCardsHtml}
+      </ul>
     `;
     container.appendChild(notesSection);
   }
@@ -146,4 +167,15 @@ export function renderStageDetail(
   container.appendChild(navFooter);
 
   return container;
+}
+
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
 }

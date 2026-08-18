@@ -58,27 +58,33 @@
 | 代码签名 | Keystore (.jks) / Play Signing | Certificate + Provisioning Profile | 证书、描述文件与签名 |
 | 打包产物 | APK / AAB | IPA / Xcode Archive | 安装包产物与归档格式 |
 
-**目录与工程结构全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-【Android 工程结构】                【iOS Xcode 工程结构】
-MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
- ├── build.gradle.kts                ├── MyApplication/
- ├── settings.gradle.kts             │    ├── MyApplicationApp.swift (@main 入口)
- └── app/                            │    ├── ContentView.swift (首屏 View)
-      ├── build.gradle.kts           │    ├── Info.plist (权限与配置元数据)
-      └── src/main/                  │    ├── Assets.xcassets (图标/颜色/图片)
-           ├── AndroidManifest.xml   │    └── Preview Content/ (预览 Mock 资产)
-           ├── java/ or kotlin/      └── MyApplicationTests/ (单元测试 Target)
-           └── res/
+[ 阶段 01: 开发环境与工程结构全景对照 ]
+
+ 1. 【工程容器与构建体系】
+    Android (Gradle):  Root Project ──▶ settings.gradle.kts ──▶ app/build.gradle.kts
+    iOS (Xcode):       Workspace (.xcworkspace) ──▶ Project (.xcodeproj) ──▶ Target (主构建目标)
+
+ 2. 【配置文件与组件清单】
+    Android:           AndroidManifest.xml (包名 / 四大组件声明 / 动态权限清单)
+    iOS:               Info.plist (系统权限描述) + Target Capabilities (推送/后台等能力)
+
+ 3. 【依赖管理生态】
+    Android:           Gradle 依赖声明 (MavenCentral / Google Maven)
+    iOS:               Swift Package Manager (SPM 原生仓库直连) / CocoaPods (.xcworkspace)
+
+ 4. 【静态资源与代码入口】
+    Android:           res/ (drawable/values/mipmap) + Application / MainActivity
+    iOS:               Assets.xcassets (矢量图/颜色集) + @main App.swift 入口
 ```
 
 **迁移避坑指南：**
-1. **依赖管理（SPM vs CocoaPods）**：现代 iOS 优先使用 Xcode 原生内置的 **Swift Package Manager (SPM)**（直接在 Xcode 粘贴 GitHub 仓库 URL，免装命令行与 Ruby 环境）；若维护包含 CocoaPods (`Podfile`) 的老项目，运行 `pod install` 后**必须打开白色图标的 `.xcworkspace`**，切勿打开蓝色 `.xcodeproj`，否则会报找不到依赖库的编译错误！
-2. **Gradle DSL 语法说明**：Android 老项目常见 `build.gradle` (Groovy 语法)，现代新项目默认采用 `build.gradle.kts` (Kotlin DSL，具代码补全与强类型检查)，其 `dependencies { ... }` 对应 iOS 的 SPM Package 依赖声明。
-3. **文件索引机制**：Xcode 是**索引制**（Project-based），在 Finder 中直接拷入文件不会自动出现在工程中；必须拖入 Xcode 并勾选 `Add to targets` 与 `Copy items if needed`。
-4. **多 Target 体系**：一个 Xcode Project 可挂载多个 Target（主 App、Widget 小组件、Notification Extension、测试 Target），类似 Android 根工程下的多 Module。
-5. **权限必填描述**：所有敏感权限（相机、相册、定位、通知等）必须在 `Info.plist` 中配置明确的 Privacy Usage Description（如 `NSCameraUsageDescription`），否则调用时系统会**直接崩溃闪退**。
+1. **【白工程 vs 蓝工程】**：维护 CocoaPods 老项目时，`pod install` 后**必须打开白色图标的 `.xcworkspace`**，切勿打开蓝色 `.xcodeproj`，否则第三方头文件无法找到报错。
+2. **【Finder 文件拖拽索引】**：Xcode 采用索引制而非物理目录监听，Finder 中新建的文件必须拖入 Xcode 并勾选 `Copy items if needed` 与 `Add to targets`。
+3. **【敏感权限先入 Plist】**：相机、相册、定位等敏感权限必须在 `Info.plist` 中配置用途描述（如 `NSCameraUsageDescription`），缺少描述调用时系统直接崩溃闪退 (SIGABRT)。
+4. **【依赖优先选原生 SPM】**：现代 iOS 优先使用 Xcode 内置的 Swift Package Manager (SPM)，直接粘贴 GitHub URL，告别第三方包管理工具配置损耗。
 
 **练手实战任务：** 在 Xcode 中新建一个 SwiftUI App 工程，观察 Target 设置与 Signing 签名，体验 SPM 引入一个开源库（如 Alamofire），并将代码 Run 到 iOS 模拟器。
 
@@ -137,34 +143,33 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 | 抛出与捕获错误 | `@Throws` / `try-catch` | `throws` / `do-catch` | 异常抛出与捕获 |
 | 可选执行 | 无原生直接对应 | `try? load()` | 抛错转为可空 nil |
 
-**语言特性与心智体系全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 语言基础与心智模型对照 ]
+[ 阶段 02: 语言基础与类型系统全景对照 ]
 
-1. 数据模型与内存语义
-   Android: data class User(...)  [引用类型 / 指针传递]
-   iOS:     struct User(...)      [值类型 / 自动深拷贝 / 线程安全]
+ 1. 【数据模型与内存语义】
+    Kotlin:            data class User(val id: String)  ──▶ [引用类型 / 指针传递 / 堆分配]
+    Swift:             struct User { let id: String }   ──▶ [值类型 / 自动深拷贝 / 栈优化 / 线程安全]
 
-2. 抽象与多态机制
-   Android: open class Base -> Child  [单根基类继承 OOP]
-   iOS:     protocol + extension      [面向协议组合 POP]
+ 2. 【多态机制与抽象体系】
+    Kotlin:            open class Base ──▶ class Child  ──▶ [单根基类继承 OOP]
+    Swift:             protocol POP ──▶ extension 默认实现 ──▶ [面向协议组合 POP]
 
-3. 状态机与枚举建模
-   Android: sealed class UiState      [密封类分层继承]
-   iOS:     enum UiState { case ... } [带关联值枚举]
+ 3. 【状态机与枚举建模】
+    Kotlin:            sealed class UiState              ──▶ [密封类多子类分发]
+    Swift:             enum UiState { case success(T) }  ──▶ [强关联值枚举 / 模式匹配]
 
-4. 内存回收模型
-   Android: JVM GC                    [垃圾收集器后台自动回收]
-   iOS:     ARC                       [引用计数即时释放 / 闭包须 weak self]
+ 4. 【内存管理与回收模型】
+    Kotlin:            JVM Garbage Collector (GC)        ──▶ [后台定期扫描标记回收]
+    Swift:             Automatic Reference Counting(ARC) ──▶ [编译期计数即时释放 / 闭包须 weak self]
 ```
 
 **迁移避坑指南：**
-1. **值类型主导 vs 引用类型**：Swift 中 `struct` 是第一等公民（UI State、数据模型、SwiftUI View 均为 struct），传参与赋值为自动深拷贝，天生线程安全；只有需要跨组件共享可变状态时才使用 `class`。
-2. **ARC 内存管理与闭包循环引用**：Swift 采用自动引用计数 (ARC) 而非 JVM GC！当闭包持有 `self` 且 `self` 也持有该闭包时，必须使用 `[weak self]` 弱引用打破循环引用，否则将导致严重内存泄漏。
-3. **Optional 可空性最佳实践**：优先使用 `guard let ... else { return }` 卫语句提前返回，或 `if let` 可选绑定；严禁在生产代码滥用强行解包运算符 `!`。
-4. **面向协议编程 (POP) vs 类继承**：Android 习惯用抽象基类继承；iOS 体系强烈推崇 `protocol` + `extension` 默认实现，通过协议拼装与组合实现多态与解耦。
-5. **强大的 Enum 关联值**：Swift 的 `enum` 支持为每个分支绑定不同类型的关联值 (Associated Values)，能原生替代 Kotlin 中绝大多数 `sealed class` 状态机建模场景。
+1. **【默认 Struct 引用选 Class】**：UI State、数据 Model、SwiftUI View 默认全用 `struct`（值拷贝/天然线程安全）；只有跨组件共享可变状态时才使用 `class`。
+2. **【闭包必加 weak self】**：Swift 采用引用计数 (ARC) 而非 JVM GC；闭包捕获 `self` 时必须声明 `[weak self]` 并用 `guard let self else { return }` 解包，防止循环引用导致内存泄漏。
+3. **【避免强制解包感叹号】**：严禁在生产代码滥用 `!` 强解 Optional；优先使用 `guard let` 卫语句提前退出或 `if let` 可选绑定安全解包。
+4. **【POP 组合优于 Class 继承】**：摒弃 Android 的抽象基类继承思维，拥抱 Swift 的 Protocol + `extension` 默认实现，通过面向协议拼装实现多态解耦。
 
 **练手实战任务：** 用 Swift 实现一套带关联值的 Result 枚举与 User Model（对比 struct 与 class 拷贝行为），定义一个 Repository 协议并用 extension 提供默认实现，最后在异步闭包中使用 `[weak self]` 模拟网络回调解包数据。
 
@@ -197,25 +202,39 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 | 系统前后台状态 | `LifecycleEventObserver` | `@Environment(\.scenePhase)` | 监听 App 前后台切换 |
 | 业务状态持有者 | `ViewModel` (`onCleared`) | `@Observable class ViewModel` (`deinit`) | 业务模型生命周期 |
 
-**代际与层级对照：**
+**架构与层级结构全景对照：**
 
 ```
-【传统命令式】
-Android: Application → Activity → Fragment → View
-iOS:     UIApplication → UIWindow → UIViewController → UIView
+[ 阶段 03: 传统与现代生命周期解耦对照 ]
 
-【现代声明式】
-Android: Single Activity → Compose @Composable 函数
-iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
+ 1. 【传统命令式 UI 层级 (MVC / MVP)】
+    Android:           Application ──▶ Activity (页面) ──▶ Fragment ──▶ View
+    iOS:               UIApplication ──▶ UIWindow ──▶ UIViewController (页面) ──▶ UIView
+                                                       │
+                                                       └──▶ 控制器独立管理视图生命周期
+
+ 2. 【现代声明式 UI 层级 (Compose / SwiftUI)】
+    Android:           Single Activity ──▶ Compose @Composable 函数 ──▶ LaunchedEffect / onDispose
+    iOS:               @main App ──▶ WindowGroup (Scene) ──▶ SwiftUI View (.task / .onAppear)
+                                                                 │
+                                                                 └──▶ View 为短命不可变结构体
+
+ 3. 【应用前后台监听】
+    Android:           ProcessLifecycleOwner / LifecycleEventObserver (ON_START / ON_STOP)
+    iOS:               @Environment(\.scenePhase) (.active / .inactive / .background)
+
+ 4. 【业务模型生命周期】
+    Android:           ViewModel (在 onCleared 销毁释放)
+    iOS:               @Observable class ViewModel (在 deinit 析构释放)
 ```
 
-**迁移注意：**
-- **分代对齐**：Activity 对应的是传统 UIKit 的 UIViewController，绝不要拿 Activity 概念硬套 SwiftUI View！
-- SwiftUI `View` 是短命结构体（如 Compose 函数），没有 `onCreate` 回调；进入异步任务用 `.task`，离开自动取消。
-- 页面可见性看 `.onAppear` / `.onDisappear`；系统前后台看 `@Environment(\.scenePhase)`。
-- 真正的业务与数据生命周期属于 `@Observable ViewModel` 类，而不是依附在 UI 视图树上。
+**迁移避坑指南：**
+1. **【切勿硬套 Activity 概念】**：SwiftUI View 是短命不可变的轻量结构体，对应 Compose 函数；切勿用 Activity 或 UIViewController 思维硬套 SwiftUI View。
+2. **【异步启动用 .task】**：进入页面发起异步请求使用 `.task` 修饰符，当视图离开屏幕时系统会自动协作式取消 Task，无需手动管理 Job 生命周期。
+3. **【前后台监听 scenePhase】**：监听系统切前后台使用 `@Environment(\.scenePhase)`；监听页面可见性使用 `.onAppear` 与 `.onDisappear`。
+4. **【业务生命周期在 ViewModel】**：真正的业务与数据生命周期属于 `@Observable ViewModel` 类（在 `deinit` 释放），而不是依附在随时可能重新构建的 UI View 树上。
 
-**练手：** 分别用 `.task` 加载异步数据、用 `.onAppear/.onDisappear` 监听视图出现、用 `scenePhase` 监听应用切前后台，对比 Compose 的 `LaunchedEffect` / `DisposableEffect` 日志。
+**练手实战任务：** 分别用 `.task` 加载异步数据、用 `.onAppear/.onDisappear` 监听视图出现、用 `scenePhase` 监听应用切前后台，对比 Compose 的 `LaunchedEffect` / `DisposableEffect` 日志。
 
 ---
 
@@ -259,20 +278,34 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 投影阴影 | `Modifier.shadow(4.dp)` | `.shadow(radius: 4)` | 阴影投影效果 |
 | 安全区域 | `Modifier.systemBarsPadding()` | `.ignoresSafeArea()` | 屏幕安全区适配 |
 
-**布局容器与修饰符思维映射：**
+**架构与层级结构全景对照：**
 
 ```
-【核心容器】Column ➔ VStack | Row ➔ HStack | Box ➔ ZStack | LazyColumn ➔ List / LazyVStack
-【尺寸撑满】fillMaxWidth() ➔ .frame(maxWidth: .infinity) | fillMaxSize() ➔ .frame(maxWidth: .infinity, maxHeight: .infinity)
-【修饰机制】Modifier.padding().background() ➔ .padding().background() (从上至下依次包装 View)
-【系统图标】Icon(Icons.Default.Star) ➔ Image(systemName: "star.fill") (内置 SF Symbols)
+[ 阶段 04: UI 布局与修饰符体系全景对照 ]
+
+ 1. 【核心容器映射】
+    一维线性排布:      Column / Row            <──▶  VStack / HStack
+    二维层叠覆盖:      Box                     <──▶  ZStack
+    惰性流式列表:      LazyColumn              <──▶  List (系统样式) / LazyVStack (自定义流)
+    惰性多列网格:      LazyVerticalGrid        <──▶  LazyVGrid(columns: [GridItem(...)])
+
+ 2. 【Modifier 逐层嵌套包装 (洋葱模型)】
+    SwiftUI:           Text("Hello")
+                         │──▶ .padding(16)        [外层包裹 PaddingView]
+                         │──▶ .background(.blue)  [更外层包裹 BackgroundView]
+                         └──▶ .cornerRadius(8)    [最外层包裹 ClipShapeView]
+    (注: 修饰符从上至下依次向外层包裹视图，顺序颠倒将导致完全不同的渲染结果)
+
+ 3. 【系统图标与尺寸扩展】
+    系统矢量图标:      Icon(Icons.Default.Star) <──▶  Image(systemName: "star.fill") (内置 SF Symbols)
+    尺寸自适应撑满:    Modifier.fillMaxSize()   <──▶  .frame(maxWidth: .infinity, maxHeight: .infinity)
 ```
 
 **迁移避坑指南：**
-1. **Modifier 链式包装机制**：SwiftUI Modifier 是从上至下依次向外包装新 View（如 `.padding().background(Color.blue)` 是外层垫边距后加背景，而 `.background(Color.blue).padding()` 是先加背景再垫外边距，视觉效果截然不同）。
-2. **ViewBuilder 容器限制**：SwiftUI 容器闭包内同级直接子视图默认不能超过 10 个（TupleView 限制），超出需用 `Group` 或抽取独立子 View。
-3. **List vs LazyVStack 选型**：`List` 内置了 iOS 原生分组、分割线、侧滑操作等系统行为；若需要完全自定义流式瀑布流，使用 `ScrollView { LazyVStack { ... } }`。
-4. **SF Symbols 原生图标库**：iOS 系统内置数千款矢量图标，直接写 `Image(systemName: "heart.fill")` 即可，免除手动切图适配。
+1. **【修饰符洋葱包装模型】**：SwiftUI Modifier 是从上至下依次向外包装新 View；例如 `.padding().background(Color.blue)` 与 `.background(Color.blue).padding()` 视觉结果截然不同。
+2. **【同级视图 10 个限制】**：ViewBuilder 闭包内同级直接子视图默认不能超过 10 个（TupleView 限制），超出时需用 `Group { ... }` 包装或拆分子组件。
+3. **【List vs LazyVStack 选型】**：`List` 自带 iOS 原生系统分组、分割线与侧滑删除行为；若需完全自定义瀑布流或流式布局，使用 `ScrollView { LazyVStack { ... } }`。
+4. **【善用 SF Symbols 矢量图标】**：iOS 内置数千款原生矢量图标，直接调用 `Image(systemName: "heart.fill")`，无需切图且自动跟随文字大小与颜色缩放。
 
 **练手实战任务：** 分别用 Compose 与 SwiftUI 编写同款商品卡片（包含图片、标题、价格、SF Symbols 图标与点击按钮），体会 Modifier 链式调用差异。
 
@@ -306,45 +339,37 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 磁盘持久化用户偏好 | `DataStore` | `@AppStorage("setting_key")` | 轻量设置持久化（重启还在） |
 | 树级全局环境注入 | `CompositionLocalProvider / LocalContext` | `@Environment(\.colorScheme)` | 跨层级全局环境注入 |
 
-**状态管理 API 核心应用场景选型矩阵：**
+**架构与层级结构全景对照：**
 
 ```
-[ 状态管理 API 核心应用场景选型矩阵 ]
+[ 阶段 05: 状态管理与数据流选型矩阵 ]
 
- 1. 视图私有状态 (组件内临时变量/展开/计数)
-    Android: remember { mutableStateOf(x) }
-    iOS:     @State private var x
+ 1. 【视图私有状态 (组件内临时可变数据)】
+    Android:           remember { mutableStateOf(x) }  ──▶ 组件内部私有状态
+    iOS:               @State private var x            ──▶ 视图私有真实数据源 (修改触发重绘)
 
- 2. 父子双向绑定 (向子组件开放数据读写权限)
-    Android: (value, onValueChange) 状态提升下发
-    iOS:     @Binding var value  <-- 父组件传递 $value 引用指针
+ 2. 【父子双向绑定 (开放数据修改权限)】
+    Android:           (value, onValueChange) 状态提升 ──▶ 通知父组件修改
+    iOS:               @Binding var value              ──▶ 传递 $value 引用指针 (原地读写数据源)
 
- 3. 派生状态计算 (基于其他状态自动缓存)
-    Android: remember(key) { derivedStateOf { ... } }
-    iOS:     计算属性 var isReady: Bool { ... } (自动追踪依赖)
+ 3. 【派生状态计算 (自动缓存与依赖追踪)】
+    Android:           remember(key) { derivedStateOf { ... } }
+    iOS:               计算属性 var isReady: Bool { ... } (Swift 自动追踪响应式依赖)
 
- 4. 页面级 ViewModel (跨组件业务模型与状态流)
-    Android: class MyVM : ViewModel() + StateFlow
-    iOS:     @Observable @MainActor class MyVM (iOS 17+ 属性级追踪)
+ 4. 【页面级业务状态持有者 (ViewModel 状态机)】
+    Android:           class MyVM : ViewModel() + StateFlow
+    iOS:               @Observable @MainActor class MyVM (iOS 17+ 属性级精准追踪)
 
- 5. 场景与进程级暂存恢复 (屏幕旋转/切后台草稿恢复)
-    Android: rememberSaveable { mutableStateOf(...) }
-    iOS:     @SceneStorage("draft_text")
-
- 6. 磁盘持久化偏好 (App 重启仍保留/设置项)
-    Android: DataStore (Flow 键值响应式流)
-    iOS:     @AppStorage("is_dark_mode") (声明式属性包装器)
-
- 7. 树级全局环境注入 (无需层层传参获取系统属性)
-    Android: CompositionLocalProvider / LocalContext.current
-    iOS:     @Environment(\.colorScheme) / @Environment(UserSession.self)
+ 5. 【持久化偏好与场景暂存】
+    场景恢复暂存:      rememberSaveable { ... }        <──▶  @SceneStorage("draft_id")
+    磁盘持久化偏好:    DataStore (Flow 键值存储)        <──▶  @AppStorage("is_dark_mode") (UserDefaults)
 ```
 
 **迁移避坑指南：**
-1. **状态作用域选型黄金法则**：视图内部私有用 `@State`；子组件读写父状态用 `@Binding`；页面级复杂业务进 `@Observable ViewModel`；跨多层级全局配置用 `@Environment`。
-2. **@AppStorage vs @SceneStorage 本质区别**：`@AppStorage` 是磁盘持久化（底层 `UserDefaults`，App 重启保留，适合设置项）；`@SceneStorage` 是场景/窗口级暂存（类似 `rememberSaveable`，退出应用可能丢失）。
-3. **SwiftUI 响应式状态模型**：`@Observable` 具备「属性级精准追踪」，仅被 View 实际读取的字段变动才会触发重绘，对应 Compose 的细粒度 Recomposition 机制。
-4. **@Binding 双向引用指针**：Compose 习惯状态提升（传入 `value` 与 `onValueChange` 回调）；SwiftUI 传入 `$state` 绑定指针，子组件修改直接同步至父组件数据源。
+1. **【状态作用域选型法则】**：视图内部私有用 `@State`；子组件读写父状态用 `@Binding`；页面级复杂业务进 `@Observable ViewModel`；跨多层级全局配置用 `@Environment`。
+2. **【@Binding 为双向指针】**：Compose 习惯状态提升（传入 `value` 与 `onValueChange` 回调）；SwiftUI 传入 `$state` 绑定指针，子组件修改直接同步至父组件数据源。
+3. **【持久化存储选型区分】**：`@AppStorage` 是磁盘持久化（底层 `UserDefaults`，App 重启仍保留）；`@SceneStorage` 是场景/窗口级暂存（退出应用可能丢失）。
+4. **【@Observable 属性级重绘】**：iOS 17+ 的 `@Observable` 具备属性级精准追踪，仅被 View 实际读取的字段变动才会触发重绘，对应 Compose 的细粒度 Recomposition 机制。
 
 **练手实战任务：** 编写一个用户偏好设置与计数器页面：包含 `@State` 私有计数器、`@Binding` 双向开关子组件、`@AppStorage` 夜间模式持久化，并在 `@Observable` ViewModel 中管理网络用户列表。
 
@@ -385,65 +410,34 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 底部导航选项卡 | `NavigationBar + NavDisplay` | `TabView(selection: $tab)` | 底部选项卡多分支容器 |
 | 模态弹窗/抽屉 | `ModalBottomSheet / Dialog` | `.sheet(isPresented:) / .fullScreenCover` | 底部抽屉与模态弹窗 |
 
-**Nav3 ↔ SwiftUI 纯数据驱动路由与 ResultEventBus 结果回传闭环：**
+**架构与层级结构全景对照：**
 
 ```
-[ Nav3 与 SwiftUI 现代纯数据驱动导航与数据回传闭环 ]
+[ 阶段 06: 现代数据驱动导航全景对照 ]
 
- 1. 强类型路由节点定义:
-    Android (Nav3):   @Serializable data class CityPickerRoute
-    iOS (SwiftUI):    enum AppRoute: Hashable { case cityPicker }
+ 1. 【强类型路由节点】
+    Android (Nav3):    @Serializable data class DetailRoute(val id: String)
+    iOS (SwiftUI):     enum AppRoute: Hashable { case detail(id: String) }
 
- 2. 状态栈管理 (纯 List 数据源):
-    Android (Nav3):   val backStack = rememberNavBackStack(HomeRoute)
-    iOS (SwiftUI):    @State var path: [AppRoute] = []
+ 2. 【状态栈数据源 (纯 List 驱动)】
+    Android (Nav3):    val backStack = rememberNavBackStack(HomeRoute)
+    iOS (SwiftUI):     @State var path: [AppRoute] = []
 
- 3. 栈操作映射 (压栈 / 出栈 / 回首页):
-    跳转压栈:   backStack.add(CityPickerRoute)      <->  path.append(.cityPicker)
-    返回出栈:   backStack.pop()                     <->  path.removeLast() / dismiss()
-    一键回首页: backStack.clear()                   <->  path.removeAll()
+ 3. 【核心栈操作映射】
+    跳转压栈:          backStack.add(DetailRoute("1"))  <──▶  path.append(.detail(id: "1"))
+    返回出栈:          backStack.pop()                  <──▶  path.removeLast()
+    一键回首页:        backStack.clear()                <──▶  path.removeAll()
 
- 4. 跨页面返回结果 (Nav3 ResultEventBus ↔ SwiftUI @Binding / 闭包):
-    【Android Nav3 方式：ResultEventBus】
-      // 1. 发送端 (CityPickerScreen)
-      val resultBus = LocalResultEventBus.current
-      Button(onClick = {
-          resultBus.sendResult(City("Shanghai")) // 发送结果事件
-          backStack.pop()                        // 出栈返回
-      }) { Text("选择上海") }
-
-      // 2. 接收端 (HomeScreen)
-      ResultEffect<City> { selectedCity ->
-          viewModel.onCitySelected(selectedCity) // 声明式监听回传事件
-      }
-
-    【iOS SwiftUI 方式：@Binding 指针双向绑定】
-      // 1. 目标选择页 (CityPickerView)
-      struct CityPickerView: View {
-          @Binding var selectedCity: String
-          @Environment(\.dismiss) private var dismiss
-          var body: some View {
-              Button("选择上海") {
-                  selectedCity = "Shanghai" // 原地修改父状态
-                  dismiss()                 // 关闭返回
-              }
-          }
-      }
-
-      // 2. 接收端 (HomeScreen)
-      NavigationStack(path: $path) {
-          HomeScreen(selectedCity: selectedCity)
-              .navigationDestination(for: AppRoute.self) { route in
-                  CityPickerView(selectedCity: $selectedCity)
-              }
-      }
+ 4. 【结果回传闭环 (Pop with Result)】
+    Android (Nav3):    LocalResultEventBus.current.sendResult(data) ──▶ ResultEffect<T> { }
+    iOS (SwiftUI):     @Binding var selectedItem: Item (直接指针回写) / 回调闭包
 ```
 
 **迁移避坑指南：**
-1. **纯数据驱动核心心智**：现代声明式路由本质是「可观察的状态列表」；页面跳转即 `List.add`，返回即 `List.removeLast`，告别任何字符串硬编码与视图嵌套。
-2. **强类型路由与解耦**：Android 借助 Kotlinx Serialization、iOS 借助 Hashable 枚举，实现编译期全类型安全与页面按需惰性构建。
-3. **Nav3 官方 ResultEventBus 体系**：在 Navigation 3 中，Google 提供了专为 `NavEntry` 设计的 `ResultEventBus`（配合 `LocalResultEventBus` 与 `ResultEffect<T>` 监听），彻底抛弃了 Nav2 的 `savedStateHandle` 字符串黑盒；而在 SwiftUI 中，最地道优雅的做法正是与其同构的 `@Binding` 双向绑定指针（原地修改父状态源并 `dismiss()`），两端均告别了传统隐式黑盒通道。
-4. **平板与多窗分栏适配**：单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
+1. **【纯 List 驱动核心心智】**：现代声明式路由本质是「可观察的状态列表」；页面跳转即 `path.append`，返回即 `path.removeLast`，彻底告别 URL 字符串拼接。
+2. **【强类型枚举替代字符串】**：路由目标使用 `enum AppRoute: Hashable` 建模，配合 `.navigationDestination(for: AppRoute.self)` 实现编译期类型安全与视图按需懒加载。
+3. **【双向绑定回传页面结果】**：相较于字符串广播总线，SwiftUI 首选 `@Binding` 双向指针（在关闭前直接回写父状态源并 `dismiss()`），简洁且零侵入。
+4. **【多栏分屏自适应 iPad】**：手机单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
 
 **练手实战任务：** 定义强类型路由，使用 Nav3 的 `ResultEventBus` / `NavDisplay` 回调与 SwiftUI 的 `NavigationStack(path:)` / `@Binding` 实现「列表压栈跳转 ➔ 详情选择并利用 `sendResult` / `@Binding` 回传结果并出栈 ➔ 一键回首页 (Pop to Root)」完整闭环。
 
@@ -486,44 +480,33 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 引用类型状态隔离 | `Mutex` | `actor` | 线程安全与并发隔离 |
 | 原子变量与无锁操作 | `AtomicInteger / AtomicBoolean` | `OSAllocatedUnfairLock / Atomic` | 原子变量与无锁同步 |
 
-**异步并发与数据流体系全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 异步并发与响应式流全景对照 ]
+[ 阶段 07: 异步并发与响应式流全景对照 ]
 
- 1. 基础任务启动与合并:
-    Android: CoroutineScope.launch { } | async { } / await() | coroutineScope { }
-    iOS:     Task { }                  | async let / await   | withTaskGroup { }
+ 1. 【任务启动与线程调度】
+    异步挂起函数:      suspend fun fetch()             <──▶  func fetch() async throws
+    启动并发任务:      CoroutineScope.launch { }       <──▶  Task { }
+    主线程 UI 调度:    withContext(Dispatchers.Main)   <──▶  @MainActor / MainActor.run { }
+    后台 IO 调度:      withContext(Dispatchers.IO)     <──▶  Task.detached { }
 
- 2. 线程切换与调度:
-    主线程 UI: Android: withContext(Dispatchers.Main) ↔ iOS: @MainActor / MainActor.run
-    后台 IO:   Android: withContext(Dispatchers.IO)   ↔ iOS: Task.detached
+ 2. 【响应式数据流对标】
+    冷数据流 (按需拉取):Flow<T> / flow { emit(x) }       <──▶  AsyncSequence / AsyncStream<T>
+    状态热流 (UI 状态): StateFlow (有默认值/防抖)       <──▶  @Observable 属性 / CurrentValueSubject
+    事件热流 (单次事件):SharedFlow / Channel (队列分发) <──▶  AsyncStream<T> / PassthroughSubject
 
- 3. 响应式流对标 (冷流 vs 状态热流 vs 事件热流):
-    【冷数据流 (按需拉取)】:
-      Android: flow { emit(1) }
-      iOS:     AsyncStream { continuation in continuation.yield(1) } / AsyncSequence
-    【状态热流 (UI 状态 / 有默认值 / 防抖)】:
-      Android: val uiState = MutableStateFlow(initialState)
-      iOS:     @Observable class ViewModel (属性级追踪) 或 CurrentValueSubject
-    【事件广播热流 (弹窗/Toast/单次事件)】:
-      Android: val eventFlow = MutableSharedFlow<UiEvent>()
-      iOS:     AsyncStream<UiEvent> 或 PassthroughSubject
-    【管道队列 (生产者-消费者)】:
-      Android: val channel = Channel<Task>()
-      iOS:     AsyncChannel<Task> / AsyncStream
-
- 4. 线程安全与并发锁:
-    Android: val mutex = Mutex(); mutex.withLock { ... }
-    iOS:     actor BankAccount { var balance = 0; func deposit() { ... } } (编译器强制数据隔离)
+ 3. 【并发安全与状态隔离】
+    Android:           val mutex = Mutex(); mutex.withLock { ... }
+    iOS:               actor SafeCounter { var count = 0; func inc() { count += 1 } }
+                       (注: Swift 编译器强制跨 actor 调用必须使用 await)
 ```
 
 **迁移避坑指南：**
-1. **UI 刷新切主线程**：Android 使用 `Dispatchers.Main`，iOS 在 UI 类（如 ViewModel）前加 `@MainActor`，或在需要时调用 `MainActor.run { ... }`。
-2. **StateFlow vs SharedFlow 在 iOS 的映射**：
-   - `StateFlow` 对应 iOS 17+ 的 `@Observable` 模型属性（或 Combine 的 `CurrentValueSubject`），具备最新状态保持与防抖机制；
-   - `SharedFlow` / `Channel` 对应 Swift 的 `AsyncStream`（或 Combine 的 `PassthroughSubject`），适合一次性弹窗、导航跳转或事件总线。
-3. **Actor 彻底消除数据竞争**：Swift 编译器对 `actor` 实施严格的隔离检查，跨 actor 访问必须 `await`，从编译期杜绝多线程竞争。
+1. **【UI 状态刷新切主线程】**：Android 使用 `withContext(Dispatchers.Main)`；iOS 在 UI 类或 ViewModel 前加 `@MainActor`，确保所有状态修改均在主线程执行。
+2. **【StateFlow 映射 @Observable】**：`StateFlow`（保持最新值/防抖）对应 iOS 17+ 的 `@Observable` 属性；一次性事件广播通道对应 Swift 的 `AsyncStream`。
+3. **【Actor 彻底消除数据竞争】**：Swift 编译器对 `actor` 实施严格的隔离检查，跨 actor 访问必须 `await`，从编译期杜绝多线程竞争。
+4. **【协作式任务取消机制】**：Swift Task 具备结构化并发能力，长循环内部应定期检查 `Task.isCancelled` 或调用 `try Task.checkCancellation()` 响应取消。
 
 **练手实战任务：** 使用 `Task` + `withTaskGroup` 并发请求多个 API，并在 ViewModel 中分别使用 `StateFlow`/`@Observable` 驱动界面状态，用 `SharedFlow`/`AsyncStream` 广播一次性 Toast 提示，使用 `actor` 实现一个并发安全的自增计数器。
 
@@ -566,60 +549,32 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | SSL 证书锁定防抓包 | `CertificatePinner` | `URLSessionDelegate` | SSL 证书锁定防抓包 |
 | 全双工实时通信 | `WebSocketListener` | `URLSessionWebSocketTask` | 全双工实时通信 |
 
-**现代网络请求与数据编解码全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 现代网络请求与数据编解码全景对照 ]
+[ 阶段 08: 现代网络请求与数据解析全景对照 ]
 
- 1. 简单异步 GET 请求:
-    Android (OkHttp + Coroutines):
-      val request = Request.Builder().url("https://api.example.com/users").build()
-      val response = okHttpClient.newCall(request).await()
-      val jsonString = response.body?.string()
+ 1. 【HTTP 引擎与请求构建】
+    底层会话引擎:      OkHttpClient                    <──▶  URLSession(configuration:)
+    异步 GET 请求:     client.newCall(req).await()     <──▶  let (data, res) = try await URLSession.shared.data(from: url)
+    请求头与请求体:    Request.Builder().post(body)    <──▶  var req = URLRequest(url:); req.httpMethod = "POST"
 
-    iOS (Swift Concurrency + URLSession):
-      let (data, response) = try await URLSession.shared.data(from: url)
-      guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
-          throw URLError(.badServerResponse)
-      }
+ 2. 【JSON 序列化与 Codable】
+    数据模型协议契约:  @Serializable                   <──▶  Codable (Decodable & Encodable)
+    反序列化解析:      Json.decodeFromString<T>(json)  <──▶  JSONDecoder().decode(T.self, from: data)
+    字段别名映射:      @SerialName("user_id")          <──▶  enum CodingKeys: String, CodingKey { case userId = "user_id" }
+    蛇形转驼峰策略:    namingStrategy = SnakeCase      <──▶  decoder.keyDecodingStrategy = .convertFromSnakeCase
 
- 2. 构造 POST 请求与请求头:
-    Android:
-      val body = jsonString.toRequestBody("application/json".toMediaType())
-      val request = Request.Builder()
-          .url("https://api.example.com/login")
-          .header("Authorization", "Bearer $token")
-          .post(body)
-          .build()
-
-    iOS:
-      var request = URLRequest(url: url)
-      request.httpMethod = "POST"
-      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-      request.httpBody = try JSONEncoder().encode(loginPayload)
-      let (data, response) = try await URLSession.shared.data(for: request)
-
- 3. Codable 极速编解码与蛇形转驼峰:
-    【Swift Data Model】
-      struct User: Identifiable, Codable {
-          let id: Int
-          let userName: String  // 自动从服务端的 user_name 映射
-          let createdAt: Date   // 自动按照 ISO8601 解析
-      }
-
-    【解码配置】
-      let decoder = JSONDecoder()
-      decoder.keyDecodingStrategy = .convertFromSnakeCase
-      decoder.dateDecodingStrategy = .iso8601
-      let user = try decoder.decode(User.self, from: data)
+ 3. 【管道拦截与全双工流】
+    管道拦截器中间件:  OkHttp Interceptor              <──▶  URLProtocol / 自定义 API Client 管道
+    全双工 WebSocket:  WebSocketListener               <──▶  URLSessionWebSocketTask (原生异步消息流)
 ```
 
 **迁移避坑指南：**
-1. **无需硬套 Retrofit**：iOS 原生 `URLSession` + `async/await` 极其轻巧，通常只需手写一个通用的 `APIClient` 结构体/类（包含 `baseURL`、`headers` 与 `request<T: Decodable>()` 方法），即可替代庞大的第三方网络库。
-2. **校验 HTTP 状态码**：`URLSession.shared.data(for:)` 只要网络连通（即便返回 404 或 500）都不会抛出 Swift 异常；必须显式将 `response` 下转型为 `HTTPURLResponse` 并检查 `statusCode`。
-3. **下划线命名首选 convertFromSnakeCase**：当服务端下发 `snake_case` 字段时，直接指定 `decoder.keyDecodingStrategy = .convertFromSnakeCase`，模型属性直接写驼峰 `userName`，无需编写繁琐的 `enum CodingKeys`。
-4. **大文件下载用 bytes(from:)**：对应 Android 的 `ResponseBody.byteStream()`，iOS 使用 `URLSession.shared.bytes(from: url)` 异步流，边下边读，避免撑爆内存。
+1. **【原生 URLSession 极简轻量】**：iOS 首选原生 `URLSession`，配合 `async/await` 与 `Codable` 即可兼具性能与类型安全，无需强行引入 Retrofit 式重型封装。
+2. **【Codable 零反射极速编解码】**：只需为数据模型遵循 `Codable` 协议，编译器自动生成极速编解码代码；配合 `keyDecodingStrategy = .convertFromSnakeCase` 自动转换蛇形下划线。
+3. **【状态码校验不可省略】**：`URLSession` 返回 `(Data, URLResponse)` 元组，即使返回 404/500 也不会抛出异常；必须将 response 强转为 `HTTPURLResponse` 校验状态码 (200...299)。
+4. **【网络请求绑定视图生命周期】**：网络任务置于 `.task { }` 修饰符中，当 View 离开视图树时，SwiftUI 会自动协作式取消底层的 `URLSession` 异步任务。
 
 **练手实战任务：** 使用原生 `URLSession` + `async/await` + `Codable` 封装一个通用的 `APIClient`：支持自动附加 Bearer Token、全局开启蛇形转驼峰与 ISO8601 时间解析、并在 401 响应时统一拦截抛出业务错误。
 
@@ -661,74 +616,33 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 磁盘文件直接读写 | `file.writeText() / file.readBytes()` | `data.write(to:) / Data(contentsOf:)` | 磁盘文件直接读写 |
 | 文件与目录管理 | `file.mkdirs() / file.delete()` | `FileManager.createDirectory() / removeItem()` | 文件与文件夹增删管理 |
 
-**本地持久化与数据库全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 本地持久化与数据库全景选型对照 ]
+[ 阶段 09: 本地持久化与数据库选型矩阵 ]
 
- 1. 声明式键值偏好 (@AppStorage ↔ DataStore):
-    Android:
-      val THEME_KEY = booleanPreferencesKey("is_dark_mode")
-      val isDarkMode: Flow<Boolean> = context.dataStore.data.map { it[THEME_KEY] ?: false }
+ 1. 【轻量键值偏好存储】
+    简单设置项:        SharedPreferences / DataStore   <──▶  UserDefaults.standard / @AppStorage
+    跨 App / 扩展共享: ContentProvider                 <──▶  UserDefaults(suiteName: "group.com.app")
 
-    iOS (SwiftUI 原生绑定，变动自动重绘):
-      @AppStorage("is_dark_mode") private var isDarkMode: Bool = false
+ 2. 【凭据与敏感令牌 (硬件级安全)】
+    Android:           EncryptedSharedPreferences / KeyStore (TEE 安全芯片)
+    iOS:               Keychain Services (Secure Enclave / 生物识别 Face ID / 卸载仍保留)
 
- 2. Keychain 硬件安全加密存储 (存储 Token 与敏感凭据):
-    【Keychain 写入与读取 (建议使用 KeychainAccess 等封装或原生 SecItem)】
-      // 写入 Token
-      let query: [String: Any] = [
-          kSecClass as String: kSecClassGenericPassword,
-          kSecAttrAccount as String: "authToken",
-          kSecValueData as String: "token_abc123".data(using: .utf8)!
-      ]
-      SecItemAdd(query as CFDictionary, nil)
+ 3. 【结构化对象关系数据库】
+    实体注解模型:      Room (@Entity / @Dao)           <──▶  SwiftData (@Model 原生 Swift 宏)
+    响应式数据查询:    dao.getUsersFlow() (Flow 监听)   <──▶  @Query var users: [User] (声明式自动重绘)
 
- 3. SwiftData 现代声明式数据库 (iOS 17+ vs Android Room):
-    【实体模型定义】
-      @Model
-      final class TodoItem {
-          @Attribute(.unique) var id: String
-          var title: String
-          var isDone: Bool
-          var createdAt: Date
-
-          init(id: String = UUID().uuidString, title: String, isDone: Bool = false) {
-              self.id = id
-              self.title = title
-              self.isDone = isDone
-              self.createdAt = Date()
-          }
-      }
-
-    【View 内部直接响应式查询与操作】
-      struct TodoListView: View {
-          @Environment(\.modelContext) private var modelContext
-          @Query(sort: \TodoItem.createdAt, order: .reverse) private var todos: [TodoItem]
-
-          var body: some View {
-              List {
-                  ForEach(todos) { todo in
-                      Text(todo.title)
-                  }
-                  .onDelete { indexSet in
-                      for index in indexSet {
-                          modelContext.delete(todos[index])
-                      }
-                  }
-              }
-              Button("添加任务") {
-                  modelContext.insert(TodoItem(title: "新任务"))
-              }
-          }
-      }
+ 4. 【沙盒文件系统与目录】
+    用户文档目录:      context.filesDir                <──▶  FileManager (.documentDirectory / iCloud 自动备份)
+    临时缓存目录:      context.cacheDir                <──▶  FileManager (.cachesDirectory / 系统内存吃紧自动清理)
 ```
 
 **迁移避坑指南：**
-1. **持久化选型黄金法则**：UI 设置项用 `@AppStorage` / `UserDefaults`；敏感 Token 必须入 `Keychain` 硬件加密；大表结构化数据用 `SwiftData` / `Room`；大体积文件/图片放沙盒 `Documents`/`Caches`。
-2. **SwiftData 极简开发体验**：基于 Swift 宏直接在纯 class 上标记 `@Model`，View 内部直接写 `@Query` 声明式自动监听数据变化，无需编写任何 SQL、DAO 或编译期注解处理器 (KSP)。
-3. **Keychain 独立于沙盒**：与 Android KeyStore 类似，Keychain 独立于 App 沙盒，即使卸载重装 App 凭据也不会丢失，并原生支持 Face ID / Touch ID 生物识别授权。
-4. **沙盒目录分工**：`.documentDirectory` 用户生成数据会被 iCloud 自动备份；`.cachesDirectory` 系统可在空间不足时自动清空，切勿将核心不可再生数据存入缓存区。
+1. **【持久化选型四大象限】**：UI 设置项用 `@AppStorage`；敏感 Token 必须存 `Keychain`；结构化大表数据用 `SwiftData`；大体积文件/图片放沙盒 `Documents`。
+2. **【SwiftData 现代 ORM 模型】**：iOS 17+ 废弃复杂的 CoreData 模型文件，直接在普通 class 上标记 `@Model`，View 内部直接写 `@Query` 即可实现响应式零样板代码监听。
+3. **【Keychain 硬件级加密防护】**：Keychain 独立于 App 沙盒，应用卸载重装凭据仍会保留，且原生支持 Touch ID / Face ID 生物识别授权。
+4. **【Documents 与 Caches 严格分工】**：`.documentDirectory` 会被 iCloud 自动备份；`.cachesDirectory` 在系统存储空间吃紧时会被随时清理，切勿存放核心不可再生数据。
 
 **练手实战任务：** 使用 `Keychain` 存取用户 Token、使用 `@AppStorage` 保存夜间模式偏好、使用 SwiftData (`@Model` + `@Query`) 实现本地待办清单增删改查，并使用 `FileManager` 保存一张头像图片至 `Documents` 目录。
 
@@ -768,92 +682,43 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 依赖倒置与接口下沉 | `interface 下沉 domain 模块` | `protocol 下沉 Core 模块` | 依赖倒置与接口下沉 |
 | 依赖注入装配根节点 | `Hilt @Module / Koin module` | `AppContainer / Factory` | 依赖注入组装根节点 |
 
-**现代移动端应用架构与单向数据流全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 现代移动端应用架构与单向数据流全景对照 ]
+[ 阶段 10: 现代移动端 Clean MVVM + UDF 单向数据流架构全景 ]
 
- 1. Clean Architecture + UDF 状态流向:
-    【UI 层 (View)】
-      用户点击 "刷新" ➔ 发送 Intent: .refresh
-    【ViewModel 层】
-      接收 Intent ➔ 将 uiState 置为 .loading ➔ 调用 GetNewsUseCase / Repository
-    【Repository 仓库层】
-      网络拉取 (URLSession) ➔ 本地缓存入库 (SwiftData) ➔ 返回领域模型
-    【ViewModel 层】
-      将 uiState 置为 .success(newsList)
-    【UI 层 (View)】
-      SwiftUI / Compose 监测到 State 变更 ➔ 细粒度精准重绘列表
-
- 2. 现代 iOS Clean MVVM + UDF 代码实现范式:
-    【State 与 Intent 状态建模】
-      struct NewsUiState {
-          var isLoading: Bool = false
-          var items: [NewsItem] = []
-          var errorMessage: String? = nil
-      }
-
-      enum NewsUiIntent {
-          case loadInitial
-          case refresh
-          case toggleBookmark(id: String)
-      }
-
-    【ViewModel 业务状态机】
-      @Observable
-      @MainActor
-      final class NewsViewModel {
-          private(set) var uiState = NewsUiState()
-          private let repository: NewsRepositoryProtocol
-
-          init(repository: NewsRepositoryProtocol) {
-              self.repository = repository
-          }
-
-          func send(_ intent: NewsUiIntent) async {
-              switch intent {
-              case .loadInitial, .refresh:
-                  uiState.isLoading = true
-                  do {
-                      let items = try await repository.fetchLatestNews()
-                      uiState.items = items
-                      uiState.isLoading = false
-                  } catch {
-                      uiState.errorMessage = error.localizedDescription
-                      uiState.isLoading = false
-                  }
-              case .toggleBookmark(let id):
-                  try? await repository.toggleBookmark(id: id)
-              }
-          }
-      }
-
-    【声明式 View 消费】
-      struct NewsListView: View {
-          @State private var viewModel: NewsViewModel
-
-          var body: some View {
-              List(viewModel.uiState.items) { item in
-                  NewsRow(item: item)
-              }
-              .overlay {
-                  if viewModel.uiState.isLoading { ProgressView() }
-              }
-              .task {
-                  await viewModel.send(.loadInitial)
-              }
-              .refreshable {
-                  await viewModel.send(.refresh)
-              }
-          }
-      }
+ +-----------------------------------------------------------------------------------+
+ | 表现层 View Layer (声明式 UI)                                                     |
+ |   Android: Jetpack Compose @Composable    │  iOS: SwiftUI struct View             |
+ +-----------------------------------------------------------------------------------+
+                                         │
+                                         │ 用户意图分发 (User Action / UiIntent)
+                                         ▼
+ +-----------------------------------------------------------------------------------+
+ | 业务模型层 ViewModel Layer (状态机驱动)                                           |
+ |   Android: ViewModel + StateFlow<UiState> │  iOS: @Observable ViewModel (UiState) |
+ +-----------------------------------------------------------------------------------+
+                                         │
+                                         │ 异步调度领域用例 (Invoke Domain / Repo Use Cases)
+                                         ▼
+ +-----------------------------------------------------------------------------------+
+ | 数据仓库层 Repository Layer (单一可信数据源 Single Source of Truth)               |
+ |   Repository 抽象协议契约 (统管内存缓存、远程 API 与本地数据库)                   |
+ +-----------------------------------------------------------------------------------+
+                   │                                             │
+                   │ 远程网络请求分发                            │ 本地持久化数据分发
+                   ▼                                             ▼
+ +-----------------------------------+         +-------------------------------------+
+ | 远程数据源 Remote DataSource      |         | 本地数据源 Local DataSource         |
+ |   Retrofit / Ktor ──▶ URLSession  |         |   Room ──▶ SwiftData / Keychain     |
+ +-----------------------------------+         +-------------------------------------+
 ```
 
 **迁移避坑指南：**
-1. **MVVM + UDF 核心心智**：View 保持极简纯净（只绑 State、发 Intent）；ViewModel 拥有唯一的真实状态源 (`StateFlow` / `@Observable`)；禁止在 View 内部直接发起数据库或网络请求。
-2. **Repository 单一数据源**：Repository 统管内存缓存、本地数据库 (`Room` / `SwiftData`) 与网络请求 (`Retrofit` / `URLSession`)，向上层暴露统一的 Flow 或 async 方法，屏蔽数据来源细节。
-3. **MVI 与 TCA 架构演进**：对于复杂交互流，使用 sealed class / enum 将用户动作建模为严格的 Intent，状态建模为不可变 State，彻底杜绝多线程状态不一致与 race condition。
-4. **工程组件化最佳实践**：Android 依赖 Gradle 多模块，iOS 优先使用 SPM Package 多 Target 拆分（Domain / Data / Feature），通过 Protocol 依赖倒置实现跨模块完全解耦与独立编译加速。
+1. **【MVVM + UDF 核心心智】**：View 保持极简纯净（只绑 State、发 Intent）；ViewModel 拥有唯一的真实状态源；禁止在 View 内部直接发起数据库或网络请求。
+2. **【Repository 单一数据源】**：Repository 统管内存缓存、本地数据库 (`Room`/`SwiftData`) 与网络请求 (`URLSession`)，暴露统一的 async 方法，屏蔽数据来源细节。
+3. **【MVI 不可变状态建模】**：将用户动作建模为严格的 Intent 枚举，状态建模为不可变 UiState 结构体，彻底消除多线程竞态条件与状态错乱。
+4. **【SPM 多 Target 组件化解耦】**：对标 Android Gradle 多模块，iOS 推荐采用 SPM Package 拆分多个 Target（Domain / Data / Feature），通过 Protocol 依赖倒置实现并行编译加速。
 
 **练手实战任务：** 按照 Clean Architecture + MVVM + UDF 架构重构一个完整的资讯阅读器 App：包含 `UiState` 不可变状态、`UiIntent` 意图驱动、`Repository` 统一拉取与本地收藏缓存、以及基于 Protocol 的 Mock 测试注入。
 
@@ -895,53 +760,31 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 运行时服务定位与解析 | `Koin (get() / by inject())` | `Swinject / Resolver` | 运行时服务定位与解析 |
 | 跨端选型哲学差异 | `Hilt 为官方必选标准` | `原生 Protocol + init 占 80%` | iOS 极简与轻量化哲学 |
 
-**依赖注入与服务解耦全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 依赖注入与服务解耦全景对照 ]
+[ 阶段 11: 依赖注入与服务解耦选型矩阵 ]
 
- 1. 原生 Protocol + 构造函数注入 (iOS 官方最推荐范式):
-    【契约定义】
-      protocol NewsRepositoryProtocol: Sendable {
-          func fetchNews() async throws -> [NewsItem]
-      }
+ 1. 【原生构造注入 (iOS 80% 推荐范式)】
+    抽象协议契约:      interface UserRepository        <──▶  protocol UserRepositoryProtocol
+    构造函数默认注入:  class VM(val repo: Repo)        <──▶  init(repo: UserRepositoryProtocol = LiveRepo())
+    Preview / 单测替换:VM(FakeRepo())                  <──▶  #Preview { UserView(vm: VM(repo: MockRepo())) }
 
-    【ViewModel 构造注入 (默认参数带线上实现，无需第三方框架)】
-      @Observable
-      @MainActor
-      final class NewsViewModel {
-          private let repository: NewsRepositoryProtocol
+ 2. 【视图树级环境注入】
+    Android:           CompositionLocalProvider(LocalService provides service) { ... }
+    iOS (SwiftUI):     View.environment(\.apiClient, client) ──▶ @Environment(\.apiClient) var client
 
-          init(repository: NewsRepositoryProtocol = LiveNewsRepository()) {
-              self.repository = repository
-          }
-      }
-
-    【Xcode Preview 与单测极速 Mock】
-      #Preview {
-          NewsView(viewModel: NewsViewModel(repository: MockNewsRepository()))
-      }
-
- 2. 现代轻量容器 Factory (类似 Koin 体验):
-    【容器定义】
-      import Factory
-
-      extension Container {
-          var newsRepository: Factory<NewsRepositoryProtocol> {
-              self { LiveNewsRepository() }.singleton
-          }
-      }
-
-    【类中直接属性注入】
-      final class NewsViewModel: ObservableObject {
-          @Injected(\.newsRepository) private var repository
-      }
+ 3. 【现代轻量 DI 容器 (Factory)】
+    模块容器定义:      val appModule = module { ... }  <──▶  Container.shared.repo = Factory { LiveRepo() }
+    属性包装器注入:    val vm: VM by viewModel()       <──▶  @Injected(\.repo) private var repo
+    生命周期作用域:    single { } / factory { }        <──▶  .singleton / .unique / .shared
 ```
 
 **迁移避坑指南：**
-1. **切勿盲目引入复杂框架**：Android 习惯使用 Hilt（带反射/APT/KSP 生成），而 iOS 社区更推崇轻量无魔法。新工程优先使用 `Protocol + init` 构造注入，规模扩大后再考虑引入 `Factory`。
-2. **SwiftUI 善用 @Environment**：跨多个视图层级共享的服务（如全局网络 Client、认证状态），直接使用 `@Environment` 注入，避免层层构造传递。
-3. **Mock 隔离数据库与网络**：所有对外的 Repository 必须以 Protocol 暴露，单测只测 ViewModel 业务状态机，不产生真实 I/O 损耗。
+1. **【iOS 极简注入哲学】**：iOS 生态不依赖重型注解生成框架；80% 以上的项目仅靠 Protocol 协议抽象与 `init` 构造函数默认参数即可实现纯净解耦。
+2. **【SwiftUI 善用 @Environment】**：全局通用服务（如 Auth 认证、全局网络 Client）通过自定义 EnvironmentKey 注入 SwiftUI 视图树，避免逐层传参。
+3. **【业务扩大选用 Factory】**：当需要类似 Koin 的服务定位与属性注入时，首选 Factory 现代容器，具备编译期类型安全且无代码生成开销。
+4. **【Mock 隔离单测与预览】**：所有外部依赖均面向 Protocol 抽象，在 Xcode Preview 与 XCTest 中一键注入 MockRepository，零网络与数据库副作用。
 
 **练手实战任务：** 定义 `UserRepositoryProtocol`，使用原生构造函数注入编写 `UserViewModel`，并在 SwiftUI Preview 中通过 Mock 实现离线预览，随后使用 Factory 体验容器化注入。
 
@@ -977,48 +820,31 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 裁剪与内容模式 | `ContentScale.Crop / Fit` | `.aspectRatio(contentMode: .fill / .fit)` | 裁剪缩放与宽高比控制 |
 | 滤镜与着色效果 | `Modifier.blur() / tint` | `.blur(radius:) / .colorMultiply()` | 模糊滤镜与着色渲染 |
 
-**图片与静态资源全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 图片与静态资源处理全景对照 ]
+[ 阶段 12: 图片与静态资源处理选型矩阵 ]
 
- 1. 矢量图导入与 Single Scale:
-    Android: 导入 svg/xml ➔ res/drawable/ic_logo.xml (VectorDrawable)
-    iOS:     拖入 Assets.xcassets ➔ 选中图片 ➔ Attributes Inspector ➔ Scales 选「Single Scale」 (免切 3 套图)
+ 1. 【静态资产与矢量适配】
+    矢量图导入:        res/drawable/ic_logo.xml        <──▶  Assets.xcassets SVG/PDF 矢量图导入
+    矢量自动栅格化:    VectorDrawable 动态缩放         <──▶  Attributes Inspector 勾选「Single Scale」
+    深浅色主题适配:    res/values/colors.xml (night)   <──▶  Color Set (Any / Dark Appearance)
 
- 2. 异步网络图片加载范式:
-    【原生内置 AsyncImage (iOS 15+)】
-      AsyncImage(url: URL(string: "https://example.com/avatar.png")) { phase in
-          switch phase {
-          case .empty:
-              ProgressView()
-          case .success(let image):
-              image
-                  .resizable()
-                  .aspectRatio(contentMode: .fill)
-                  .frame(width: 80, height: 80)
-                  .clipShape(Circle())
-          case .failure:
-              Image(systemName: "person.crop.circle.badge.exclamationmark")
-                  .foregroundStyle(.gray)
-          @unknown default:
-              EmptyView()
-          }
-      }
+ 2. 【异步网络图片加载与缓存】
+    原生异步图片:      SubcomposeAsyncImage            <──▶  AsyncImage(url:) { phase in ... }
+    第三方主流方案:    Coil / Glide                    <──▶  Kingfisher (KFImage) / Nuke
+    多级缓存控制:      MemoryCache + DiskCache         <──▶  ImageCache.default (内存上限 + 磁盘过期)
 
-    【第三方 Kingfisher (对标 Coil / Glide)】
-      KFImage(URL(string: "https://example.com/banner.jpg"))
-          .placeholder { ProgressView() }
-          .setProcessor(RoundCornerImageProcessor(cornerRadius: 12))
-          .cacheMemoryOnly()
-          .resizable()
-          .aspectRatio(contentMode: .fit)
+ 3. 【内存位图与图像处理】
+    内存位图对象:      Bitmap / ImageBitmap            <──▶  UIImage / CGImage (CoreGraphics 管道)
+    裁剪与缩放链:      ContentScale.Crop               <──▶  .resizable().aspectRatio(contentMode: .fill).frame(...)
 ```
 
 **迁移避坑指南：**
-1. **Image 缩放链式规则**：SwiftUI 中 `Image` 默认按原始像素尺寸绘制，撑满外框必须链式声明 `.resizable().aspectRatio(contentMode: .fill).frame(...)`，遗漏 `.resizable()` 会导致图片无法缩放。
-2. **矢量图 Single Scale 机制**：Assets 导入 SVG/PDF 时，必须勾选「Single Scale」与「Preserve Vector Data」，Xcode 才会自动生成全分辨率位图并在放大时保持矢量清晰度。
-3. **AsyncImage 缓存局限**：原生 `AsyncImage` 仅依赖基础的 `URLCache`，不支持精细的磁盘过期策略与内存上限控制；对高性能瀑布流推荐使用成熟的 `Kingfisher`。
+1. **【Image 缩放必加 resizable】**：SwiftUI 中 `Image` 默认按原始像素尺寸绘制，撑满外框必须链式声明 `.resizable().aspectRatio(contentMode: .fill).frame(...)`。
+2. **【矢量图勾选 Single Scale】**：Assets 导入 SVG/PDF 矢量图标时，在 Attributes Inspector 勾选「Single Scale」，Xcode 会在编译期自动生成全套多倍图。
+3. **【深浅色自适应 Color Set】**：在 Assets 中创建 Color Set 并分别配置 Any 与 Dark 色值，代码中直接调用 `Color("BrandPrimary")` 即可自动响应深色模式。
+4. **【AsyncImage 缓存局限】**：原生 `AsyncImage` 仅依赖系统 `URLCache`，不支持精细的磁盘过期策略与预加载；复杂长列表推荐使用 `Kingfisher`。
 
 **练手实战任务：** 在 Assets 中配置一套自适应浅/深色模式的主题 Color Set 与 SVG 图标，使用 `AsyncImage` 实现带有加载骨架屏与失败重试占位图的网络商品图列表。
 
@@ -1054,53 +880,31 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 拖拽手势交互 | `pointerInput + Modifier.offset` | `DragGesture() + .offset(...)` | 拖拽手势实时交互动画 |
 | 关键帧与多阶段 | `KeyframesSpec` | `PhaseAnimator / KeyframeAnimator` | 多阶段序列与关键帧动画 |
 
-**声明式动画与转场体系全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 声明式动画与转场全景对照 ]
+[ 阶段 13: 声明式动画与转场动效全景对照 ]
 
- 1. 物理弹簧与显式动画:
-    Android:
-      val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1.0f, animationSpec = spring())
-    iOS:
-      Button("Tap Me") {
-          withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-              isExpanded.toggle()
-          }
-      }
-      .scaleEffect(isExpanded ? 1.1 : 1.0)
+ 1. 【状态驱动属性插值】
+    隐式属性动画:      val size by animateDpAsState()  <──▶  .animation(.spring(), value: targetState)
+    显式闭包触发:      LaunchedEffect / Animatable     <──▶  withAnimation(.spring()) { isExpanded.toggle() }
+    物理弹簧曲线:      spring(dampingRatio, stiffness) <──▶  .spring(response: 0.5, dampingFraction: 0.7)
 
- 2. matchedGeometryEffect 共享元素形变 (对标 Compose SharedTransition):
-    struct SharedCardView: View {
-        @Namespace private var animationNamespace
-        @State private var isDetail = false
+ 2. 【视图进退场转场过渡】
+    条件进退场:        AnimatedVisibility(enter, exit) <──▶  if condition { View } + .transition(.slide)
+    组合过渡动效:      fadeIn() + slideInVertically()  <──▶  .opacity.combined(with: .slide)
+    内容形态平滑切换:  AnimatedContent                 <──▶  .contentTransition(.numericText())
 
-        var body: some View {
-            if !isDetail {
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(.blue)
-                    .matchedGeometryEffect(id: "card_shape", in: animationNamespace)
-                    .frame(width: 120, height: 120)
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { isDetail = true }
-                    }
-            } else {
-                RoundedRectangle(cornerRadius: 28)
-                    .fill(.blue)
-                    .matchedGeometryEffect(id: "card_shape", in: animationNamespace)
-                    .frame(maxWidth: .infinity, maxHeight: 300)
-                    .onTapGesture {
-                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { isDetail = false }
-                    }
-            }
-        }
-    }
+ 3. 【高级几何形变与手势】
+    跨层级共享元素:    SharedTransitionLayout          <──▶  matchedGeometryEffect(id:in:namespace)
+    交互式拖拽手势:    pointerInput + Modifier.offset  <──▶  DragGesture().onChanged { }.onEnded { }
 ```
 
 **迁移避坑指南：**
-1. **.animation(value:) 必须绑定状态**：从 iOS 15 开始，无参数的 `.animation()` 已被废弃；必须使用 `.animation(.spring(), value: targetState)` 明确监听状态，避免无意触发意外重绘动画。
-2. **.transition 必须在条件分支内**：`.transition(...)` 必须挂载在由 `if/else` 或 `ForEach` 动态增删的视图上，并在外部通过 `withAnimation { ... }` 触发状态变更才会生效。
-3. **matchedGeometryEffect 必须共用 Namespace**：两个变形视图必须处于同一个 `@Namespace` 作用域内，且赋予完全相同的 `id` 字符串。
+1. **【.animation 必显式绑定 value】**：从 iOS 15 开始，无参数的 `.animation()` 已废弃；必须使用 `.animation(.spring(), value: targetState)` 绑定具体状态，避免无意触发意外重绘。
+2. **【.transition 必须依赖条件分支】**：`.transition(...)` 必须挂载在由 `if/else` 或 `ForEach` 动态增删的视图上，并在外部通过 `withAnimation { ... }` 触发状态变更。
+3. **【首选物理弹簧 Curves】**：iOS 极度推崇物理弹簧质感（`.spring(response:dampingFraction:)`），相比线性与贝塞尔曲线更具跟手感与可打断性。
+4. **【matchedGeometryEffect 共用命名空间】**：跨层级形变的两个视图必须处于同一个 `@Namespace` 作用域内，且赋予完全相同的 `id` 标识。
 
 **练手实战任务：** 实现一个高质感商品详情动效：包含列表卡片点击通过 `matchedGeometryEffect` 展开至全屏大图、弹簧物理阻尼按钮点击缩放反馈、以及下拉拖拽手势实时跟手缩放返回列表。
 
@@ -1136,45 +940,31 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 域名深链直达 | `App Links (.well-known/assetlinks.json)` | `Universal Links (.well-known/apple-app-site-association)` | 外部链接直达页面 (Deep Link) |
 | 自定义协议跳转 | `Custom Scheme (<data android:scheme>)` | `URL Schemes (CFBundleURLTypes)` | 自定义协议头跳转 |
 
-**iOS 核心系统能力全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ iOS 核心系统能力与权限后台对照 ]
+[ 阶段 14: 系统权限、后台任务与推送直达全景对照 ]
 
- 1. 运行时权限申请范式 (以相机权限为例):
-    【Info.plist 配置必填文案】
-      <key>NSCameraUsageDescription</key>
-      <string>需要使用相机拍摄头像与扫描二维码</string>
+ 1. 【隐私权限合规体系】
+    权限静态声明:      AndroidManifest.xml             <──▶  Info.plist (Privacy Usage Descriptions 必填)
+    运行时动态授权:    RequestPermission API           <──▶  AVCaptureDevice.requestAccess / UNUserNotificationCenter
+    权限状态检测:      PermissionChecker               <──▶  .authorized / .denied / .notDetermined
 
-    【代码中请求授权】
-      switch AVCaptureDevice.authorizationStatus(for: .video) {
-      case .authorized:
-          openCamera()
-      case .notDetermined:
-          AVCaptureDevice.requestAccess(for: .video) { granted in
-              if granted { openCamera() }
-          }
-      case .denied, .restricted:
-          guideUserToSettings() // 引导跳系统设置页
-      @unknown default:
-          break
-      }
+ 2. 【后台任务执行与保活】
+    周期性后台调度:    WorkManager (PeriodicRequest)   <──▶  BackgroundTasks (BGAppRefreshTask 系统统筹)
+    后台音频/定位保活: Foreground Service              <──▶  CLLocationManager (background) / AVAudioSession (.playback)
 
- 2. 本地定时通知调度 (UNUserNotificationCenter):
-    let content = UNMutableNotificationContent()
-    content.title = "学习提醒"
-    content.body = "今天完成 SwiftUI 动画章节学习了吗？"
-    content.sound = .default
-
-    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-    let request = UNNotificationRequest(identifier: "study_reminder", content: content, trigger: trigger)
-    try await UNUserNotificationCenter.current().add(request)
+ 3. 【消息推送与外部直达】
+    远程推送通道:      FCM (Firebase Cloud Messaging)  <──▶  APNs (Apple Push Notification 系统统一通道)
+    本地定时通知:      NotificationCompat.Builder      <──▶  UNNotificationRequest + UNTimeIntervalNotificationTrigger
+    域名深度直达:      App Links (assetlinks.json)     <──▶  Universal Links (apple-app-site-association)
 ```
 
 **迁移避坑指南：**
-1. **权限描述缺失必闪退**：iOS 严禁未配置 Info.plist 描述文案调用相机、相册、定位 API，只要触发直接 SIGABRT 闪退。
-2. **后台无自由 Service**：iOS 不允许无限制后台常驻，切勿尝试在后台自建 WebSocket 长连接；所有后台刷新必须注册 `BGAppRefreshTask` 由系统统筹调度。
-3. **Universal Links 必须双向验证**：域名必须支持 HTTPS，服务器根目录必须部署 `apple-app-site-association`，且 Xcode 的 Associated Domains 必须配置 `applinks:yourdomain.com`。
+1. **【权限描述缺失必闪退】**：相机、相册、定位等敏感硬件权限必须在 `Info.plist` 中配置明确的用途描述文案；未配置调用时系统直接崩溃闪退 (SIGABRT)。
+2. **【后台严禁自由常驻】**：iOS 不允许无限制后台常驻服务；所有后台定期任务必须注册 `BackgroundTasks`，由系统根据电量和网络统筹唤醒。
+3. **【APNs 统一远程推送管道】**：所有 iOS 远程推送均经由 Apple APNs 下发；在 AppDelegate 中注册并获取 `deviceToken` 即可接收系统原生横幅。
+4. **【Universal Links 双向域名校验】**：必须在 HTTPS 域名服务器根目录部署 `apple-app-site-association` 文件，并在 Xcode 的 Associated Domains 中配置对应域名。
 
 **练手实战任务：** 在 Info.plist 配置相机权限文案并编写运行时请求逻辑，使用 `UNUserNotificationCenter` 调度一个 5 秒后触发的本地通知，并在 Xcode 关联 Universal Links 域名。
 
@@ -1208,54 +998,31 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 控件定位查找 | `onNodeWithTag("btn")` | `app.buttons["login_button"]` | 无障碍标识符查找 |
 | 模拟用户交互 | `performClick() / performTextInput()` | `element.tap() / element.typeText()` | 模拟手势点击与文本输入 |
 
-**iOS 单元测试与 UI 测试全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ iOS 单元测试与 UI 测试代码范式 ]
+[ 阶段 15: 单元测试与 UI 自动化测试全景对照 ]
 
- 1. 现代 Swift Testing 单元测试 (Xcode 16+ / 纯宏声明):
-    import Testing
-    @testable import MyApp
+ 1. 【业务逻辑与单元测试】
+    经典测试框架:      JUnit 4 / JUnit 5               <──▶  XCTest (XCTestCase) + XCTAssertEqual
+    现代宏测试标准:    JUnit 5 (@Test)                 <──▶  Swift Testing (@Test + #expect(a == b))
+    测试假对象构造:    MockK / Mockito (字节码反射)    <──▶  Protocol Mock (面向协议手写 Mock，零反射)
 
-    struct UserViewModelTests {
-        @Test("验证加载用户列表成功")
-        func testLoadUsersSuccess() async throws {
-            let mockRepo = MockUserRepository(stubbedUsers: [User(id: "1", name: "Alex")])
-            let viewModel = UserViewModel(repository: mockRepo)
+ 2. 【异步并发与数据流测试】
+    挂起函数测试:      runTest { val res = api() }     <──▶  func testAsync() async throws { let res = try await api() }
+    回调超时等待:      CountDownLatch                  <──▶  XCTestExpectation (fulfillment / wait:for:timeout:)
 
-            await viewModel.loadUsers()
-
-            #expect(viewModel.uiState.users.count == 1)
-            #expect(viewModel.uiState.users.first?.name == "Alex")
-            #expect(!viewModel.uiState.isLoading)
-        }
-    }
-
- 2. XCUITest 自动化 UI 测试:
-    import XCTest
-
-    final class LoginUITests: XCTestCase {
-        func testLoginSuccessFlow() throws {
-            let app = XCUIApplication()
-            app.launch()
-
-            let emailField = app.textFields["email_input"]
-            emailField.tap()
-            emailField.typeText("test@example.com")
-
-            let loginBtn = app.buttons["login_button"]
-            loginBtn.tap()
-
-            let welcomeText = app.staticTexts["welcome_label"]
-            XCTAssertTrue(welcomeText.waitForExistence(timeout: 3))
-        }
-    }
+ 3. 【UI 界面自动化测试】
+    UI 测试驱动引擎:   Espresso / Compose UI Test      <──▶  XCUITest (XCUIApplication)
+    无障碍标识符查找:  onNodeWithTag("login_btn")      <──▶  app.buttons["login_btn"] (.accessibilityIdentifier)
+    模拟用户手势交互:  performClick() / performText()  <──▶  element.tap() / element.typeText("abc")
 ```
 
 **迁移避坑指南：**
-1. **避免重型 Mock 框架**：Android 常用 MockK/Mockito 等字节码增强框架；iOS 优先面向 `Protocol` 手写内存 Mock，编译极速且类型安全。
-2. **Swift Testing vs XCTest**：新写测试代码推荐使用 `@Test` 与 `#expect`（Swift Testing），断言报错信息更丰富、支持并发并行执行。
-3. **UI 测试必须声明 Accessibility ID**：SwiftUI 视图必须添加 `.accessibilityIdentifier("my_id")`，切勿使用视图文案或标题来定位 UI 元素（否则多语言适配时直接断言失败）。
+1. **【面向 Protocol 手写 Mock 零反射】**：iOS 单测强烈推崇为 Protocol 编写轻量 Mock 类（如 `MockUserRepository`），零反射开销且编译期强类型安全。
+2. **【全面拥抱 Swift Testing 新标准】**：Xcode 16+ 引入现代 Swift Testing，使用 `@Test` 宏与 `#expect(...)` 表达式，替代冗长的 XCTAssert 语法。
+3. **【原生支持 async/await 测试函数】**：Swift 并发函数可直接在 async 测试方法中 `await` 调用，无需编写复杂的 `XCTestExpectation` 阻塞等待。
+4. **【UI 自动化必设 Accessibility ID】**：XCUITest 自动化测试必须通过 `.accessibilityIdentifier("login_btn")` 定位元素，严禁通过 UI 本地化文案或标题查找。
 
 **练手实战任务：** 为 ViewModel 编写一套完整的 XCTest 异步单元测试（测试成功、失败与加载状态流），并通过 XCUITest 编写一个自动化登录流测试用例。
 
@@ -1290,30 +1057,32 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | 测试分发渠道 | `Google Play Internal Testing` | `TestFlight` | 测试分发与内部体验渠道 |
 | 应用审核准则 | `Google Play 开发者政策` | `App Store Review Guidelines` | 应用审核指南与上架准则 |
 
-**打包构建与应用发布全景对照：**
+**架构与层级结构全景对照：**
 
 ```
-[ 打包构建与应用发布全景对照 ]
+[ 阶段 16: 打包构建、证书签名与应用发布全景对照 ]
 
- 1. 签名体系核心心智:
-    【Certificate (证书)】: 证明「你是合法的 Apple 开发者」
-    【App ID (Bundle Identifier)】: 证明「App 的唯一身份 (如 com.company.app)」
-    【Provisioning Profile (描述文件)】: 胶水文件，将「开发者证书 + App ID + 允许安装的测试机 UDID + 开启的 Entitlements 权限」绑定封包
+ 1. 【构建配置与多环境变体】
+    多环境配置:        productFlavors / Build Variants <──▶  Build Schemes (Debug / Release / Staging)
+    环境变量与 BaseURL:buildConfigField / resValue     <──▶  xcconfig 配置文件 ──▶ 注入 Info.plist
+    代码编译优化裁剪:  R8 / ProGuard / minifyEnabled   <──▶  Swift 编译器优化 (-Osize) / Strip Symbols
 
- 2. 发布全流程流水线:
-    Xcode 切换 Release Scheme
-      ➔ Product ➔ Archive (生成 .xcarchive 产物)
-      ➔ Organizer 窗口点击「Distribute App」
-      ➔ 自动签名校验上传至 App Store Connect
-      ➔ TestFlight 内部/外部公开测试分发
-      ➔ 填写 App 元数据、截屏、隐私问卷与审核备注
-      ➔ 提交 App Review 审核 ➔ 通过后正式上架 App Store
+ 2. 【签名安全与产物归档】
+    签名证书体系:      Keystore (.jks 密钥库)          <──▶  Apple Developer Certificate (公钥证书)
+    权限与设备绑定:    Play App Signing 托管           <──▶  Provisioning Profile (证书 + App ID + 设备 UDID)
+    签名托管模式:      signingConfigs { }              <──▶  Xcode 勾选「Automatically manage signing」
+
+ 3. 【安装包产物与控制台分发】
+    发布包产物格式:    APK / AAB (Android App Bundle)  <──▶  IPA / Xcode Archive (.xcarchive)
+    开发者控制台:      Google Play Console             <──▶  App Store Connect (元数据 / 价格 / 提审)
+    官方测试分发渠道:  Google Play 内部测试            <──▶  TestFlight (内部团队 / 公开测试链接)
 ```
 
 **迁移避坑指南：**
-1. **自动签名优先**：初学者和中小型团队务必在 Signing & Capabilities 中勾选「Automatically manage signing」，Xcode 自动管理证书与描述文件。
-2. **xcconfig 环境变量注入**：不要在代码中硬编码 `https://api.dev.com` 与 `https://api.prod.com`；使用 `Debug.xcconfig` 与 `Release.xcconfig` 将 `API_BASE_URL` 注入到 `Info.plist`。
-3. **App Store 审核红线**：所有数字虚拟服务必须走 Apple IAP 内购 (StoreKit)，不得引导至外部网页支付；必须提供有效的测试账号；隐私问卷必须与 App 实际收集的数据严格一致。
+1. **【优先开启自动签名管理】**：个人与中小型团队务必在 Xcode 中勾选「Automatically manage signing」，由系统自动管理证书生成与描述文件更新。
+2. **【环境隔离首选 xcconfig】**：严禁在业务代码中硬编码测试与正式环境 API 地址；通过 `Debug.xcconfig` 与 `Release.xcconfig` 将配置安全注入 `Info.plist`。
+3. **【TestFlight 极速内测分发】**：构建产物上传至 App Store Connect 后，可直接通过 TestFlight 分发给内部测试员或生成公开测试链接，无需单独收集设备 UDID。
+4. **【严格遵守 App Store 审核准则】**：数字虚拟商品必须接入 StoreKit (IAP) 内购；必须提供真实有效的审核测试账号与操作演示视频，严禁残留占位内容。
 
 **练手实战任务：** 在 Xcode 中创建 Staging 与 Release 构建配置，开启 Automatically manage signing，执行 Product → Archive 导出 .xcarchive 产物并在 Organizer 中分析包体积构成。
 
