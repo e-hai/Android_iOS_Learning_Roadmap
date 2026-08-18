@@ -865,13 +865,85 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ### ⑪ 依赖注入
 
-| 模式 / 框架 | Android 体系 | iOS 体系 | 核心说明 |
-| --- | --- | --- | --- |
-| 轻量服务定位容器 | `Koin` | `Factory` | 轻量依赖注入容器 |
-| 大型编译期生成框架 | `Hilt / Dagger` | `Swinject / Resolver` | 大型依赖注入框架 |
-| 原生构造解耦 | 构造函数手动注入 | `protocol + init 构造注入` | 构造函数直接传参注入（推荐） |
+**阶段目标：** 掌握 iOS 依赖注入最佳实践：原生 Protocol + 构造注入、SwiftUI `@Environment` 传递、Factory 现代容器与 Hilt/Koin 差异。  
+**核心认知：** iOS 首选原生极简解耦：无需过早引入复杂注解框架，80% 以上的项目仅靠 `Protocol` + 构造函数默认参数即可优雅实现业务解耦与单测 Mock。
 
-很多 iOS 项目直接：**protocol + 构造函数注入**，未必上框架。
+#### 模块一：原生解耦与构造注入（官方推荐）
+
+| 模式 / 场景 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 依赖抽象契约 | `interface ApiService` | `protocol ApiServiceProtocol` | 面向协议抽象解耦 |
+| 构造函数传参注入 | `class MyVM(val repo: Repo)` | `init(repo: RepoProtocol = LiveRepo())` | 构造函数直接传参注入 |
+| 顶层依赖组装容器 | `object AppContainer { ... }` | `final class AppContainer` | 轻量静态依赖容器 |
+| 视图树级环境注入 | `CompositionLocalProvider(...)` | `@Environment(\.apiClient)` | SwiftUI 环境级依赖注入 |
+| 单元测试与预览替换 | `FakeRepo : Repo` | `MockRepo : RepoProtocol` | Mock 测试与预览无缝替换 |
+
+#### 模块二：现代轻量 DI 容器 (Factory)
+
+| 容器特性 / 语法 | Android (Koin) | iOS (Factory) | 核心说明 |
+| --- | --- | --- | --- |
+| 服务容器定义 | `val appModule = module { ... }` | `Container.shared.repo = Factory { ... }` | 编译期安全服务定义 |
+| 属性包装器注入 | `val vm: MyVM by viewModel()` | `@Injected(\.repo) private var repo` | 属性包装器自动解析 |
+| 生命周期与作用域 | `single { } / factory { }` | `.singleton / .unique / .shared` | 单例与多例作用域控制 |
+| 测试与 Preview 覆盖 | `loadKoinModules(mockModule)` | `Container.shared.repo.register { ... }` | 环境覆盖与 Preview 注入 |
+
+#### 模块三：大型运行时框架与选型哲学
+
+| 维度 / 框架 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 大型编译期代码生成 | `Hilt (@AndroidEntryPoint)` | `Needle (Uber 编译期强类型 DI)` | 大型工程编译期生成 DI |
+| 运行时服务定位与解析 | `Koin (get() / by inject())` | `Swinject / Resolver` | 运行时服务定位与解析 |
+| 跨端选型哲学差异 | `Hilt 为官方必选标准` | `原生 Protocol + init 占 80%` | iOS 极简与轻量化哲学 |
+
+**依赖注入与服务解耦全景对照：**
+
+```
+[ 依赖注入与服务解耦全景对照 ]
+
+ 1. 原生 Protocol + 构造函数注入 (iOS 官方最推荐范式):
+    【契约定义】
+      protocol NewsRepositoryProtocol: Sendable {
+          func fetchNews() async throws -> [NewsItem]
+      }
+
+    【ViewModel 构造注入 (默认参数带线上实现，无需第三方框架)】
+      @Observable
+      @MainActor
+      final class NewsViewModel {
+          private let repository: NewsRepositoryProtocol
+
+          init(repository: NewsRepositoryProtocol = LiveNewsRepository()) {
+              self.repository = repository
+          }
+      }
+
+    【Xcode Preview 与单测极速 Mock】
+      #Preview {
+          NewsView(viewModel: NewsViewModel(repository: MockNewsRepository()))
+      }
+
+ 2. 现代轻量容器 Factory (类似 Koin 体验):
+    【容器定义】
+      import Factory
+
+      extension Container {
+          var newsRepository: Factory<NewsRepositoryProtocol> {
+              self { LiveNewsRepository() }.singleton
+          }
+      }
+
+    【类中直接属性注入】
+      final class NewsViewModel: ObservableObject {
+          @Injected(\.newsRepository) private var repository
+      }
+```
+
+**迁移避坑指南：**
+1. **切勿盲目引入复杂框架**：Android 习惯使用 Hilt（带反射/APT/KSP 生成），而 iOS 社区更推崇轻量无魔法。新工程优先使用 `Protocol + init` 构造注入，规模扩大后再考虑引入 `Factory`。
+2. **SwiftUI 善用 @Environment**：跨多个视图层级共享的服务（如全局网络 Client、认证状态），直接使用 `@Environment` 注入，避免层层构造传递。
+3. **Mock 隔离数据库与网络**：所有对外的 Repository 必须以 Protocol 暴露，单测只测 ViewModel 业务状态机，不产生真实 I/O 损耗。
+
+**练手实战任务：** 定义 `UserRepositoryProtocol`，使用原生构造函数注入编写 `UserViewModel`，并在 SwiftUI Preview 中通过 Mock 实现离线预览，随后使用 Factory 体验容器化注入。
 
 ### ⑫ 图片与静态资源
 
