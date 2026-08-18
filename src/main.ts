@@ -169,25 +169,24 @@ class AppController {
     bg.className = 'atmosphere-bg';
     app.appendChild(bg);
 
-    // Header
+    // If in 3D Constellation Mode:
+    if (this.currentViewMode === '3d') {
+      const constellationView = renderNeuralConstellationView((mode) => this.switchViewMode(mode));
+      app.appendChild(constellationView);
+      return;
+    }
+
+    // Header in Document Mode
     const header = renderHeader(
       () => this.toggleSidebar(),
       () => this.openSearchModal(),
       () => {
-        this.switchViewMode('doc');
         this.navigate('home');
       },
       this.currentViewMode,
       (mode) => this.switchViewMode(mode)
     );
     app.appendChild(header);
-
-    // If in 3D Constellation Mode:
-    if (this.currentViewMode === '3d') {
-      const constellationView = renderNeuralConstellationView();
-      app.appendChild(constellationView);
-      return;
-    }
 
     // Body in Document Mode
     const body = document.createElement('div');

@@ -23,7 +23,9 @@ interface PalaceNode {
   pos: THREE.Vector3;
 }
 
-export function renderNeuralConstellationView(): HTMLElement {
+export function renderNeuralConstellationView(
+  onSwitchViewMode: (mode: '3d' | 'doc') => void
+): HTMLElement {
   const container = document.createElement('div');
   container.className = 'constellation-view-container';
 
@@ -225,7 +227,7 @@ export function renderNeuralConstellationView(): HTMLElement {
     });
   });
 
-  // Inter-Hub Synaptic Highways (Connecting hubs sequentially)
+  // Inter-Hub Synaptic Highways
   for (let i = 0; i < stageHubPositions.length; i++) {
     const nextIdx = (i + 1) % stageHubPositions.length;
     const p1 = stageHubPositions[i].pos;
@@ -257,30 +259,44 @@ export function renderNeuralConstellationView(): HTMLElement {
     });
   }
 
-  // 3. Top Floating Bar (Search + Filters + Orbit tools)
+  // 3. Unified 3D Mode Top Bar (Dedicated in 3D Mode)
   const topBar = document.createElement('div');
   topBar.className = 'constellation-top-bar';
   topBar.innerHTML = `
-    <div class="constellation-title-group">
-      <div class="constellation-brand-badge">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-        <span>福尔摩斯记忆宫殿 · 3D 知识拓扑</span>
+    <div class="top-bar-left">
+      <div class="constellation-title-group">
+        <div class="constellation-brand-badge">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+          <span>3D 认知星云</span>
+        </div>
+      </div>
+
+      <div class="view-mode-toggle">
+        <button class="view-mode-btn active" id="btn-mode-3d" title="当前：3D 星云模式">
+          🌌 3D 星云
+        </button>
+        <button class="view-mode-btn" id="btn-mode-doc" title="切换为文档路线模式">
+          📄 文档
+        </button>
       </div>
     </div>
 
-    <!-- Quick Palace Search -->
-    <div class="palace-search-box">
-      <svg class="palace-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" class="palace-search-input" id="palace-search-input" placeholder="在记忆宫殿中穿梭检索..." />
+    <!-- Center: Palace Search & Filters -->
+    <div class="top-bar-center">
+      <div class="palace-search-box">
+        <svg class="palace-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" class="palace-search-input" id="palace-search-input" placeholder="在记忆宫殿中穿梭检索..." />
+      </div>
+
+      <div class="constellation-filter-tabs">
+        <button class="constellation-tab-btn active" data-filter="all">全部节点</button>
+        <button class="constellation-tab-btn" data-filter="main">核心主线</button>
+        <button class="constellation-tab-btn" data-filter="adv">进阶扩展</button>
+      </div>
     </div>
 
-    <div class="constellation-filter-tabs">
-      <button class="constellation-tab-btn active" data-filter="all">全部节点</button>
-      <button class="constellation-tab-btn" data-filter="main">核心主线</button>
-      <button class="constellation-tab-btn" data-filter="adv">进阶扩展</button>
-    </div>
-
-    <div class="constellation-right-tools">
+    <!-- Right: 3D Tools & Theme -->
+    <div class="top-bar-right">
       <button class="tool-pill-btn active" id="btn-toggle-spin" title="切换 3D 星系自转">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
         <span>3D 旋转</span>
@@ -288,6 +304,10 @@ export function renderNeuralConstellationView(): HTMLElement {
       <button class="tool-pill-btn" id="btn-reset-cam" title="全景视角复位">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
         <span>全景</span>
+      </button>
+      <button class="tool-pill-btn" id="btn-theme-toggle" title="切换主题">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        <span>主题</span>
       </button>
     </div>
   `;
@@ -312,12 +332,12 @@ export function renderNeuralConstellationView(): HTMLElement {
   `;
   container.appendChild(legend);
 
-  // 5. Hover Tooltip
-  const tooltip = document.createElement('div');
-  tooltip.className = 'constellation-node-tooltip';
-  container.appendChild(tooltip);
+  // 5. 3D Floating Anchor Tooltip (Directly on top of node in 3D space)
+  const anchorTooltip = document.createElement('div');
+  anchorTooltip.className = 'constellation-node-anchor-tooltip';
+  container.appendChild(anchorTooltip);
 
-  // 6. Holographic HUD Lens (Interactive inspection popover)
+  // 6. Holographic HUD Lens (Pinned to Bottom-Right Corner)
   const hudLens = document.createElement('div');
   hudLens.className = 'palace-hud-lens';
   container.appendChild(hudLens);
@@ -505,18 +525,20 @@ export function renderNeuralConstellationView(): HTMLElement {
           gsap.to(targetNode.haloMesh.scale, { x: 1.9, y: 1.9, z: 1.9, duration: 0.2 });
         }
 
+        // Project directly on top of the node in 3D space
         const vector = targetNode.pos.clone().project(camera);
         const screenX = ((vector.x + 1) * rect.width) / 2;
         const screenY = ((-vector.y + 1) * rect.height) / 2;
 
-        tooltip.style.left = `${screenX}px`;
-        tooltip.style.top = `${screenY}px`;
-        tooltip.innerHTML = `
-          <div class="tooltip-num">${targetNode.type === 'stage' ? '阶段星核' : targetNode.type === 'spark' ? '✨ 避坑灵光' : '🎯 概念突触'}</div>
-          <div class="tooltip-title">${targetNode.title}</div>
-          <div class="tooltip-desc">${targetNode.subtitle || '点击穿梭展开 ➔'}</div>
+        anchorTooltip.style.left = `${screenX}px`;
+        anchorTooltip.style.top = `${screenY}px`;
+
+        const tagText = targetNode.type === 'stage' ? '阶段星核' : targetNode.type === 'spark' ? '✨ 避坑灵光' : '🎯 概念突触';
+        anchorTooltip.innerHTML = `
+          <span class="anchor-tooltip-tag">${tagText}</span>
+          <span class="anchor-tooltip-title">${targetNode.title}</span>
         `;
-        tooltip.classList.add('visible');
+        anchorTooltip.classList.add('visible');
       }
     } else if (hoveredNode) {
       gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
@@ -525,7 +547,7 @@ export function renderNeuralConstellationView(): HTMLElement {
       }
       hoveredNode = null;
       canvasWrap.style.cursor = 'grab';
-      tooltip.classList.remove('visible');
+      anchorTooltip.classList.remove('visible');
     }
   };
 
@@ -538,7 +560,11 @@ export function renderNeuralConstellationView(): HTMLElement {
   canvasWrap.addEventListener('mousemove', onMouseMove);
   canvasWrap.addEventListener('click', onClick);
 
-  // 8. Search Input Event (Instant Mind Warp)
+  // 8. Top Bar Event Listeners
+  topBar.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
+    onSwitchViewMode('doc');
+  });
+
   const searchInput = topBar.querySelector('#palace-search-input') as HTMLInputElement;
   searchInput?.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -574,7 +600,7 @@ export function renderNeuralConstellationView(): HTMLElement {
     });
   });
 
-  // Spin & Reset Controls
+  // Spin, Reset, and Theme Controls
   let isSpinning = true;
   const spinBtn = topBar.querySelector('#btn-toggle-spin');
   spinBtn?.addEventListener('click', () => {
@@ -588,6 +614,13 @@ export function renderNeuralConstellationView(): HTMLElement {
   topBar.querySelector('#btn-reset-cam')?.addEventListener('click', () => {
     hudLens.classList.remove('active');
     sceneManager.resetCamera([0, 16, 32], [0, 0, 0]);
+  });
+
+  topBar.querySelector('#btn-theme-toggle')?.addEventListener('click', () => {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const nextTheme = isDark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    localStorage.setItem('learning_cockpit_theme', nextTheme);
   });
 
   // 9. Animation Loop

@@ -1,13 +1,14 @@
 /* Sherlock Holmes 3D Memory Palace Mode Styles */
 
 .constellation-view-container {
-  position: relative;
-  width: 100%;
-  height: calc(100vh - 64px);
-  min-height: 560px;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
   background: radial-gradient(circle at 50% 50%, #0c1527 0%, #050811 100%);
   overflow: hidden;
   display: flex;
+  z-index: 50;
 }
 
 [data-theme="light"] .constellation-view-container {
@@ -32,54 +33,65 @@
   display: block;
 }
 
-/* Top Floating Control Bar */
+/* Unified 3D Mode Top Bar */
 .constellation-top-bar {
   position: absolute;
-  top: 16px;
+  top: 14px;
   left: 20px;
   right: 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   pointer-events: none;
-  z-index: 10;
+  z-index: 30;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
-.constellation-title-group {
+.top-bar-left {
   pointer-events: auto;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.constellation-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: var(--radius-full);
-  padding: 6px 16px;
+  padding: 6px 14px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
 }
 
 [data-theme="light"] .constellation-title-group {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.88);
   border-color: rgba(13, 148, 136, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .constellation-brand-badge {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 800;
   color: var(--color-ios);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   display: flex;
   align-items: center;
   gap: 6px;
+  letter-spacing: 0.5px;
 }
 
-/* Palace Search Input */
-.palace-search-box {
+/* Center Tools: Palace Search & Filter Pills */
+.top-bar-center {
   pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.palace-search-box {
   position: relative;
   display: flex;
   align-items: center;
@@ -107,7 +119,7 @@
 }
 
 .palace-search-input:focus {
-  width: 280px;
+  width: 270px;
   border-color: var(--color-accent);
   box-shadow: 0 0 12px var(--color-accent-ring);
 }
@@ -120,14 +132,13 @@
 }
 
 .constellation-filter-tabs {
-  pointer-events: auto;
   display: inline-flex;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-full);
-  padding: 4px;
+  padding: 3px;
   gap: 4px;
   box-shadow: var(--shadow-md);
 }
@@ -160,7 +171,8 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
-.constellation-right-tools {
+/* Right Tools */
+.top-bar-right {
   pointer-events: auto;
   display: flex;
   align-items: center;
@@ -171,7 +183,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 14px;
+  padding: 6px 12px;
   border-radius: var(--radius-full);
   font-size: 12px;
   font-weight: 600;
@@ -202,23 +214,90 @@
   border-color: var(--color-accent);
 }
 
-/* 3D Holographic HUD Lens / Node Inspection Popup */
+/* 3D Floating Node Anchor Tooltip (On top of node) */
+.constellation-node-anchor-tooltip {
+  position: absolute;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 0 10px rgba(56, 189, 248, 0.2);
+  pointer-events: none;
+  transform: translate(-50%, -100%) translateY(-10px);
+  opacity: 0;
+  transition: opacity 160ms ease, transform 160ms ease;
+  z-index: 20;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+[data-theme="light"] .constellation-node-anchor-tooltip {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(13, 148, 136, 0.4);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 0 10px rgba(13, 148, 136, 0.15);
+}
+
+.constellation-node-anchor-tooltip::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid rgba(15, 23, 42, 0.92);
+}
+
+[data-theme="light"] .constellation-node-anchor-tooltip::after {
+  border-top-color: rgba(255, 255, 255, 0.94);
+}
+
+.constellation-node-anchor-tooltip.visible {
+  opacity: 1;
+  transform: translate(-50%, -100%) translateY(-14px);
+}
+
+.anchor-tooltip-tag {
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--color-ios);
+  letter-spacing: 0.5px;
+}
+
+.anchor-tooltip-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fff;
+}
+
+[data-theme="light"] .anchor-tooltip-title {
+  color: var(--color-ink);
+}
+
+/* 3D Holographic HUD Lens in Bottom-Right Corner */
 .palace-hud-lens {
   position: absolute;
-  top: 76px;
+  bottom: 24px;
   right: 24px;
-  width: 420px;
+  width: 440px;
   max-width: calc(100vw - 48px);
   background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: var(--radius-xl);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.15);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 20px rgba(56, 189, 248, 0.15);
   z-index: 25;
   display: flex;
   flex-direction: column;
-  transform: translateY(-10px) scale(0.95);
+  transform: translateY(20px) scale(0.96);
   opacity: 0;
   pointer-events: none;
   transition: opacity 240ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -226,9 +305,9 @@
 }
 
 [data-theme="light"] .palace-hud-lens {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   border-color: rgba(13, 148, 136, 0.35);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15), 0 0 20px rgba(13, 148, 136, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15), 0 0 20px rgba(13, 148, 136, 0.1);
 }
 
 .palace-hud-lens.active {
@@ -273,11 +352,11 @@
 }
 
 .hud-lens-body {
-  padding: 18px;
+  padding: 16px 18px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-height: 60vh;
+  gap: 12px;
+  max-height: 52vh;
   overflow-y: auto;
 }
 
@@ -285,10 +364,10 @@
   background: rgba(30, 41, 59, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
-  padding: 12px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 [data-theme="light"] .hud-concept-card {
@@ -301,7 +380,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
 }
 
@@ -346,8 +425,8 @@
 /* Legend HUD in bottom-left */
 .palace-legend-hud {
   position: absolute;
-  bottom: 20px;
-  left: 20px;
+  bottom: 24px;
+  left: 24px;
   background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.15);
@@ -395,21 +474,28 @@
   box-shadow: 0 0 6px #fbbf24;
 }
 
-/* Global View Mode Switcher in Header */
+/* Global View Mode Switcher */
 .view-mode-toggle {
   display: inline-flex;
   align-items: center;
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-full);
   padding: 2px;
   gap: 2px;
 }
 
+[data-theme="light"] .view-mode-toggle {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--color-border);
+}
+
 .view-mode-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   padding: 4px 10px;
   border-radius: var(--radius-full);
   font-size: 12px;
@@ -419,13 +505,32 @@
 }
 
 .view-mode-btn:hover {
+  color: #fff;
+}
+
+[data-theme="light"] .view-mode-btn:hover {
   color: var(--color-ink);
 }
 
 .view-mode-btn.active {
   background: var(--color-accent);
   color: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 900px) {
+  .constellation-top-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .top-bar-center {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .palace-search-input {
+    width: 160px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -435,7 +540,7 @@
     right: 10px;
     bottom: 10px;
     width: auto;
-    max-height: 70vh;
+    max-height: 65vh;
   }
   .palace-legend-hud {
     display: none;
