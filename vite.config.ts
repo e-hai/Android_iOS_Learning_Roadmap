@@ -13,7 +13,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           three: ['three'],
-          gsap: ['gsap', 'canvas-confetti'],
+          gsap: ['gsap'],
         },
       },
     },

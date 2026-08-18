@@ -3,7 +3,6 @@ import { i18n } from '../services/i18n';
 import { renderComparisonTable } from './ComparisonTable';
 import { renderArchitectureDiagram } from './ArchitectureDiagram';
 import { stages } from '../data/roadmap-data';
-import { openMemoryFlashcardsModal } from '../visuals/cards/MemoryFlashcardModal3D';
 
 export function renderStageDetail(
   stage: LearningStage,
@@ -111,22 +110,14 @@ export function renderStageDetail(
       .join('');
 
     notesSection.innerHTML = `
-      <div class="section-header" style="margin-top:28px;display:flex;align-items:center;justify-content:space-between;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div class="section-header-bar"></div>
-          <span class="section-header-title">${i18n.t('detail.section.notes')}</span>
-        </div>
-        <button class="btn btn-secondary btn-sm" id="btn-stage-flashcards" style="color:var(--color-accent);font-weight:700;">
-          ⚡ 本章 3D 闪卡速测
-        </button>
+      <div class="section-header" style="margin-top:28px;">
+        <div class="section-header-bar"></div>
+        <span class="section-header-title">${i18n.t('detail.section.notes')}</span>
       </div>
       <ul class="notes-grid" style="margin-bottom:28px;">
         ${noteCardsHtml}
       </ul>
     `;
-    notesSection.querySelector('#btn-stage-flashcards')?.addEventListener('click', () => {
-      openMemoryFlashcardsModal(stage.id);
-    });
     container.appendChild(notesSection);
   }
 

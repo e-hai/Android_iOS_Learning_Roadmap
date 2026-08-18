@@ -1,10 +1,11 @@
 import { i18n } from '../services/i18n';
-import { openMemoryFlashcardsModal } from '../visuals/cards/MemoryFlashcardModal3D';
 
 export function renderHeader(
   onToggleSidebar: () => void,
   onOpenSearch: () => void,
-  onNavigateHome: () => void
+  onNavigateHome: () => void,
+  currentViewMode: '3d' | 'doc' = 'doc',
+  onToggleViewMode?: (mode: '3d' | 'doc') => void
 ): HTMLElement {
   const header = document.createElement('header');
   header.className = 'app-header';
@@ -24,14 +25,20 @@ export function renderHeader(
     </div>
 
     <div class="header-right">
+      <!-- Global View Mode Switcher -->
+      <div class="view-mode-toggle">
+        <button class="view-mode-btn ${currentViewMode === '3d' ? 'active' : ''}" id="btn-mode-3d" title="切换为 3D 认知星云模式">
+          🌌 3D 星云
+        </button>
+        <button class="view-mode-btn ${currentViewMode === 'doc' ? 'active' : ''}" id="btn-mode-doc" title="切换为文档路线模式">
+          📄 文档
+        </button>
+      </div>
+
       <button class="search-trigger-btn" id="btn-search-trigger">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <span class="search-trigger-label" style="font-size:12.5px;">${i18n.t('search.placeholder').split('(')[0].trim() || '搜索...'}</span>
         <span class="kbd-shortcut">⌘K</span>
-      </button>
-
-      <button class="btn btn-ghost btn-sm" id="btn-flashcard-trigger" title="3D 避坑记忆闪卡" style="color:var(--color-accent);font-weight:700;">
-        ⚡ 3D 闪卡
       </button>
 
       <button class="btn btn-ghost btn-sm" id="btn-lang-toggle" title="${i18n.t('web.switch_lang')}">
@@ -60,10 +67,12 @@ export function renderHeader(
     e.stopPropagation();
     onOpenSearch();
   });
-  header.querySelector('#btn-flashcard-trigger')?.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    openMemoryFlashcardsModal();
+
+  header.querySelector('#btn-mode-3d')?.addEventListener('click', () => {
+    if (onToggleViewMode) onToggleViewMode('3d');
+  });
+  header.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
+    if (onToggleViewMode) onToggleViewMode('doc');
   });
 
   const langBtn = header.querySelector('#btn-lang-toggle') as HTMLButtonElement;

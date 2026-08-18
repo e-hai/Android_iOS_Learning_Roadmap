@@ -11,9 +11,11 @@ import { renderSidebar } from './components/Sidebar';
 import { renderHomeView } from './components/HomeView';
 import { renderStageDetail } from './components/StageDetailView';
 import { renderGlobalSearch } from './components/GlobalSearch';
+import { renderNeuralConstellationView } from './visuals/macro/NeuralConstellationView';
 
 class AppController {
   private currentTarget: string = 'home';
+  private currentViewMode: '3d' | 'doc' = (localStorage.getItem('learning_cockpit_view_mode') as '3d' | 'doc') || 'doc';
   private sidebarOpen = false;
   private desktopSidebarCollapsed = false;
   private searchModalElement: HTMLElement | null = null;
@@ -59,6 +61,12 @@ class AppController {
     parseHash();
   }
 
+  private switchViewMode(mode: '3d' | 'doc') {
+    this.currentViewMode = mode;
+    localStorage.setItem('learning_cockpit_view_mode', mode);
+    this.render();
+  }
+
   private navigate(targetId: string) {
     this.currentTarget = targetId;
     window.location.hash = targetId === 'home' ? '' : targetId;
@@ -91,6 +99,11 @@ class AppController {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         e.preventDefault();
         this.navigate('home');
+      }
+      // ⌘M for 3D/Doc mode toggle
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        this.switchViewMode(this.currentViewMode === '3d' ? 'doc' : '3d');
       }
     });
   }
@@ -128,6 +141,7 @@ class AppController {
 
     this.searchModalElement = renderGlobalSearch(
       (stageId) => {
+        this.switchViewMode('doc');
         this.navigate(stageId);
       },
       () => {
@@ -159,11 +173,31 @@ class AppController {
     const header = renderHeader(
       () => this.toggleSidebar(),
       () => this.openSearchModal(),
-      () => this.navigate('home')
+      () => {
+        this.switchViewMode('doc');
+        this.navigate('home');
+      },
+      this.currentViewMode,
+      (mode) => this.switchViewMode(mode)
     );
     app.appendChild(header);
 
-    // Body
+    // If in 3D Constellation Mode:
+    if (this.currentViewMode === '3d') {
+      const constellationView = renderNeuralConstellationView(
+        (stageId) => {
+          this.switchViewMode('doc');
+          this.navigate(stageId);
+        },
+        () => {
+          this.switchViewMode('doc');
+        }
+      );
+      app.appendChild(constellationView);
+      return;
+    }
+
+    // Body in Document Mode
     const body = document.createElement('div');
     body.className = 'app-body';
 
