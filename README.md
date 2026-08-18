@@ -947,48 +947,375 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ### ⑫ 图片与静态资源
 
+**阶段目标：** 掌握 iOS 图像与资源体系全景：Assets 资产目录、PDF/SVG 矢量适配、AsyncImage/Kingfisher 网络缓存与 UIImage 内存位图处理。  
+**核心认知：** `Assets.xcassets` 统管多倍图与深浅色模式，矢量图勾选 Single Scale 免切图；UI 图片缩放必加 `.resizable().aspectRatio(contentMode:)`。
+
+#### 模块一：资产目录与多倍图适配
+
 | 资产类型 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
 | 资源目录 | `res/drawable / mipmap` | `Assets.xcassets` | 静态图片资产目录 |
-| 内存位图 | `Bitmap` | `UIImage` | 内存位图对象 |
-| 网络图片异步加载 | `Coil / Glide` | `AsyncImage / Kingfisher` | 网络图片异步加载与缓存 |
-| 界面渲染绘制 | `Painter / ImageBitmap` | `Image / UIImage` | 视图图片渲染组件 |
+| 矢量图适配 | `VectorDrawable (.xml)` | `PDF / SVG (Single Scale)` | 矢量图无损缩放 |
+| 屏幕多倍图 | `hdpi / xhdpi / xxhdpi` | `1x / 2x / 3x` | 屏幕分辨率倍图适配 |
+| 颜色与深浅模式 | `res/values/colors.xml (night)` | `Color Set (Any / Dark)` | 自适应深浅色颜色集 |
+
+#### 模块二：网络图片异步加载与缓存
+
+| 加载机制 / 策略 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 原生异步图片 | `SubcomposeAsyncImage` | `AsyncImage(url:)` | 原生异步图片加载组件 |
+| 第三方图片库 | `Coil / Glide` | `Kingfisher (KFImage) / Nuke` | 网络图片异步加载与缓存 |
+| 占位与失败图 | `placeholder / error` | `placeholder / failure content` | 占位图与加载失败降级 |
+| 多级缓存策略 | `MemoryCache + DiskCache` | `ImageCache.default (Kingfisher)` | 内存与磁盘多级缓存策略 |
+
+#### 模块三：内存位图与图像处理
+
+| 图像处理 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 内存位图对象 | `Bitmap` | `UIImage / CGImage` | 内存位图对象 |
+| 视图图片渲染 | `Image(bitmap:)` | `Image(uiImage:)` | 视图图片渲染组件 |
+| 裁剪与内容模式 | `ContentScale.Crop / Fit` | `.aspectRatio(contentMode: .fill / .fit)` | 裁剪缩放与宽高比控制 |
+| 滤镜与着色效果 | `Modifier.blur() / tint` | `.blur(radius:) / .colorMultiply()` | 模糊滤镜与着色渲染 |
+
+**图片与静态资源全景对照：**
+
+```
+[ 图片与静态资源处理全景对照 ]
+
+ 1. 矢量图导入与 Single Scale:
+    Android: 导入 svg/xml ➔ res/drawable/ic_logo.xml (VectorDrawable)
+    iOS:     拖入 Assets.xcassets ➔ 选中图片 ➔ Attributes Inspector ➔ Scales 选「Single Scale」 (免切 3 套图)
+
+ 2. 异步网络图片加载范式:
+    【原生内置 AsyncImage (iOS 15+)】
+      AsyncImage(url: URL(string: "https://example.com/avatar.png")) { phase in
+          switch phase {
+          case .empty:
+              ProgressView()
+          case .success(let image):
+              image
+                  .resizable()
+                  .aspectRatio(contentMode: .fill)
+                  .frame(width: 80, height: 80)
+                  .clipShape(Circle())
+          case .failure:
+              Image(systemName: "person.crop.circle.badge.exclamationmark")
+                  .foregroundStyle(.gray)
+          @unknown default:
+              EmptyView()
+          }
+      }
+
+    【第三方 Kingfisher (对标 Coil / Glide)】
+      KFImage(URL(string: "https://example.com/banner.jpg"))
+          .placeholder { ProgressView() }
+          .setProcessor(RoundCornerImageProcessor(cornerRadius: 12))
+          .cacheMemoryOnly()
+          .resizable()
+          .aspectRatio(contentMode: .fit)
+```
+
+**迁移避坑指南：**
+1. **Image 缩放链式规则**：SwiftUI 中 `Image` 默认按原始像素尺寸绘制，撑满外框必须链式声明 `.resizable().aspectRatio(contentMode: .fill).frame(...)`，遗漏 `.resizable()` 会导致图片无法缩放。
+2. **矢量图 Single Scale 机制**：Assets 导入 SVG/PDF 时，必须勾选「Single Scale」与「Preserve Vector Data」，Xcode 才会自动生成全分辨率位图并在放大时保持矢量清晰度。
+3. **AsyncImage 缓存局限**：原生 `AsyncImage` 仅依赖基础的 `URLCache`，不支持精细的磁盘过期策略与内存上限控制；对高性能瀑布流推荐使用成熟的 `Kingfisher`。
+
+**练手实战任务：** 在 Assets 中配置一套自适应浅/深色模式的主题 Color Set 与 SVG 图标，使用 `AsyncImage` 实现带有加载骨架屏与失败重试占位图的网络商品图列表。
+
+---
 
 ### ⑬ 动画与转场动效
 
+**阶段目标：** 深入掌握声明式动效系统：状态驱动属性动画、物理弹簧曲线、转场过渡 (Transitions) 与跨层级共享元素 (matchedGeometryEffect)。  
+**核心认知：** SwiftUI 动画与 Compose 同样基于状态插值；iOS 极度推崇物理弹簧 `.spring()` 质感；跨层级平滑变形使用 `matchedGeometryEffect`。
+
+#### 模块一：声明式属性动画与弹簧曲线
+
 | 动画类型 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
-| 状态驱动属性动画 | `animate*AsState / updateTransition` | `withAnimation / .animation` | 状态驱动平滑动画 |
-| 元素转场进出 | `AnimatedVisibility` | `.transition` | 元素显隐与进退场转场 |
-| 跨层级共享元素 | `MotionLayout / SharedElement` | `matchedGeometryEffect` | 跨页面共享元素形变动效 |
+| 隐式属性动画 | `animate*AsState` | `.animation(.spring(), value: state)` | 状态驱动隐式属性动画 |
+| 显式触发动画 | `Animatable / LaunchedEffect` | `withAnimation { state.toggle() }` | 闭包显式触发全局动画 |
+| 物理弹簧曲线 | `spring(dampingRatio, stiffness)` | `.spring(response:dampingFraction:)` | 高品质弹簧物理曲线 |
+| 缓动与贝塞尔 | `tween(duration, Easing)` | `.easeInOut(duration:) / .timingCurve` | 线性与贝塞尔缓动曲线 |
+
+#### 模块二：视图进退场转场动效
+
+| 转场场景 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 进退场转场 | `AnimatedVisibility(enter, exit)` | `if cond { View } + .transition(...)` | 元素显隐与进退场转场 |
+| 组合转场动效 | `fadeIn() + slideInVertically()` | `.opacity.combined(with: .slide)` | 渐变与位移组合转场 |
+| 内容形态切换 | `AnimatedContent` | `.contentTransition(.numericText())` | 数字与内容切换平滑过渡 |
+
+#### 模块三：手势驱动与高级动效
+
+| 高级动效 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 跨层级共享元素 | `SharedTransitionLayout` | `matchedGeometryEffect(id:in:namespace)` | 跨页面共享元素形变动效 |
+| 拖拽手势交互 | `pointerInput + Modifier.offset` | `DragGesture() + .offset(...)` | 拖拽手势实时交互动画 |
+| 关键帧与多阶段 | `KeyframesSpec` | `PhaseAnimator / KeyframeAnimator` | 多阶段序列与关键帧动画 |
+
+**声明式动画与转场体系全景对照：**
+
+```
+[ 声明式动画与转场全景对照 ]
+
+ 1. 物理弹簧与显式动画:
+    Android:
+      val scale by animateFloatAsState(targetValue = if (isPressed) 0.95f else 1.0f, animationSpec = spring())
+    iOS:
+      Button("Tap Me") {
+          withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+              isExpanded.toggle()
+          }
+      }
+      .scaleEffect(isExpanded ? 1.1 : 1.0)
+
+ 2. matchedGeometryEffect 共享元素形变 (对标 Compose SharedTransition):
+    struct SharedCardView: View {
+        @Namespace private var animationNamespace
+        @State private var isDetail = false
+
+        var body: some View {
+            if !isDetail {
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.blue)
+                    .matchedGeometryEffect(id: "card_shape", in: animationNamespace)
+                    .frame(width: 120, height: 120)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { isDetail = true }
+                    }
+            } else {
+                RoundedRectangle(cornerRadius: 28)
+                    .fill(.blue)
+                    .matchedGeometryEffect(id: "card_shape", in: animationNamespace)
+                    .frame(maxWidth: .infinity, maxHeight: 300)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) { isDetail = false }
+                    }
+            }
+        }
+    }
+```
+
+**迁移避坑指南：**
+1. **.animation(value:) 必须绑定状态**：从 iOS 15 开始，无参数的 `.animation()` 已被废弃；必须使用 `.animation(.spring(), value: targetState)` 明确监听状态，避免无意触发意外重绘动画。
+2. **.transition 必须在条件分支内**：`.transition(...)` 必须挂载在由 `if/else` 或 `ForEach` 动态增删的视图上，并在外部通过 `withAnimation { ... }` 触发状态变更才会生效。
+3. **matchedGeometryEffect 必须共用 Namespace**：两个变形视图必须处于同一个 `@Namespace` 作用域内，且赋予完全相同的 `id` 字符串。
+
+**练手实战任务：** 实现一个高质感商品详情动效：包含列表卡片点击通过 `matchedGeometryEffect` 展开至全屏大图、弹簧物理阻尼按钮点击缩放反馈、以及下拉拖拽手势实时跟手缩放返回列表。
+
+---
 
 ### ⑭ 系统能力
 
-实战高频，主路径未展开，迁移时优先补：
+**阶段目标：** 掌握 iOS 核心系统能力与后台机制：Info.plist 隐私权限申请、BackgroundTasks 后台保活、APNs 远程推送与 Universal Links 外部直达。  
+**核心认知：** 隐私权限必须先声明 Info.plist 描述文案；后台保活严格受控于 BackgroundTasks；远程推送统一由 APNs 分发。
 
-| 系统能力 | Android 体系 | iOS 体系 | 核心说明 |
+#### 模块一：权限申请与隐私合规
+
+| 权限机制 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
-| 敏感权限申请 | `Manifest + runtime permission` | `Info.plist + 系统授权弹窗` | 动态敏感权限申请 |
-| 后台任务调度 | `WorkManager` | `BackgroundTasks (BGTaskScheduler)` | 系统受控后台任务调度 |
-| 远程消息推送 | `FCM (Firebase Cloud Messaging)` | `APNs` | 远程消息推送通道 |
-| 外部深链直达 | `App Links / Intent Filter` | `Universal Links / URL Scheme` | 外部链接直达页面 (Deep Link) |
+| 权限静态声明 | `AndroidManifest <uses-permission>` | `Info.plist (Privacy Usage Description)` | 隐私权限静态声明描述 |
+| 运行时动态授权 | `ActivityResultContracts.RequestPermission` | `AVCaptureDevice / UNUserNotificationCenter` | 动态敏感权限申请 |
+| 授权状态检测 | `ContextCompat.checkSelfPermission` | `authorizationStatus / openSettingsURL` | 授权状态检测与设置引导 |
+
+#### 模块二：后台任务调度与常驻
+
+| 后台机制 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 后台周期调度 | `WorkManager (PeriodicWorkRequest)` | `BGAppRefreshTask / BGProcessingTask` | 系统受控后台任务调度 |
+| 后台定位追踪 | `FusedLocationProviderClient (Foreground Service)` | `CLLocationManager (allowsBackgroundLocationUpdates)` | 后台定位持续追踪 |
+| 后台音频播放 | `MediaSessionService` | `AVAudioSession (category: .playback)` | 后台音频播放保活 |
+
+#### 模块三：推送通知与外部直达
+
+| 推送与直达 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 远程消息推送 | `FCM (Firebase Cloud Messaging)` | `APNs (Apple Push Notification service)` | 远程消息推送通道 |
+| 本地定时通知 | `NotificationCompat.Builder` | `UNNotificationRequest + UNCalendarNotificationTrigger` | 本地定时与即时通知 |
+| 域名深链直达 | `App Links (.well-known/assetlinks.json)` | `Universal Links (.well-known/apple-app-site-association)` | 外部链接直达页面 (Deep Link) |
+| 自定义协议跳转 | `Custom Scheme (<data android:scheme>)` | `URL Schemes (CFBundleURLTypes)` | 自定义协议头跳转 |
+
+**iOS 核心系统能力全景对照：**
+
+```
+[ iOS 核心系统能力与权限后台对照 ]
+
+ 1. 运行时权限申请范式 (以相机权限为例):
+    【Info.plist 配置必填文案】
+      <key>NSCameraUsageDescription</key>
+      <string>需要使用相机拍摄头像与扫描二维码</string>
+
+    【代码中请求授权】
+      switch AVCaptureDevice.authorizationStatus(for: .video) {
+      case .authorized:
+          openCamera()
+      case .notDetermined:
+          AVCaptureDevice.requestAccess(for: .video) { granted in
+              if granted { openCamera() }
+          }
+      case .denied, .restricted:
+          guideUserToSettings() // 引导跳系统设置页
+      @unknown default:
+          break
+      }
+
+ 2. 本地定时通知调度 (UNUserNotificationCenter):
+    let content = UNMutableNotificationContent()
+    content.title = "学习提醒"
+    content.body = "今天完成 SwiftUI 动画章节学习了吗？"
+    content.sound = .default
+
+    let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+    let request = UNNotificationRequest(identifier: "study_reminder", content: content, trigger: trigger)
+    try await UNUserNotificationCenter.current().add(request)
+```
+
+**迁移避坑指南：**
+1. **权限描述缺失必闪退**：iOS 严禁未配置 Info.plist 描述文案调用相机、相册、定位 API，只要触发直接 SIGABRT 闪退。
+2. **后台无自由 Service**：iOS 不允许无限制后台常驻，切勿尝试在后台自建 WebSocket 长连接；所有后台刷新必须注册 `BGAppRefreshTask` 由系统统筹调度。
+3. **Universal Links 必须双向验证**：域名必须支持 HTTPS，服务器根目录必须部署 `apple-app-site-association`，且 Xcode 的 Associated Domains 必须配置 `applinks:yourdomain.com`。
+
+**练手实战任务：** 在 Info.plist 配置相机权限文案并编写运行时请求逻辑，使用 `UNUserNotificationCenter` 调度一个 5 秒后触发的本地通知，并在 Xcode 关联 Universal Links 域名。
+
+---
 
 ### ⑮ 单元测试与 UI 测试
 
-| 测试类型 | Android 体系 | iOS 体系 | 核心说明 |
+**阶段目标：** 掌握 iOS 现代化测试全景体系：XCTest 单元测试、Swift Testing 新标准、异步数据流测试与 XCUITest 界面自动化测试。  
+**核心认知：** 面向 Protocol 手写 Mock 零反射；Xcode 16+ 引入现代 Swift Testing (`@Test` / `#expect`)；UI 测试通过 `accessibilityIdentifier` 定位。
+
+#### 模块一：业务逻辑与单元测试
+
+| 测试体系 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
-| 单元测试框架 | `JUnit` | `XCTest` | 单元测试与逻辑断言 |
-| 自动化 UI 测试 | `Espresso / Compose UI Test` | `XCUITest` | 自动化 UI 界面测试 |
-| 异步数据流测试 | `runTest / Turbine` | `async/await XCTest / expectation` | 异步并发与数据流测试 |
+| 单元测试框架 | `JUnit 5 (@Test)` | `XCTest (XCTestCase) / Swift Testing (@Test)` | 单元测试与逻辑断言 |
+| 逻辑断言机制 | `assertEquals / assertTrue` | `XCTAssertEqual / #expect(result == expected)` | 测试断言与预期校验 |
+| 面向协议 Mock | `MockK / Mockito` | `Protocol Mock (手写 Mock 对象)` | 面向协议假对象构造 |
+
+#### 模块二：异步并发与数据流测试
+
+| 异步测试 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 异步挂起测试 | `runTest { }` | `func testAsync() async throws` | 异步并发与数据流测试 |
+| 回调等待超时 | `CountDownLatch` | `XCTestExpectation (wait:for:timeout:)` | 异步回调预期等待超时 |
+
+#### 模块三：自动化 UI 界面测试
+
+| UI 测试 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| UI 自动化驱动 | `Espresso / Compose UI Test` | `XCUITest (XCUIApplication)` | 自动化 UI 界面测试 |
+| 控件定位查找 | `onNodeWithTag("btn")` | `app.buttons["login_button"]` | 无障碍标识符查找 |
+| 模拟用户交互 | `performClick() / performTextInput()` | `element.tap() / element.typeText()` | 模拟手势点击与文本输入 |
+
+**iOS 单元测试与 UI 测试全景对照：**
+
+```
+[ iOS 单元测试与 UI 测试代码范式 ]
+
+ 1. 现代 Swift Testing 单元测试 (Xcode 16+ / 纯宏声明):
+    import Testing
+    @testable import MyApp
+
+    struct UserViewModelTests {
+        @Test("验证加载用户列表成功")
+        func testLoadUsersSuccess() async throws {
+            let mockRepo = MockUserRepository(stubbedUsers: [User(id: "1", name: "Alex")])
+            let viewModel = UserViewModel(repository: mockRepo)
+
+            await viewModel.loadUsers()
+
+            #expect(viewModel.uiState.users.count == 1)
+            #expect(viewModel.uiState.users.first?.name == "Alex")
+            #expect(!viewModel.uiState.isLoading)
+        }
+    }
+
+ 2. XCUITest 自动化 UI 测试:
+    import XCTest
+
+    final class LoginUITests: XCTestCase {
+        func testLoginSuccessFlow() throws {
+            let app = XCUIApplication()
+            app.launch()
+
+            let emailField = app.textFields["email_input"]
+            emailField.tap()
+            emailField.typeText("test@example.com")
+
+            let loginBtn = app.buttons["login_button"]
+            loginBtn.tap()
+
+            let welcomeText = app.staticTexts["welcome_label"]
+            XCTAssertTrue(welcomeText.waitForExistence(timeout: 3))
+        }
+    }
+```
+
+**迁移避坑指南：**
+1. **避免重型 Mock 框架**：Android 常用 MockK/Mockito 等字节码增强框架；iOS 优先面向 `Protocol` 手写内存 Mock，编译极速且类型安全。
+2. **Swift Testing vs XCTest**：新写测试代码推荐使用 `@Test` 与 `#expect`（Swift Testing），断言报错信息更丰富、支持并发并行执行。
+3. **UI 测试必须声明 Accessibility ID**：SwiftUI 视图必须添加 `.accessibilityIdentifier("my_id")`，切勿使用视图文案或标题来定位 UI 元素（否则多语言适配时直接断言失败）。
+
+**练手实战任务：** 为 ViewModel 编写一套完整的 XCTest 异步单元测试（测试成功、失败与加载状态流），并通过 XCUITest 编写一个自动化登录流测试用例。
+
+---
 
 ### ⑯ 打包构建与应用发布
 
-| 发布阶段 | Android 体系 | iOS 体系 | 核心说明 |
+**阶段目标：** 掌握 iOS 应用构建、签名体系与上架流程：Build Schemes 多环境、Certificates & Profiles 证书签名、IPA 归档与 App Store Connect 提审。  
+**核心认知：** Scheme 组合 Configuration；签名绑定证书与描述文件（推荐自动签名）；TestFlight 快速内测分发。
+
+#### 模块一：构建变体与环境配置
+
+| 构建配置 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
-| 构建多环境配置 | `Build Variants / Flavors` | `Build Schemes / Configurations` | 开发/测试/正式多环境配置 |
-| 打包产物格式 | `APK / AAB` | `IPA / Xcode Archive` | 打包分发安装包产物 |
-| 应用管理后台 | `Google Play Console` | `App Store Connect` | 开发者发布管理后台 |
-| 代码签名与安全 | `Keystore / Play App Signing` | `Certificates / Provisioning Profiles` | 证书签名与描述文件校验 |
+| 多环境变体 | `productFlavors / Build Variants` | `Build Schemes / Configurations` | 开发/测试/正式多环境配置 |
+| 环境变量注入 | `buildConfigField / resValue` | `xcconfig / Info.plist` | 环境变量与 BaseURL 注入 |
+| 编译优化与裁剪 | `R8 / ProGuard / minifyEnabled` | `Swift Compiler Optimization (-Osize) / Strip Debug Symbols` | 代码编译优化与符号裁剪 |
+
+#### 模块二：签名证书与产物归档
+
+| 签名与打包 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 签名证书体系 | `Keystore (.jks) / Play App Signing` | `Apple Developer Certificate + Provisioning Profile` | 证书签名与描述文件校验 |
+| 签名托管模式 | `signingConfigs { ... }` | `Xcode Automatically manage signing` | Xcode 自动签名托管 |
+| 安装包产物 | `APK / AAB (Android App Bundle)` | `IPA / Xcode Archive (.xcarchive)` | 打包分发安装包产物 |
+
+#### 模块三：商店控制台与灰度分发
+
+| 平台与分发 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 开发者管理后台 | `Google Play Console` | `App Store Connect` | 开发者发布管理后台 |
+| 测试分发渠道 | `Google Play Internal Testing` | `TestFlight` | 测试分发与内部体验渠道 |
+| 应用审核准则 | `Google Play 开发者政策` | `App Store Review Guidelines` | 应用审核指南与上架准则 |
+
+**打包构建与应用发布全景对照：**
+
+```
+[ 打包构建与应用发布全景对照 ]
+
+ 1. 签名体系核心心智:
+    【Certificate (证书)】: 证明「你是合法的 Apple 开发者」
+    【App ID (Bundle Identifier)】: 证明「App 的唯一身份 (如 com.company.app)」
+    【Provisioning Profile (描述文件)】: 胶水文件，将「开发者证书 + App ID + 允许安装的测试机 UDID + 开启的 Entitlements 权限」绑定封包
+
+ 2. 发布全流程流水线:
+    Xcode 切换 Release Scheme
+      ➔ Product ➔ Archive (生成 .xcarchive 产物)
+      ➔ Organizer 窗口点击「Distribute App」
+      ➔ 自动签名校验上传至 App Store Connect
+      ➔ TestFlight 内部/外部公开测试分发
+      ➔ 填写 App 元数据、截屏、隐私问卷与审核备注
+      ➔ 提交 App Review 审核 ➔ 通过后正式上架 App Store
+```
+
+**迁移避坑指南：**
+1. **自动签名优先**：初学者和中小型团队务必在 Signing & Capabilities 中勾选「Automatically manage signing」，Xcode 自动管理证书与描述文件。
+2. **xcconfig 环境变量注入**：不要在代码中硬编码 `https://api.dev.com` 与 `https://api.prod.com`；使用 `Debug.xcconfig` 与 `Release.xcconfig` 将 `API_BASE_URL` 注入到 `Info.plist`。
+3. **App Store 审核红线**：所有数字虚拟服务必须走 Apple IAP 内购 (StoreKit)，不得引导至外部网页支付；必须提供有效的测试账号；隐私问卷必须与 App 实际收集的数据严格一致。
+
+**练手实战任务：** 在 Xcode 中创建 Staging 与 Release 构建配置，开启 Automatically manage signing，执行 Product → Archive 导出 .xcarchive 产物并在 Organizer 中分析包体积构成。
 
 ---
 
