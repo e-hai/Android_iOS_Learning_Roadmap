@@ -352,20 +352,30 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑥ 页面导航与路由
 
-**阶段目标：** 掌握纯声明式 UI 强类型与数据驱动路由架构（Compose Navigation 2.8+ / Nav3 ↔ SwiftUI NavigationStack）。  
+**阶段目标：** 掌握纯声明式 UI 强类型数据驱动路由、跨页面参数传递与结果回传闭环（Compose Navigation 2.8+ / Nav3 ↔ SwiftUI NavigationStack）。  
 **核心认知：** 现代声明式路由的本质是**「可观察的状态列表」**；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串拼接与视图级强绑定。
 
-### 模块一：强类型路由定义与状态栈管理（核心路由机制）
+### 模块一：强类型路由定义与状态栈管理
 
 | 导航操作 / 维度 | Android (Nav3 / 2.8+ 强类型) | iOS (SwiftUI 16+ NavigationStack) | 核心特性说明 |
 | --- | --- | --- | --- |
 | **强类型路由节点** | `@Serializable data class Detail(val id: String)` | `enum AppRoute: Hashable { case detail(id: String) }` | 编译期强类型，告别字符串拼写错误 |
 | **状态栈数据源** | `val backStack = rememberNavBackStack()` (Nav3) | `@State var path: [AppRoute] = []` | 纯状态驱动（数组列表） |
 | **页面跳转 (压栈)** | `backStack.add(Detail(...))` / `navigate(Detail)` | `path.append(.detail(...))` | 状态驱动压入目标路由 |
-| **页面返回 (出栈)** | `backStack.pop()` / `popBackStack()` | `path.removeLast()` | 弹出顶层路由返回上一级 |
+| **页面返回 (出栈)** | `backStack.pop()` / `popBackStack()` | `path.removeLast()` / `@Environment(\.dismiss) var dismiss; dismiss()` | 弹出顶层路由返回上一级 |
 | **一键回首页** | `backStack.clear()` / `popBackStack(Home, false)` | `path.removeAll()` | **Pop to Root** 一键清栈回首页 |
 
-### 模块二：页面呈现容器与多端/分屏适配（容器与分栏）
+### 模块二：参数传递与页面结果回传
+
+| 数据传递场景 | Android (Compose 体系) | iOS (SwiftUI 体系) | 核心机制与模式说明 |
+| --- | --- | --- | --- |
+| **正向参数传递** | Route 数据类构造字段：`Detail(val id: String)` | enum 关联值 / View 初始化器：`case detail(id: String)` | 强类型入参，随路由节点直接下发 |
+| **返回数据 (双向绑定)** | `previousBackStackEntry.savedStateHandle.set("key", val)` | `@Binding var selected: Item`（推荐） | **SwiftUI 首选**：双向绑定指针，子页修改直接更新父数据源 |
+| **返回数据 (闭包回调)** | Composable 函数传入 `onResult: (Item) -> Unit` | View 声明 `let onResult: (Item) -> Void` 闭包 | 函数式直接回调，解耦状态归属 |
+| **返回数据 (共享模型)** | 共享父级 ViewModel 的 `StateFlow` | 共享 `@Observable` ViewModel / `@Environment` | 跨页面共享域模型，写入单一真实数据源 |
+| **模态弹窗选择回传** | `ModalBottomSheet { onSelect(it) }` | `.sheet(isPresented:) { Picker(result: $selected) }` | 弹层选择器闭环，关闭弹窗自动同步状态 |
+
+### 模块三：页面呈现容器与多端适配
 
 | 容器类型 / 场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
@@ -374,12 +384,12 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 | **底部导航选项卡** | `NavigationBar + NavDisplay` | `TabView(selection: $tab)` | 根级多分支页面容器 |
 | **模态弹窗/抽屉** | `ModalBottomSheet / Dialog` | `.sheet(isPresented:) / .fullScreenCover` | 独立弹层容器 |
 
-**现代纯数据驱动路由架构：**
+**现代纯数据驱动路由与结果回传架构：**
 
 ```
-[ 现代第三代纯数据驱动路由: Android Nav3 <-> iOS 16+ NavigationStack ]
+[ 现代第三代纯数据驱动路由与数据回传闭环 ]
 
- 1. 路由节点定义 (强类型模型):
+ 1. 强类型路由节点定义:
     Android: @Serializable data class DetailRoute(val id: String)
     iOS:     enum AppRoute: Hashable { case detail(id: String) }
 
@@ -389,14 +399,23 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
  3. 核心栈操作映射 (压栈 / 出栈 / 回首页):
     跳转压栈:   backStack.add(DetailRoute("101"))   <->  path.append(.detail("101"))
-    返回出栈:   backStack.pop()                     <->  path.removeLast()
+    返回出栈:   backStack.pop()                     <->  path.removeLast() / dismiss()
     一键回首页: backStack.clear()                   <->  path.removeAll()
 
- 4. 路由呈现容器:
+ 4. 页面返回结果 (Pop with Result):
+    【Android】
+      目标页回传: navController.previousBackStackEntry?.savedStateHandle?.set("selected_id", 101)
+      上一页监听: val result by currentBackStackEntry.savedStateHandle.getStateFlow("selected_id", null).collectAsState()
+    【iOS】
+      发起页: @State private var selectedItem: Item?
+      目标页: @Binding var selectedItem: Item?
+      目标页回传: self.selectedItem = item; dismiss()  <-- 直接操作指针，无需中间事件总线！
+
+ 5. 路由呈现容器:
     Android (Nav3):
       NavDisplay(backStack) { route ->
           when (route) {
-              is HomeRoute   -> HomeScreen(...)
+              is HomeRoute   -> HomeScreen(onGoDetail = { id -> backStack.add(DetailRoute(id)) })
               is DetailRoute -> DetailScreen(route.id)
           }
       }
@@ -415,9 +434,10 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 **迁移避坑指南：**
 1. **纯数据驱动核心心智**：现代声明式路由本质是「可观察的状态列表」；页面跳转即 `List.add`，返回即 `List.removeLast`，告别任何字符串硬编码与视图嵌套。
 2. **强类型路由与解耦**：Android 借助 Kotlinx Serialization、iOS 借助 Hashable 枚举，实现编译期全类型安全与页面按需惰性构建。
-3. **平板与多窗分栏适配**：单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
+3. **返回数据最佳实践（Pop with Result）**：Android 传统常依赖 `savedStateHandle` 在栈帧间存取结果或传递 lambda；SwiftUI 最地道、优雅的做法是**直接向下传递 `@Binding` 双向绑定指针**，目标页赋值即自动修改发起页数据源，再调用 `dismiss()` 关闭页面；或使用尾随闭包回调与共享 `@Observable ViewModel`。
+4. **平板与多窗分栏适配**：单栏使用 `NavigationStack`，iPad/折叠屏双栏分屏使用 `NavigationSplitView(sidebar:detail:)`，对标 Nav3 的多窗 `NavDisplay`。
 
-**练手实战任务：** 定义强类型路由枚举/对象，使用 `NavigationStack(path:)` 与 `NavDisplay/NavHost` 实现「列表压栈跳转 ➔ 详情参数读取 ➔ 一键回首页 (Pop to Root)」完整闭环。
+**练手实战任务：** 定义强类型路由枚举/对象，使用 `NavigationStack(path:)` 与 `NavDisplay/NavHost` 实现「列表压栈跳转 ➔ 详情选择并利用 `@Binding` / `savedStateHandle` 回传结果 ➔ 一键回首页 (Pop to Root)」完整闭环。
 
 ---
 
