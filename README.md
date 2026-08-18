@@ -531,21 +531,97 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑧ 网络请求与数据解析
 
-| 层次 / 功能 | Android 体系 | iOS 体系 | 核心说明 |
+**阶段目标：** 掌握现代网络请求与数据解析全流程：URLSession 异步请求、Codable 高性能编解码、拦截器封装与错误处理机制。  
+**核心认知：** iOS 极度推崇原生内置哲学：无需引入 Retrofit 或复杂第三方库，原生 `URLSession` + `async/await` + `Codable` 即可优雅搞定类型安全、高性能的网络请求与 JSON 编解码。
+
+### 模块一：HTTP 引擎与请求构建（网络传输）
+
+| 场景 / 功能 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
-| 底层 HTTP 引擎 | `OkHttp` | `URLSession` | 底层 HTTP 请求与会话 |
-| 声明式 API 客户端 | `Retrofit` | `URLSession + API Client` | RESTful 接口封装 |
-| 现代纯异步客户端 | `Ktor Client` | `Async/Await 原生客户端` | 原生纯异步网络客户端 |
-| JSON 序列化解析 | `Gson / kotlinx.serialization` | `Codable + JSONDecoder` | JSON 解析与模型编解码 |
+| 底层会话引擎 | `OkHttpClient` | `URLSession(configuration:)` | 底层网络会话引擎 |
+| 异步 GET 请求 | `client.newCall(request).execute()` | `URLSession.shared.data(from: url)` | 简单 GET 异步请求 |
+| 构造请求体与 Header | `Request.Builder().url().post(body)` | `var request = URLRequest(url:)` | 构造请求头与请求体 |
+| 声明式 REST 客户端 | `Retrofit (@GET / @POST)` | `URLSession + API Client` | 声明式 REST 接口封装 |
+| 拦截器与中间件 | `OkHttp Interceptor` | `URLProtocol / URLSessionConfiguration` | Token 与日志拦截器 |
 
-建议顺序：
+### 模块二：JSON 编解码与序列化（数据解析）
+
+| 解析机制 / 策略 | Android (Kotlinx / Gson) | iOS (Swift Codable) | 核心说明 |
+| --- | --- | --- | --- |
+| 模型编解码协议 | `@Serializable` | `Codable (Decodable & Encodable)` | 模型编解码协议标记 |
+| JSON 反序列化 | `Json.decodeFromString<T>(text)` | `JSONDecoder().decode(T.self, from: data)` | JSON 字节反序列化为模型 |
+| 对象序列化为 JSON | `Json.encodeToString(model)` | `JSONEncoder().encode(model)` | 模型对象序列化为 JSON |
+| 自定义字段映射 | `@SerialName("user_id")` | `enum CodingKeys: String, CodingKey` | 自定义字段键名映射 |
+| 蛇形下划线转驼峰 | `Json { namingStrategy = SnakeCase }` | `decoder.keyDecodingStrategy = .convertFromSnakeCase` | 蛇形下划线自动转驼峰 |
+| 日期时间解析策略 | `JsonBuilder { ... }` | `decoder.dateDecodingStrategy = .iso8601` | 日期时间自动解析策略 |
+
+### 模块三：高级传输、异常与实时通信（健壮性与流）
+
+| 高级场景 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 状态码与响应校验 | `response.isSuccessful / code` | `(response as? HTTPURLResponse)?.statusCode` | HTTP 状态码与响应校验 |
+| 网络异常与超时 | `HttpException / IOException` | `URLError` | 网络异常与超时捕获 |
+| 流式大文件下载 | `ResponseBody.byteStream()` | `URLSession.shared.bytes(from: url)` | 流式大文件下载与读取 |
+| 多段文件表单上传 | `MultipartBody.Builder()` | `URLSession.shared.upload(for:from:)` | 多段文件表单上传 |
+| SSL 证书锁定防抓包 | `CertificatePinner` | `URLSessionDelegate` | SSL 证书锁定防抓包 |
+| 全双工实时通信 | `WebSocketListener` | `URLSessionWebSocketTask` | 全双工实时通信 |
+
+**现代网络请求与数据编解码全景对照：**
 
 ```
-Android: OkHttp → Retrofit → Serialization（Ktor 可选）
-iOS:     URLSession → Codable/JSONDecoder → 封装 API Client
+[ 现代网络请求与数据编解码全景对照 ]
+
+ 1. 简单异步 GET 请求:
+    Android (OkHttp + Coroutines):
+      val request = Request.Builder().url("https://api.example.com/users").build()
+      val response = okHttpClient.newCall(request).await()
+      val jsonString = response.body?.string()
+
+    iOS (Swift Concurrency + URLSession):
+      let (data, response) = try await URLSession.shared.data(from: url)
+      guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
+          throw URLError(.badServerResponse)
+      }
+
+ 2. 构造 POST 请求与请求头:
+    Android:
+      val body = jsonString.toRequestBody("application/json".toMediaType())
+      val request = Request.Builder()
+          .url("https://api.example.com/login")
+          .header("Authorization", "Bearer $token")
+          .post(body)
+          .build()
+
+    iOS:
+      var request = URLRequest(url: url)
+      request.httpMethod = "POST"
+      request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+      request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+      request.httpBody = try JSONEncoder().encode(loginPayload)
+      let (data, response) = try await URLSession.shared.data(for: request)
+
+ 3. Codable 极速编解码与蛇形转驼峰:
+    【Swift Data Model】
+      struct User: Identifiable, Codable {
+          let id: Int
+          let userName: String  // 自动从服务端的 user_name 映射
+          let createdAt: Date   // 自动按照 ISO8601 解析
+      }
+
+    【解码配置】
+      let decoder = JSONDecoder()
+      decoder.keyDecodingStrategy = .convertFromSnakeCase
+      decoder.dateDecodingStrategy = .iso8601
+      let user = try decoder.decode(User.self, from: data)
 ```
 
-**练手：** 同一个 REST 接口两端请求并解码成模型。
+**迁移避坑指南：**
+1. **无需硬套 Retrofit**：iOS 原生 `URLSession` + `async/await` 极其轻巧，通常只需手写一个通用的 `APIClient` 结构体/类（包含 `baseURL`、`headers` 与 `request<T: Decodable>()` 方法），即可替代庞大的第三方网络库。
+2. **校验 HTTP 状态码**：`URLSession.shared.data(for:)` 只要网络连通（即便返回 404 或 500）都不会抛出 Swift 异常；必须显式将 `response` 下转型为 `HTTPURLResponse` 并检查 `statusCode`。
+3. **下划线命名首选 convertFromSnakeCase**：当服务端下发 `snake_case` 字段时，直接指定 `decoder.keyDecodingStrategy = .convertFromSnakeCase`，模型属性直接写驼峰 `userName`，无需编写繁琐的 `enum CodingKeys`。
+4. **大文件下载用 bytes(from:)**：对应 Android 的 `ResponseBody.byteStream()`，iOS 使用 `URLSession.shared.bytes(from: url)` 异步流，边下边读，避免撑爆内存。
+
+**练手实战任务：** 使用原生 `URLSession` + `async/await` + `Codable` 封装一个通用的 `APIClient`：支持自动附加 Bearer Token、全局开启蛇形转驼峰与 ISO8601 时间解析、并在 401 响应时统一拦截抛出业务错误。
 
 ---
 
