@@ -251,6 +251,7 @@ export const zhHans: Record<string, string> = {
   "row.note.storage_room": "数据库 ORM（存大表）",
   "row.note.storage_sp": "轻量键值偏好存储",
   "row.note.storage_sqlite": "原生 SQL 操作",
+  "row.note.target": "打包目标与签名配置",
   "row.note.task_mod": "异步任务（离开视图自动取消）",
   "row.note.test_async": "异步并发与数据流测试",
   "row.note.test_ui": "自动化 UI 界面测试",

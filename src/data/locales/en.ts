@@ -251,6 +251,7 @@ export const en: Record<string, string> = {
   "row.note.storage_room": "SQLite ORM database",
   "row.note.storage_sp": "Key-value preferences",
   "row.note.storage_sqlite": "Direct SQLite operations",
+  "row.note.target": "Target & build configuration",
   "row.note.task_mod": "Async task (auto-cancelled)",
   "row.note.test_async": "Async concurrency testing",
   "row.note.test_ui": "Automated UI testing",
