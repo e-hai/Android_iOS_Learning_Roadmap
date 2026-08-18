@@ -84,55 +84,79 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 
 ---
 
-## ② 语言与类型系统 ★★★★★
+## ② 语言基础与类型系统 ★★★★★
 
-**阶段目标：** 深入掌握 Kotlin ↔ Swift 语法映射，透彻理解 `struct` 值语义、ARC 引用计数弱引用、POP 面向协议编程与 `enum` 关联值。  
-**迁移最大坑：** Swift 以 **值类型（struct）+ ARC** 为主，不是 Java/Kotlin 那套「万物皆引用 + JVM GC」。
+**阶段目标：** 深入掌握 Kotlin ↔ Swift 语法映射，透彻理解 struct 值语义、ARC 弱引用、POP 面向协议编程与 Enum 关联值。  
+**核心认知：** Swift 中 `struct` 是第一等公民（值类型 / 自动深拷贝 / 线程安全）；内存管理采用 ARC 计数制，闭包强引用必须显式使用 `[weak self]`。
 
 ### 模块一：变量、函数与空安全（基础语法）
 
-| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| 语言特性 / 场景 | Kotlin (Android) | Swift (iOS) | 核心心智与特性说明 |
 | --- | --- | --- | --- |
-| 常量与变量 | `val` (只读) / `var` (可变) | `let` (常量绑定) / `var` (可变变量) | 变量可变性控制（Swift 推荐优先使用 `let`） |
-| 函数声明 | `fun foo(x: Int): String` | `func foo(x: Int) -> String` | 函数签名语法与 Swift 外部参数标签支持 |
-| 空安全体系 | Nullable `?` / Elvis `?:` / `!!` | Optional `?` / `??` / `if let` / `guard let` / `!` | 可选类型安全解包（**强烈推崇 `guard let` 卫语句**） |
-| 集合与可变性 | `List` / `MutableList` / `Map` / `Set` | `Array` / `Dictionary` / `Set` | Swift 通过 `let` / `var` 统一控制集合可变性 |
-| 分支模式匹配 | `when (x) { is Int -> ... }` | `switch x { case ... }` | Swift `switch` 必须穷尽匹配，原生支持复杂模式解构 |
+| **不可变常量** | `val x = 1` | `let x = 1` | 一旦赋值不可重新绑定 |
+| **可变变量** | `var y = 2` | `var y = 2` | 可变本地变量 / 属性 |
+| **基础数据类型** | `Int`, `Double`, `Boolean`, `String` | `Int`, `Double`, `Bool`, `String` | 强类型，基本命名一致 |
+| **函数声明** | `fun calculate(a: Int): Int` | `func calculate(a: Int) -> Int` | `fun` ➔ `func`，返回值使用 `->` |
+| **参数外部标签** | 命名参数 `calculate(a = 1)` | `func sum(_ a: Int, for count: Int)` | 外部标签（`_` 忽略，自定义介词） |
+| **空安全类型** | `String?` | `String?` | 显式 Optional 包装类型 |
+| **安全调用** | `user?.name` | `user?.name` | 链路安全访问可空属性 |
+| **Elvis / 空合并** | `user?.name ?: "默认值"` | `user?.name ?? "默认值"` | `?:` (Elvis) ➔ `??` (Nil-Coalescing) |
+| **强制解包** | `user!!.name` (慎用) | `user!.name` (慎用) | 断言非空，若为 nil 立即崩溃 |
+| **可选绑定解包** | `user?.let { u -> ... }` | `if let user = user { ... }` | 作用域安全绑定非空值 |
+| **卫语句提前返回** | `if (user == null) return` | `guard let user = user else { return }` | **Swift 核心习惯**：卫语句提前退出 |
 
 ### 模块二：面向对象与值语义（核心心智差异）
 
-| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| 维度 / 机制 | Kotlin (Android) | Swift (iOS) | 核心心智差异 |
 | --- | --- | --- | --- |
-| 核心值类型 | `data class`（仍是引用语义/堆分配） | **`struct`（值类型/栈分配/自动深拷贝）** | **Swift 核心基石**：UI State、Model 与 View 全是 struct |
-| 引用与并发类 | `class` / `object` (单例) | `class` (引用类型) / `actor` (并发隔离类) | 跨组件共享可变状态用 class，线程安全状态用 actor |
-| 接口与协议 | `interface` (接口多继承) | `protocol` (面向协议编程 POP) | 协议组合与基于协议的抽象设计 |
-| 扩展能力 | `fun String.foo()` (扩展函数) | `extension String { ... }` | Swift 扩展支持扩展方法、计算属性与协议实现 |
-| 委托机制 | 类委托 `by delegate` | 协议扩展默认实现 / 组合包装 | 优先通过 `protocol extension` 提供默认实现 |
+| **数据模型** | `data class User(val id: String)` | `struct User { let id: String }` | **值类型 vs 引用类型**：Swift `struct` 赋值为自动深拷贝，天然线程安全 |
+| **共享类声明** | `class Manager` | `class Manager` | 跨组件共享可变状态与需要生命周期时才用 `class` |
+| **抽象协议 / 接口** | `interface OnClickListener` | `protocol Clickable` | **POP (面向协议编程)**：iOS 极其推崇协议组合 |
+| **默认实现扩展** | 接口内写默认函数 | `extension Clickable { func onClick() }` | 用 `extension` 无侵入为协议提供通用默认实现 |
+| **继承 vs 组合** | `open class Base` ➔ `class Child : Base()` | 推荐 `protocol + extension` 拼装 | Android 偏好抽象基类继承；iOS 体系首选协议拼装 |
+| **单例模式** | `object AppConfig` | `class AppConfig { static let shared = ... }` | Swift 常用 `static let shared` 静态属性单例 |
 
 ### 模块三：高级类型、枚举与泛型
 
-| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| 语言特性 / 场景 | Kotlin (Android) | Swift (iOS) | 核心心智与特性说明 |
 | --- | --- | --- | --- |
-| 密封/代数类型 | `sealed class` / `sealed interface` | **`enum`（支持携带关联值 Associated Values）** | Swift 枚举可为每个 case 携带不同类型元组数据 |
-| 泛型与约束 | `fun <T> foo()` / `out` / `in` 协变逆变 | `<T: Constraint>` / `some View` (不透明) / `any` (存在) | Swift `some` 隐藏具体类型，`any` 运行时装箱 |
-| 属性访问器 | `val prop get() = ...` (自定义 getter) | `var prop: Type { get { ... } }` (计算属性) | 计算属性与只读属性声明语法 |
-| 访问控制 | `private` / `protected` / `internal` / `public` | `private` / `fileprivate` / `internal` / `public` / `open` | Swift 模块内外可见性与可继承权限控制 |
+| **带关联值枚举** | `sealed class UiState` | `enum UiState { case loading, success(Data) }` | **Swift 核心利器**：枚举每个分支可绑定独立关联值数据 |
+| **模式匹配** | `when (state) { is Loading -> ... }` | `switch state { case .success(let data): ... }` | `switch` 必须穷尽所有分支（Exhaustive） |
+| **泛型约束** | `class Repo<T : Comparable>` | `class Repo<T: Comparable>` | 泛型占位符与类型上界约束 |
+| **类型别名** | `typealias UserId = String` | `typealias UserId = String` | 为复杂闭包或长类型起别名 |
+| **类型判断与强转** | `is String` / `as? String` | `is String` / `as? String` | 安全下转型运算符一致 |
 
 ### 模块四：闭包、错误处理与内存模型（避坑重点）
 
-| 维度 | Android 体系 (Kotlin) | iOS 体系 (Swift) | 核心学习重点 |
+| 机制 / 场景 | Kotlin (Android) | Swift (iOS) | 核心避坑点 |
 | --- | --- | --- | --- |
-| 高阶函数闭包 | Lambda: `{ a -> ... }` (尾随闭包) | Closure: `{ a in ... }` (尾随闭包 / `$0` 简写) | Swift 闭包语法与参数隐式简写 |
-| 错误处理 | `try-catch` / `runCatching` / `Result` | `do-try-catch` / `throws` / `try?` / `Result<T, Error>` | Swift 显式错误抛出与 `try?` 可选值转换 |
-| 内存管理 | JVM GC (垃圾回收器，无强引用循环断裂) | **ARC (自动引用计数，闭包必须 `[weak self]`)** | **最大内存泄漏坑**：循环引用与弱引用破环 |
+| **闭包 / Lambda** | `{ item -> item.id }` / `it.id` | `{ item in item.id }` / `{ $0.id }` | `in` 关键字分隔参数列表；`$0`, `$1` 为匿名参数索引 |
+| **尾随闭包** | `Button { println() }` | `Button { print() }` | 最后一个闭包参数可写在括号外 |
+| **内存回收模型** | **JVM GC** (垃圾收集器后台回收) | **ARC** (自动引用计数) | **核心差异**：Swift 无 GC，对象引用计数清零立即释放 |
+| **闭包循环引用防漏** | GC 自动处理多数引用环 | **`[weak self]` 捕获列表** | **必记**：闭包持有 self 且 self 持有闭包时必须用 `[weak self]` |
+| **抛出与捕获错误** | `@Throws fun load()` / `try-catch` | `func load() throws` / `do-catch` | 显式抛出与捕获异常 |
+| **可选执行** | 无原生直接对应 | `try? load()` (失败返回 nil) | 将抛错函数转换为 Optional 返回值 |
 
 **语言特性与心智体系全景对照：**
 
 ```
-【数据模型】Kotlin: data class User(...) (引用语义) ↔ Swift: struct User(...) (值类型/自动深拷贝)
-【多态机制】Kotlin: open class Base → class Child : Base() ↔ Swift: protocol Identifiable → extension Identifiable
-【状态枚举】Kotlin: sealed class UiState ↔ Swift: enum UiState { case loading, success(Data), error(Error) }
-【内存回收】Kotlin: JVM GC (无循环引用强断裂) ↔ Swift: ARC (闭包必须 [weak self] 避免循环引用)
+[ 语言基础与心智模型对照 ]
+
+1. 数据模型与内存语义
+   Android: data class User(...)  [引用类型 / 指针传递]
+   iOS:     struct User(...)      [值类型 / 自动深拷贝 / 线程安全]
+
+2. 抽象与多态机制
+   Android: open class Base -> Child  [单根基类继承 OOP]
+   iOS:     protocol + extension      [面向协议组合 POP]
+
+3. 状态机与枚举建模
+   Android: sealed class UiState      [密封类分层继承]
+   iOS:     enum UiState { case ... } [带关联值枚举]
+
+4. 内存回收模型
+   Android: JVM GC                    [垃圾收集器后台自动回收]
+   iOS:     ARC                       [引用计数即时释放 / 闭包须 weak self]
 ```
 
 **迁移避坑指南：**
@@ -146,7 +170,7 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 
 ---
 
-## ③ 生命周期（分代横向对齐）★★★★★
+## ③ 生命周期 ★★★★★
 
 不要拿 Activity 去硬套 SwiftUI！必须**分代横向对齐**：传统时代对标 UIKit，现代时代对标 Compose。
 
@@ -195,7 +219,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ④ UI 布局（Compose ↔ SwiftUI）★★★★★
+## ④ UI 布局与核心控件 ★★★★★
 
 **阶段目标：** 直接从 Jetpack Compose 迁移到 SwiftUI：掌握核心容器布局、基础控件与 Modifier 链式调用。  
 **核心认知：** 两者皆为现代声明式 UI，思想高度一致；最大区别在于 **SwiftUI Modifier 的包装顺序**与**容器闭包子视图数量约束**。
@@ -254,7 +278,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ⑤ 状态管理与数据流（全场景映射）★★★★★
+## ⑤ 状态管理与数据流 ★★★★★
 
 **阶段目标：** 精准掌握 Compose 与 SwiftUI 各状态 API 的应用场景：视图私有状态、父子双向绑定、ViewModel 业务模型、场景暂存恢复、磁盘偏好与全局环境。  
 **核心认知：** 声明式 UI 的核心是**状态所有权与单向数据流**：谁拥有真实数据源（Source of Truth），谁向下分发，子组件通过引用或事件反向修改。
@@ -326,7 +350,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ⑥ 页面导航与路由（Nav3 & NavigationStack）★★★★☆
+## ⑥ 页面导航与路由 ★★★★☆
 
 **阶段目标：** 掌握纯声明式 UI 强类型与数据驱动路由架构（Compose Navigation 2.8+ / Nav3 ↔ SwiftUI NavigationStack）。  
 **核心认知：** 现代声明式路由的本质是**「可观察的状态列表」**；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串拼接与视图级强绑定。
@@ -397,7 +421,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ⑦ 异步 ★★★★★
+## ⑦ 异步与并发 ★★★★★
 
 会 Kotlin 协程的话，Swift Concurrency 上手很快，但要习惯 **async 函数染色** 与 **Actor 隔离**。
 
@@ -425,7 +449,7 @@ iOS:     Thread → Task → AsyncSequence → Actor
 
 ---
 
-## ⑧ 网络 ★★★★☆
+## ⑧ 网络请求与数据解析 ★★★★☆
 
 | Android | iOS |
 | --- | --- |
@@ -445,7 +469,7 @@ iOS:     URLSession → Codable/JSONDecoder → 封装 API Client
 
 ---
 
-## ⑨ 数据存储 ★★★★☆
+## ⑨ 本地数据存储 ★★★★☆
 
 | Android | iOS | 用途 |
 | --- | --- | --- |
@@ -467,7 +491,7 @@ iOS:     UserDefaults → Keychain → SwiftData（需要时再补 CoreData）
 
 ---
 
-## ⑩ 架构 ★★★★★
+## ⑩ 应用架构 ★★★★★
 
 两端几乎同一套：**MVVM + Repository**。
 
@@ -499,7 +523,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 
 很多 iOS 项目直接：**protocol + 构造函数注入**，未必上框架。
 
-### ⑫ 图片与资源 ★★★☆☆
+### ⑫ 图片与静态资源 ★★★☆☆
 
 | Android | iOS |
 | --- | --- |
@@ -508,7 +532,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | Coil / Glide | AsyncImage / Kingfisher 等 |
 | Painter / ImageBitmap | Image / UIImage |
 
-### ⑬ 动画 ★★★★☆
+### ⑬ 动画与转场动效 ★★★★☆
 
 | Android | iOS |
 | --- | --- |
@@ -516,7 +540,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | `AnimatedVisibility` | `transition` |
 | MotionLayout / Shared Element | `matchedGeometryEffect` |
 
-### ⑭ 权限 · 后台 · 推送 ★★★★☆
+### ⑭ 系统能力 ★★★★☆
 
 实战高频，主路径未展开，迁移时优先补：
 
@@ -527,7 +551,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | 推送 | FCM | APNs |
 | 深链 | App Links / Intent | Universal Links / URL Scheme |
 
-### ⑮ 测试 ★★★☆☆
+### ⑮ 单元测试与 UI 测试 ★★★☆☆
 
 | Android | iOS |
 | --- | --- |
@@ -535,7 +559,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | Espresso / Compose UI Test | XCUITest |
 | 协程测试 | async 测试 / 期望值 |
 
-### ⑯ 发布 ★★★☆☆
+### ⑯ 打包构建与应用发布 ★★★☆☆
 
 | Android | iOS |
 | --- | --- |
@@ -569,3 +593,4 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 3. **第 4 周：** ⑦⑧⑨ — 接真实 API + 本地缓存  
 4. **第 5 周：** ⑩ — 按 MVVM 重整，再挑 ⑭⑮ 补权限与测试  
 5. **之后：** 按需补 ⑪–⑬、⑯，准备上架
+
