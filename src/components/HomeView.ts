@@ -143,13 +143,13 @@ export function renderHomeView(
     <p style="font-size:13.5px;color:var(--color-ink-muted);margin-bottom:16px;">${i18n.t('home.matrix.desc')}</p>
 
     <div class="matrix-group-title">
-      <span class="chip chip-main" style="font-size:10px;padding:2px 6px;">★ ${i18n.t('badge.main')}</span>
+      <span class="chip chip-main" style="font-size:10px;padding:2px 6px;">${i18n.t('badge.main')}</span>
       <span>${i18n.t('home.matrix.main')}</span>
     </div>
     <div class="matrix-grid" id="matrix-grid-main"></div>
 
     <div class="matrix-group-title" style="margin-top:28px;">
-      <span class="chip chip-advanced" style="font-size:10px;padding:2px 6px;">☆ ${i18n.t('badge.advanced')}</span>
+      <span class="chip chip-advanced" style="font-size:10px;padding:2px 6px;">${i18n.t('badge.advanced')}</span>
       <span>${i18n.t('home.matrix.adv')}</span>
     </div>
     <div class="matrix-grid" id="matrix-grid-adv"></div>
@@ -170,7 +170,6 @@ export function renderHomeView(
       <div class="matrix-card-info">
         <span class="matrix-card-title">${stage.number}. ${i18n.t(stage.titleKey)}</span>
         <div class="matrix-card-meta">
-          <span style="letter-spacing:1px;">${stage.stars}</span>
           <span>${stage.rows.length} ${i18n.getLanguage() === 'zh-Hans' ? '项对照' : 'items'}</span>
         </div>
       </div>
@@ -187,7 +186,6 @@ export function renderHomeView(
       <div class="matrix-card-info">
         <span class="matrix-card-title">${stage.number}. ${i18n.t(stage.titleKey)}</span>
         <div class="matrix-card-meta">
-          <span style="letter-spacing:1px;">${stage.stars}</span>
           <span>${stage.rows.length} ${i18n.getLanguage() === 'zh-Hans' ? '项对照' : 'items'}</span>
         </div>
       </div>

@@ -16,7 +16,6 @@ export interface LearningStage {
   id: string;
   number: number;
   titleKey: string;
-  stars: string;
   isAdvanced: boolean;
   goalKey: string;
   noteKeys: string[];

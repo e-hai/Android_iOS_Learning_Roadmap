@@ -324,9 +324,8 @@ export const en: Record<string, string> = {
   "web.prev_stage": "Previous Stage",
   "web.next_stage": "Next Stage",
   "web.close": "Close",
-  "web.search_no_results": "No matching comparison or stage found",
+  "web.search_no_results": "No matching comparisons or stages found",
   "web.stage_num": "Stage %d",
-  "web.stars": "Difficulty: ",
   "web.theme_toggle": "Toggle Theme",
-  "web.github": "GitHub Repo"
+  "web.github": "GitHub Repository"
 };

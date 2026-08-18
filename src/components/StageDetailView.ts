@@ -20,9 +20,6 @@ export function renderStageDetail(
         <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}">
           ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
         </span>
-        <span style="font-size:12px;color:var(--color-ink-muted);letter-spacing:1px;">
-          ${stage.stars}
-        </span>
       </div>
       <span class="stage-number-large">${String(stage.number).padStart(2, '0')}</span>
     </div>

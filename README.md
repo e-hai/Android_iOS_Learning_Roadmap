@@ -17,14 +17,14 @@
 
 - 已会 Android：每阶段重点看 **iOS 列** 和「迁移注意」
 - 两端都在学：先 Android 模块，再立刻学 iOS 对应模块，形成映射
-- ★ 为主路径（建议按序学完）；☆ 为进阶（可后补）
+- 路线分为 10 个核心主路径阶段与 6 个进阶扩展阶段
 
 ---
 
 ## 推荐学习顺序总览
 
 ```
-【主路径 ★】
+【核心主路径】
 ① 开发环境          Android Studio     ↔  Xcode
 ② 语言与类型系统    Kotlin             ↔  Swift（含 struct / ARC）
 ③ 生命周期          Activity/Fragment  ↔  App / Scene / scenePhase
@@ -36,13 +36,13 @@
 ⑨ 数据存储          DataStore / Room   ↔  UserDefaults / SwiftData
 ⑩ 架构              MVVM + Repository（两端基本一致）
 
-【进阶 ☆】
+【进阶扩展】
 ⑪ 依赖注入 · ⑫ 图片资源 · ⑬ 动画 · ⑭ 权限/后台/推送 · ⑮ 测试 · ⑯ 发布
 ```
 
 ---
 
-## ① 开发环境与工程结构 ★★★★☆
+## ① 开发环境与工程结构
 
 **阶段目标：** 掌握 Xcode 与 Android Studio 的工程映射体系，理解 Project、Target、SPM/CocoaPods 依赖、Info.plist 与 Assets 资产管理。
 
@@ -84,7 +84,7 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 
 ---
 
-## ② 语言基础与类型系统 ★★★★★
+## ② 语言基础与类型系统
 
 **阶段目标：** 深入掌握 Kotlin ↔ Swift 语法映射，透彻理解 struct 值语义、ARC 弱引用、POP 面向协议编程与 Enum 关联值。  
 **核心认知：** Swift 中 `struct` 是第一等公民（值类型 / 自动深拷贝 / 线程安全）；内存管理采用 ARC 计数制，闭包强引用必须显式使用 `[weak self]`。
@@ -170,7 +170,7 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 
 ---
 
-## ③ 生命周期 ★★★★★
+## ③ 生命周期
 
 不要拿 Activity 去硬套 SwiftUI！必须**分代横向对齐**：传统时代对标 UIKit，现代时代对标 Compose。
 
@@ -219,7 +219,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ④ UI 布局与核心控件 ★★★★★
+## ④ UI 布局与核心控件
 
 **阶段目标：** 直接从 Jetpack Compose 迁移到 SwiftUI：掌握核心容器布局、基础控件与 Modifier 链式调用。  
 **核心认知：** 两者皆为现代声明式 UI，思想高度一致；最大区别在于 **SwiftUI Modifier 的包装顺序**与**容器闭包子视图数量约束**。
@@ -278,7 +278,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ⑤ 状态管理与数据流 ★★★★★
+## ⑤ 状态管理与数据流
 
 **阶段目标：** 精准掌握 Compose 与 SwiftUI 各状态 API 的应用场景：视图私有状态、父子双向绑定、ViewModel 业务模型、场景暂存恢复、磁盘偏好与全局环境。  
 **核心认知：** 声明式 UI 的核心是**状态所有权与单向数据流**：谁拥有真实数据源（Source of Truth），谁向下分发，子组件通过引用或事件反向修改。
@@ -350,7 +350,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ⑥ 页面导航与路由 ★★★★☆
+## ⑥ 页面导航与路由
 
 **阶段目标：** 掌握纯声明式 UI 强类型与数据驱动路由架构（Compose Navigation 2.8+ / Nav3 ↔ SwiftUI NavigationStack）。  
 **核心认知：** 现代声明式路由的本质是**「可观察的状态列表」**；页面跳转即 `List.add`，返回即 `List.removeLast`，彻底告别 URL 字符串拼接与视图级强绑定。
@@ -421,7 +421,7 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ---
 
-## ⑦ 异步与并发 ★★★★★
+## ⑦ 异步与并发
 
 会 Kotlin 协程的话，Swift Concurrency 上手很快，但要习惯 **async 函数染色** 与 **Actor 隔离**。
 
@@ -449,7 +449,7 @@ iOS:     Thread → Task → AsyncSequence → Actor
 
 ---
 
-## ⑧ 网络请求与数据解析 ★★★★☆
+## ⑧ 网络请求与数据解析
 
 | Android | iOS |
 | --- | --- |
@@ -469,7 +469,7 @@ iOS:     URLSession → Codable/JSONDecoder → 封装 API Client
 
 ---
 
-## ⑨ 本地数据存储 ★★★★☆
+## ⑨ 本地数据存储
 
 | Android | iOS | 用途 |
 | --- | --- | --- |
@@ -491,7 +491,7 @@ iOS:     UserDefaults → Keychain → SwiftData（需要时再补 CoreData）
 
 ---
 
-## ⑩ 应用架构 ★★★★★
+## ⑩ 应用架构
 
 两端几乎同一套：**MVVM + Repository**。
 
@@ -510,11 +510,11 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 
 ---
 
-## 进阶部分 ☆
+## 进阶扩展
 
 主路径跑通一个小 App 后再补。
 
-### ⑪ 依赖注入 ★★★☆☆
+### ⑪ 依赖注入
 
 | Android | iOS |
 | --- | --- |
@@ -523,7 +523,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 
 很多 iOS 项目直接：**protocol + 构造函数注入**，未必上框架。
 
-### ⑫ 图片与静态资源 ★★★☆☆
+### ⑫ 图片与静态资源
 
 | Android | iOS |
 | --- | --- |
@@ -532,7 +532,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | Coil / Glide | AsyncImage / Kingfisher 等 |
 | Painter / ImageBitmap | Image / UIImage |
 
-### ⑬ 动画与转场动效 ★★★★☆
+### ⑬ 动画与转场动效
 
 | Android | iOS |
 | --- | --- |
@@ -540,7 +540,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | `AnimatedVisibility` | `transition` |
 | MotionLayout / Shared Element | `matchedGeometryEffect` |
 
-### ⑭ 系统能力 ★★★★☆
+### ⑭ 系统能力
 
 实战高频，主路径未展开，迁移时优先补：
 
@@ -551,7 +551,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | 推送 | FCM | APNs |
 | 深链 | App Links / Intent | Universal Links / URL Scheme |
 
-### ⑮ 单元测试与 UI 测试 ★★★☆☆
+### ⑮ 单元测试与 UI 测试
 
 | Android | iOS |
 | --- | --- |
@@ -559,7 +559,7 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 | Espresso / Compose UI Test | XCUITest |
 | 协程测试 | async 测试 / 期望值 |
 
-### ⑯ 打包构建与应用发布 ★★★☆☆
+### ⑯ 打包构建与应用发布
 
 | Android | iOS |
 | --- | --- |

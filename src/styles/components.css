@@ -162,12 +162,6 @@
   text-overflow: ellipsis;
 }
 
-.sidebar-item-stars {
-  font-size: 9px;
-  color: var(--color-ink-muted);
-  letter-spacing: 1px;
-}
-
 /* Section Header */
 .section-header {
   display: flex;

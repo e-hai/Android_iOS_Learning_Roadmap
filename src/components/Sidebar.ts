@@ -38,7 +38,6 @@ export function renderSidebar(
       </span>
       <div class="sidebar-item-info">
         <span class="sidebar-item-title">${i18n.t(stage.titleKey)}</span>
-        <span class="sidebar-item-stars">${stage.stars}</span>
       </div>
     `;
     row.addEventListener('click', () => onSelect(stage.id));

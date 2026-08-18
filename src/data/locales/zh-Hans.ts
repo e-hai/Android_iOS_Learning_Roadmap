@@ -326,7 +326,6 @@ export const zhHans: Record<string, string> = {
   "web.close": "关闭",
   "web.search_no_results": "未找到匹配的对比项或阶段",
   "web.stage_num": "阶段 %d",
-  "web.stars": "难度：",
   "web.theme_toggle": "切换主题",
   "web.github": "GitHub 仓库"
 };
