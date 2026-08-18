@@ -1,13 +1,17 @@
-/* 3D Neural Constellation Mode Styles */
+/* Sherlock Holmes 3D Memory Palace Mode Styles */
 
 .constellation-view-container {
   position: relative;
   width: 100%;
   height: calc(100vh - 64px);
   min-height: 560px;
-  background: radial-gradient(circle at 50% 50%, var(--color-surface-raised) 0%, var(--color-bg) 100%);
+  background: radial-gradient(circle at 50% 50%, #0c1527 0%, #050811 100%);
   overflow: hidden;
   display: flex;
+}
+
+[data-theme="light"] .constellation-view-container {
+  background: radial-gradient(circle at 50% 50%, #f1f5f9 0%, #e2e8f0 100%);
 }
 
 .constellation-canvas-wrap {
@@ -48,37 +52,89 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: var(--color-surface-glass);
+  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(56, 189, 248, 0.3);
   border-radius: var(--radius-full);
   padding: 6px 16px;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="light"] .constellation-title-group {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(13, 148, 136, 0.3);
 }
 
 .constellation-brand-badge {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 800;
-  color: var(--color-accent);
+  color: var(--color-ios);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+}
+
+/* Palace Search Input */
+.palace-search-box {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.palace-search-input {
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-full);
+  padding: 6px 14px 6px 34px;
+  color: #fff;
+  font-size: 12.5px;
+  width: 220px;
+  outline: none;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="light"] .palace-search-input {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--color-border);
+  color: var(--color-ink);
+}
+
+.palace-search-input:focus {
+  width: 280px;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 12px var(--color-accent-ring);
+}
+
+.palace-search-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-ink-muted);
+  pointer-events: none;
 }
 
 .constellation-filter-tabs {
   pointer-events: auto;
   display: inline-flex;
-  background: var(--color-surface-glass);
+  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: var(--radius-full);
   padding: 4px;
   gap: 4px;
   box-shadow: var(--shadow-md);
+}
+
+[data-theme="light"] .constellation-filter-tabs {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--color-border);
 }
 
 .constellation-tab-btn {
@@ -91,13 +147,17 @@
 }
 
 .constellation-tab-btn:hover {
+  color: #fff;
+}
+
+[data-theme="light"] .constellation-tab-btn:hover {
   color: var(--color-ink);
 }
 
 .constellation-tab-btn.active {
   background: var(--color-accent);
   color: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
 }
 
 .constellation-right-tools {
@@ -115,13 +175,19 @@
   border-radius: var(--radius-full);
   font-size: 12px;
   font-weight: 600;
-  background: var(--color-surface-glass);
+  background: rgba(15, 23, 42, 0.85);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  color: var(--color-ink);
-  border: 1px solid var(--color-border);
+  color: #f8fafc;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   box-shadow: var(--shadow-sm);
   transition: all var(--transition-fast);
+}
+
+[data-theme="light"] .tool-pill-btn {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--color-border);
+  color: var(--color-ink);
 }
 
 .tool-pill-btn:hover {
@@ -136,195 +202,197 @@
   border-color: var(--color-accent);
 }
 
-/* Hover Node Tooltip */
-.constellation-node-tooltip {
+/* 3D Holographic HUD Lens / Node Inspection Popup */
+.palace-hud-lens {
   position: absolute;
-  background: var(--color-surface-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border-hover);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
-  box-shadow: var(--shadow-lg);
-  pointer-events: none;
-  transform: translate(-50%, -120%);
-  opacity: 0;
-  transition: opacity 180ms ease, transform 180ms ease;
-  z-index: 20;
-  min-width: 190px;
-}
-
-.constellation-node-tooltip.visible {
-  opacity: 1;
-  transform: translate(-50%, -130%);
-}
-
-.tooltip-num {
-  font-size: 11px;
-  font-weight: 800;
-  color: var(--color-accent);
-  letter-spacing: 0.5px;
-}
-
-.tooltip-title {
-  font-size: 13.5px;
-  font-weight: 700;
-  color: var(--color-ink);
-  margin-top: 2px;
-}
-
-.tooltip-desc {
-  font-size: 11.5px;
-  color: var(--color-ink-muted);
-  margin-top: 4px;
-}
-
-/* Bottom Quick Track */
-.constellation-bottom-track {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--color-surface-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
-  padding: 6px 14px;
-  box-shadow: var(--shadow-md);
-  z-index: 10;
-  max-width: 92%;
-  overflow-x: auto;
-}
-
-.track-node-dot {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-ink-muted);
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-}
-
-.track-node-dot:hover {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  border-color: var(--color-accent);
-  transform: scale(1.15);
-}
-
-.track-node-dot.active {
-  background: var(--color-accent);
-  color: #fff;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 8px var(--color-accent);
-}
-
-/* Sliding 3D Stage Inspector Panel */
-.constellation-inspector-panel {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  bottom: 16px;
-  width: 480px;
-  max-width: calc(100vw - 32px);
-  background: var(--color-surface-glass);
+  top: 76px;
+  right: 24px;
+  width: 420px;
+  max-width: calc(100vw - 48px);
+  background: rgba(15, 23, 42, 0.88);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
-  border: 1px solid var(--color-border);
+  border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-modal);
-  z-index: 30;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.15);
+  z-index: 25;
   display: flex;
   flex-direction: column;
-  transform: translateX(120%);
-  transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translateY(-10px) scale(0.95);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms cubic-bezier(0.34, 1.56, 0.64, 1), transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
 }
 
-.constellation-inspector-panel.open {
-  transform: translateX(0);
+[data-theme="light"] .palace-hud-lens {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(13, 148, 136, 0.35);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.15), 0 0 20px rgba(13, 148, 136, 0.1);
 }
 
-.inspector-header {
-  padding: 16px 20px;
+.palace-hud-lens.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0) scale(1);
+}
+
+.hud-lens-header {
+  padding: 14px 18px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-sunken);
-  gap: 12px;
+  background: rgba(30, 41, 59, 0.7);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.inspector-stage-meta {
-  display: flex;
+[data-theme="light"] .hud-lens-header {
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border);
+}
+
+.hud-lens-badge {
+  display: inline-flex;
   align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-ios);
+  letter-spacing: 0.5px;
+}
+
+.hud-lens-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 2px;
+}
+
+[data-theme="light"] .hud-lens-title {
+  color: var(--color-ink);
+}
+
+.hud-lens-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.hud-concept-card {
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
 }
 
-.inspector-stage-title {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--color-ink);
-  margin-top: 4px;
+[data-theme="light"] .hud-concept-card {
+  background: var(--color-surface);
+  border-color: var(--color-border);
 }
 
-.inspector-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.inspector-section-title {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--color-ink-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 8px;
+.hud-row-target {
   display: flex;
   align-items: center;
-  gap: 6px;
-}
-
-.inspector-goal-box {
-  padding: 12px 14px;
-  background: var(--color-accent-soft);
-  border-left: 3px solid var(--color-accent);
-  border-radius: var(--radius-sm);
+  justify-content: space-between;
+  gap: 8px;
   font-size: 13px;
-  color: var(--color-ink);
-  line-height: 1.55;
+  font-weight: 700;
 }
 
-.inspector-footer {
-  padding: 14px 20px;
-  border-top: 1px solid var(--color-border);
+.hud-tag-android {
+  color: var(--color-android);
+}
+
+.hud-tag-ios {
+  color: var(--color-ios);
+}
+
+.hud-code-snippet {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.3);
+  color: #38bdf8;
+  word-break: break-all;
+}
+
+[data-theme="light"] .hud-code-snippet {
   background: var(--color-surface-sunken);
+  color: var(--color-ios);
+}
+
+.hud-lens-footer {
+  padding: 12px 18px;
+  background: rgba(30, 41, 59, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
-.inspector-nav-group {
+[data-theme="light"] .hud-lens-footer {
+  background: var(--color-surface-sunken);
+  border-color: var(--color-border);
+}
+
+/* Legend HUD in bottom-left */
+.palace-legend-hud {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-lg);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11.5px;
+  color: #94a3b8;
+  z-index: 10;
+  pointer-events: none;
+}
+
+[data-theme="light"] .palace-legend-hud {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: var(--color-border);
+  color: var(--color-ink-muted);
+}
+
+.legend-item {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.legend-dot-hub {
+  background: var(--color-accent);
+  box-shadow: 0 0 6px var(--color-accent);
+}
+
+.legend-dot-concept {
+  background: var(--color-ios);
+  box-shadow: 0 0 6px var(--color-ios);
+}
+
+.legend-dot-spark {
+  background: #fbbf24;
+  box-shadow: 0 0 6px #fbbf24;
 }
 
 /* Global View Mode Switcher in Header */
@@ -361,16 +429,15 @@
 }
 
 @media (max-width: 768px) {
-  .constellation-inspector-panel {
+  .palace-hud-lens {
     top: auto;
     left: 10px;
     right: 10px;
     bottom: 10px;
     width: auto;
-    max-height: 80vh;
-    transform: translateY(120%);
+    max-height: 70vh;
   }
-  .constellation-inspector-panel.open {
-    transform: translateY(0);
+  .palace-legend-hud {
+    display: none;
   }
 }

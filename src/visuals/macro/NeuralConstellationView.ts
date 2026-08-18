@@ -6,6 +6,24 @@ import { i18n } from '../../services/i18n';
 import { renderComparisonTable } from '../../components/ComparisonTable';
 import { renderArchitectureDiagram } from '../../components/ArchitectureDiagram';
 
+interface PalaceNode {
+  mesh: THREE.Mesh;
+  haloMesh?: THREE.Mesh;
+  type: 'stage' | 'concept' | 'spark';
+  stageId: string;
+  stageNum: number;
+  stageTitle: string;
+  isAdv: boolean;
+  title: string;
+  subtitle?: string;
+  androidCode?: string;
+  iosCode?: string;
+  explanation?: string;
+  noteTag?: string;
+  noteBody?: string;
+  pos: THREE.Vector3;
+}
+
 export function renderNeuralConstellationView(
   onOpenStageInDoc: (stageId: string) => void,
   onSwitchToDocMode: () => void
@@ -13,156 +31,262 @@ export function renderNeuralConstellationView(
   const container = document.createElement('div');
   container.className = 'constellation-view-container';
 
-  // 1. 3D Canvas Wrap
+  // 1. Canvas Wrap
   const canvasWrap = document.createElement('div');
   canvasWrap.className = 'constellation-canvas-wrap';
   container.appendChild(canvasWrap);
 
   const sceneManager = new ThreeSceneManager(canvasWrap, {
-    cameraPos: [0, 2.0, 13],
-    fov: 48,
+    cameraPos: [0, 16, 32],
+    fov: 45,
     autoRotate: true,
   });
 
   const { scene, camera } = sceneManager;
-  const galaxyGroup = new THREE.Group();
-  scene.add(galaxyGroup);
+  const palaceGroup = new THREE.Group();
+  scene.add(palaceGroup);
 
-  // Background Star Particles
+  // Background Starfield
   const starGeom = new THREE.BufferGeometry();
-  const starCount = 300;
+  const starCount = 450;
   const starPositions = new Float32Array(starCount * 3);
   for (let i = 0; i < starCount * 3; i += 3) {
-    starPositions[i] = (Math.random() - 0.5) * 50;
-    starPositions[i + 1] = (Math.random() - 0.5) * 40;
-    starPositions[i + 2] = (Math.random() - 0.5) * 50;
+    starPositions[i] = (Math.random() - 0.5) * 80;
+    starPositions[i + 1] = (Math.random() - 0.5) * 60;
+    starPositions[i + 2] = (Math.random() - 0.5) * 80;
   }
   starGeom.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
   const starMat = new THREE.PointsMaterial({
     color: sceneManager.theme.isDark ? 0x64748b : 0x94a3b8,
-    size: 0.15,
+    size: 0.18,
     transparent: true,
-    opacity: 0.6,
+    opacity: 0.65,
   });
   const starField = new THREE.Points(starGeom, starMat);
   scene.add(starField);
 
-  // 2. Build 16 Nodes
-  interface ConstellationNode {
-    mesh: THREE.Mesh;
-    glowMesh: THREE.Mesh;
-    id: string;
-    num: number;
-    title: string;
-    isAdv: boolean;
-    pos: THREE.Vector3;
-  }
+  // 2. Build Memory Palace Node Graph
+  const allNodes: PalaceNode[] = [];
+  const stageHubPositions: { id: string; pos: THREE.Vector3 }[] = [];
 
-  const nodes: ConstellationNode[] = [];
+  const lineMatDim = new THREE.LineBasicMaterial({
+    color: sceneManager.theme.isDark ? 0x1e293b : 0xcbd5e1,
+    transparent: true,
+    opacity: 0.35,
+  });
 
+  const lineMatSynapse = new THREE.LineBasicMaterial({
+    color: 0x14b8a6,
+    transparent: true,
+    opacity: 0.45,
+  });
+
+  const lineMatSpark = new THREE.LineBasicMaterial({
+    color: 0xfbbf24,
+    transparent: true,
+    opacity: 0.35,
+  });
+
+  // Level 1: 16 Stage Hubs
   stages.forEach((stage, idx) => {
     const isAdv = stage.isAdvanced;
     const angle = (idx / stages.length) * Math.PI * 2;
-    const radius = isAdv ? 5.2 : 3.8;
-    const x = Math.cos(angle) * radius;
-    const y = Math.sin(angle * 2) * 1.5 + (isAdv ? -0.6 : 0.6);
-    const z = Math.sin(angle) * radius;
-    const pos = new THREE.Vector3(x, y, z);
+    const ringRadius = isAdv ? 17.5 : 13.0;
+    const hubX = Math.cos(angle) * ringRadius;
+    const hubY = Math.sin(angle * 2) * 2.5 + (isAdv ? -1.0 : 1.0);
+    const hubZ = Math.sin(angle) * ringRadius;
+    const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
+    stageHubPositions.push({ id: stage.id, pos: hubPos });
 
-    // Core Sphere
-    const geom = new THREE.SphereGeometry(isAdv ? 0.28 : 0.35, 24, 24);
-    const color = isAdv ? 0x38bdf8 : 0x22c55e;
-    const mat = new THREE.MeshStandardMaterial({
-      color: color,
-      emissive: color,
-      emissiveIntensity: 0.65,
+    // Stage Hub Mesh
+    const hubGeom = new THREE.SphereGeometry(0.48, 24, 24);
+    const hubColor = isAdv ? 0x38bdf8 : 0x22c55e;
+    const hubMat = new THREE.MeshStandardMaterial({
+      color: hubColor,
+      emissive: hubColor,
+      emissiveIntensity: 0.75,
       roughness: 0.2,
       metalness: 0.8,
     });
-    const mesh = new THREE.Mesh(geom, mat);
-    mesh.position.copy(pos);
-    galaxyGroup.add(mesh);
+    const hubMesh = new THREE.Mesh(hubGeom, hubMat);
+    hubMesh.position.copy(hubPos);
+    palaceGroup.add(hubMesh);
 
-    // Glowing Halo
-    const glowGeom = new THREE.SphereGeometry(isAdv ? 0.46 : 0.56, 16, 16);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: color,
+    // Outer Rotating Halo
+    const haloGeom = new THREE.SphereGeometry(0.72, 16, 16);
+    const haloMat = new THREE.MeshBasicMaterial({
+      color: hubColor,
       transparent: true,
       opacity: 0.22,
       wireframe: true,
     });
-    const glowMesh = new THREE.Mesh(glowGeom, glowMat);
-    glowMesh.position.copy(pos);
-    galaxyGroup.add(glowMesh);
+    const haloMesh = new THREE.Mesh(haloGeom, haloMat);
+    haloMesh.position.copy(hubPos);
+    palaceGroup.add(haloMesh);
 
-    nodes.push({
-      mesh,
-      glowMesh,
-      id: stage.id,
-      num: stage.number,
-      title: i18n.t(stage.titleKey),
+    allNodes.push({
+      mesh: hubMesh,
+      haloMesh,
+      type: 'stage',
+      stageId: stage.id,
+      stageNum: stage.number,
+      stageTitle: i18n.t(stage.titleKey),
       isAdv,
-      pos,
+      title: `${stage.number}. ${i18n.t(stage.titleKey)}`,
+      subtitle: `${stage.rows.length} 核心概念 · 4 黄金避坑秘籍`,
+      explanation: i18n.t(stage.goalKey),
+      pos: hubPos,
+    });
+
+    // Level 2: Concept Orbit Nodes (4 key concept pairs)
+    const topRows = stage.rows.slice(0, 4);
+    topRows.forEach((row, rIdx) => {
+      const cAngle = (rIdx / topRows.length) * Math.PI * 2 + 0.3;
+      const cRadius = 2.4;
+      const cPos = new THREE.Vector3(
+        hubX + Math.cos(cAngle) * cRadius,
+        hubY + 0.8 + Math.sin(cAngle) * 0.4,
+        hubZ + Math.sin(cAngle) * cRadius
+      );
+
+      const cGeom = new THREE.SphereGeometry(0.22, 16, 16);
+      const cMat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        emissive: 0x0284c7,
+        emissiveIntensity: 0.6,
+        roughness: 0.3,
+      });
+      const cMesh = new THREE.Mesh(cGeom, cMat);
+      cMesh.position.copy(cPos);
+      palaceGroup.add(cMesh);
+
+      // Connection to Stage Hub
+      const cLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, cPos]);
+      const cLine = new THREE.Line(cLineGeom, lineMatSynapse);
+      palaceGroup.add(cLine);
+
+      allNodes.push({
+        mesh: cMesh,
+        type: 'concept',
+        stageId: stage.id,
+        stageNum: stage.number,
+        stageTitle: i18n.t(stage.titleKey),
+        isAdv,
+        title: `${row.android.split('(')[0].trim()} ➔ ${row.ios.split('(')[0].trim()}`,
+        subtitle: `概念对照 #${rIdx + 1}`,
+        androidCode: row.android,
+        iosCode: row.ios,
+        explanation: i18n.t(row.note || 'detail.col.android'),
+        pos: cPos,
+      });
+    });
+
+    // Level 3: Golden Pitfall Spark Nodes (4 golden memory sparks)
+    const noteKeys = stage.noteKeys || [];
+    noteKeys.forEach((nk, nIdx) => {
+      const sAngle = (nIdx / 4) * Math.PI * 2 + 0.7;
+      const sRadius = 1.8;
+      const sPos = new THREE.Vector3(
+        hubX + Math.cos(sAngle) * sRadius,
+        hubY - 0.9 - Math.sin(sAngle) * 0.3,
+        hubZ + Math.sin(sAngle) * sRadius
+      );
+
+      const sGeom = new THREE.SphereGeometry(0.16, 16, 16);
+      const sMat = new THREE.MeshStandardMaterial({
+        color: 0xfbbf24,
+        emissive: 0xd97706,
+        emissiveIntensity: 0.9,
+        roughness: 0.1,
+      });
+      const sMesh = new THREE.Mesh(sGeom, sMat);
+      sMesh.position.copy(sPos);
+      palaceGroup.add(sMesh);
+
+      // Spark connection to Hub
+      const sLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, sPos]);
+      const sLine = new THREE.Line(sLineGeom, lineMatSpark);
+      palaceGroup.add(sLine);
+
+      const fullText = i18n.t(nk);
+      const tagMatch = fullText.match(/^【([^】]+)】\s*(.*)$/) || fullText.match(/^\[([^\]]+)\]\s*(.*)$/);
+      const tag = tagMatch ? tagMatch[1] : `避坑法则 #${nIdx + 1}`;
+      const body = tagMatch ? tagMatch[2] : fullText;
+
+      allNodes.push({
+        mesh: sMesh,
+        type: 'spark',
+        stageId: stage.id,
+        stageNum: stage.number,
+        stageTitle: i18n.t(stage.titleKey),
+        isAdv,
+        title: `【${tag}】`,
+        subtitle: `黄金避坑秘籍 #${nIdx + 1}`,
+        noteTag: tag,
+        noteBody: body,
+        explanation: body,
+        pos: sPos,
+      });
     });
   });
 
-  // Synaptic Connection Beams
-  const lineMaterial = new THREE.LineBasicMaterial({
-    color: sceneManager.theme.isDark ? 0x334155 : 0x94a3b8,
-    transparent: true,
-    opacity: 0.4,
-  });
-
-  for (let i = 0; i < nodes.length; i++) {
-    const nextIdx = (i + 1) % nodes.length;
-    const p1 = nodes[i].pos;
-    const p2 = nodes[nextIdx].pos;
+  // Inter-Hub Synaptic Highways (Connecting 16 hubs sequentially)
+  for (let i = 0; i < stageHubPositions.length; i++) {
+    const nextIdx = (i + 1) % stageHubPositions.length;
+    const p1 = stageHubPositions[i].pos;
+    const p2 = stageHubPositions[nextIdx].pos;
 
     const curve = new THREE.QuadraticBezierCurve3(
       p1,
-      new THREE.Vector3((p1.x + p2.x) / 2, (p1.y + p2.y) / 2 + 0.6, (p1.z + p2.z) / 2),
+      new THREE.Vector3((p1.x + p2.x) / 2, (p1.y + p2.y) / 2 + 1.2, (p1.z + p2.z) / 2),
       p2
     );
     const points = curve.getPoints(24);
     const geom = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geom, lineMaterial);
-    galaxyGroup.add(line);
+    const line = new THREE.Line(geom, lineMatDim);
+    palaceGroup.add(line);
   }
 
-  // Floating Energy Pulses
-  const pulseGeom = new THREE.SphereGeometry(0.09, 12, 12);
-  const pulseMat = new THREE.MeshBasicMaterial({ color: 0x14b8a6 });
+  // Moving Highway Electrons
+  const pulseGeom = new THREE.SphereGeometry(0.1, 12, 12);
+  const pulseMat = new THREE.MeshBasicMaterial({ color: 0x2dd4bf });
   const pulseSpheres: { mesh: THREE.Mesh; fromIdx: number; progress: number }[] = [];
 
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 10; i++) {
     const p = new THREE.Mesh(pulseGeom, pulseMat);
-    galaxyGroup.add(p);
+    palaceGroup.add(p);
     pulseSpheres.push({
       mesh: p,
-      fromIdx: Math.floor(Math.random() * (stages.length - 1)),
+      fromIdx: Math.floor(Math.random() * (stageHubPositions.length - 1)),
       progress: Math.random(),
     });
   }
 
-  // 3. Top Floating Bar
+  // 3. Top Floating Bar (Search + Filters + Modes)
   const topBar = document.createElement('div');
   topBar.className = 'constellation-top-bar';
   topBar.innerHTML = `
     <div class="constellation-title-group">
       <div class="constellation-brand-badge">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-        <span>3D 认知星云 · 知识图谱</span>
+        <span>福尔摩斯记忆宫殿 · 3D 知识拓扑</span>
       </div>
     </div>
 
+    <!-- Quick Palace Search -->
+    <div class="palace-search-box">
+      <svg class="palace-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" class="palace-search-input" id="palace-search-input" placeholder="在记忆宫殿中穿梭检索..." />
+    </div>
+
     <div class="constellation-filter-tabs">
-      <button class="constellation-tab-btn active" data-filter="all">全部阶段 (16)</button>
-      <button class="constellation-tab-btn" data-filter="main">核心主线 (10)</button>
-      <button class="constellation-tab-btn" data-filter="adv">进阶扩展 (6)</button>
+      <button class="constellation-tab-btn active" data-filter="all">全部节点 (${allNodes.length})</button>
+      <button class="constellation-tab-btn" data-filter="main">核心主线</button>
+      <button class="constellation-tab-btn" data-filter="adv">进阶扩展</button>
     </div>
 
     <div class="constellation-right-tools">
-      <button class="tool-pill-btn active" id="btn-toggle-spin" title="切换 3D 自转">
+      <button class="tool-pill-btn active" id="btn-toggle-spin" title="切换 3D 星系自转">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
         <span>3D 旋转</span>
       </button>
@@ -178,198 +302,188 @@ export function renderNeuralConstellationView(
   `;
   container.appendChild(topBar);
 
-  // 4. Hover Tooltip
+  // 4. Legend HUD in bottom-left
+  const legend = document.createElement('div');
+  legend.className = 'palace-legend-hud';
+  legend.innerHTML = `
+    <div class="legend-item">
+      <span class="legend-dot legend-dot-hub"></span>
+      <span>阶段中心星核 (16 Hubs)</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot legend-dot-concept"></span>
+      <span>核心语法概念突触 (Concepts)</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot legend-dot-spark"></span>
+      <span>黄金避坑记忆灵光 (Sparks)</span>
+    </div>
+  `;
+  container.appendChild(legend);
+
+  // 5. Hover Tooltip
   const tooltip = document.createElement('div');
   tooltip.className = 'constellation-node-tooltip';
   container.appendChild(tooltip);
 
-  // 5. Bottom Quick Track
-  const bottomTrack = document.createElement('div');
-  bottomTrack.className = 'constellation-bottom-track';
-  bottomTrack.innerHTML = stages
-    .map(
-      (s) => `
-    <button class="track-node-dot" data-stage="${s.id}" title="${s.number}. ${i18n.t(s.titleKey)}">
-      ${s.number}
-    </button>
-  `
-    )
-    .join('');
-  container.appendChild(bottomTrack);
+  // 6. Holographic HUD Lens (Interactive inspection popover)
+  const hudLens = document.createElement('div');
+  hudLens.className = 'palace-hud-lens';
+  container.appendChild(hudLens);
 
-  // 6. Sliding 3D Stage Inspector Drawer
-  const inspector = document.createElement('div');
-  inspector.className = 'constellation-inspector-panel';
-  container.appendChild(inspector);
+  const renderHudLens = (node: PalaceNode) => {
+    let contentHtml = '';
 
-  const renderInspector = (stageId: string) => {
-    const stage = stages.find((s) => s.id === stageId) || stages[0];
-    const stageIndex = stages.findIndex((s) => s.id === stageId);
+    if (node.type === 'stage') {
+      const stage = stages.find((s) => s.id === node.stageId) || stages[0];
+      contentHtml = `
+        <div class="hud-lens-header">
+          <div>
+            <div class="hud-lens-badge">
+              <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}" style="font-size:10px;padding:2px 6px;">
+                ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
+              </span>
+              <span>STAGE ${String(stage.number).padStart(2, '0')}</span>
+            </div>
+            <h3 class="hud-lens-title">${stage.number}. ${i18n.t(stage.titleKey)}</h3>
+          </div>
+          <button class="btn-ghost" id="btn-close-hud" style="padding:4px;" title="关闭">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="hud-lens-body">
+          <div style="font-size:13px;line-height:1.55;color:var(--color-ink);background:var(--color-accent-soft);padding:10px 12px;border-left:3px solid var(--color-accent);border-radius:4px;">
+            ${i18n.t(stage.goalKey)}
+          </div>
+          <div id="hud-table-mount"></div>
+          <div id="hud-diagram-mount"></div>
+        </div>
+        <div class="hud-lens-footer">
+          <span style="font-size:11.5px;color:var(--color-ink-muted);">点击周围子节点查看代码</span>
+          <button class="btn btn-primary btn-sm" id="btn-hud-open-doc">
+            <span>在文档中查看</span>
+          </button>
+        </div>
+      `;
+    } else if (node.type === 'concept') {
+      contentHtml = `
+        <div class="hud-lens-header">
+          <div>
+            <div class="hud-lens-badge" style="color:var(--color-ios);">
+              <span>🎯 概念突触 · STAGE ${String(node.stageNum).padStart(2, '0')}</span>
+            </div>
+            <h3 class="hud-lens-title">${node.title}</h3>
+          </div>
+          <button class="btn-ghost" id="btn-close-hud" style="padding:4px;" title="关闭">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="hud-lens-body">
+          <div class="hud-concept-card">
+            <div class="hud-row-target">
+              <span class="hud-tag-android">🟢 Android 实现:</span>
+            </div>
+            <div class="hud-code-snippet">${escapeHtml(node.androidCode || '')}</div>
+          </div>
+          <div class="hud-concept-card">
+            <div class="hud-row-target">
+              <span class="hud-tag-ios">🔵 iOS / SwiftUI 对标:</span>
+            </div>
+            <div class="hud-code-snippet">${escapeHtml(node.iosCode || '')}</div>
+          </div>
+          <div style="font-size:13px;line-height:1.55;color:var(--color-ink-secondary);">
+            <b>机制解析：</b>${node.explanation || ''}
+          </div>
+        </div>
+        <div class="hud-lens-footer">
+          <button class="btn btn-secondary btn-sm" id="btn-hud-focus-parent">
+            <span>🔍 聚焦父星核 (${node.stageTitle})</span>
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-hud-open-doc">
+            <span>在文档中查看</span>
+          </button>
+        </div>
+      `;
+    } else {
+      // Golden Spark
+      contentHtml = `
+        <div class="hud-lens-header">
+          <div>
+            <div class="hud-lens-badge" style="color:#fbbf24;">
+              <span>✨ 黄金避坑灵光 · STAGE ${String(node.stageNum).padStart(2, '0')}</span>
+            </div>
+            <h3 class="hud-lens-title">${node.title}</h3>
+          </div>
+          <button class="btn-ghost" id="btn-close-hud" style="padding:4px;" title="关闭">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="hud-lens-body">
+          <div style="background:rgba(251, 191, 36, 0.12);border-left:3px solid #fbbf24;padding:12px;border-radius:6px;font-size:13.5px;line-height:1.6;color:var(--color-ink);">
+            ${node.noteBody || node.explanation || ''}
+          </div>
+        </div>
+        <div class="hud-lens-footer">
+          <button class="btn btn-secondary btn-sm" id="btn-hud-focus-parent">
+            <span>🔍 聚焦父星核 (${node.stageTitle})</span>
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-hud-open-doc">
+            <span>在文档中查看</span>
+          </button>
+        </div>
+      `;
+    }
 
-    // Highlight bottom track dot
-    bottomTrack.querySelectorAll('.track-node-dot').forEach((dot) => {
-      dot.classList.toggle('active', dot.getAttribute('data-stage') === stageId);
-    });
+    hudLens.innerHTML = contentHtml;
 
-    const noteCardsHtml = (stage.noteKeys || [])
-      .map((k) => {
-        const text = i18n.t(k);
-        const tagMatch = text.match(/^【([^】]+)】\s*(.*)$/) || text.match(/^\[([^\]]+)\]\s*(.*)$/);
-        if (tagMatch) {
-          const [, tag, body] = tagMatch;
-          return `
-            <li class="note-item-card" style="padding:10px 12px;">
-              <div class="note-item-header">
-                <span class="note-item-badge">【${escapeHtml(tag)}】</span>
-              </div>
-              <div class="note-item-text" style="font-size:12.5px;">${escapeHtml(body)}</div>
-            </li>
-          `;
+    if (node.type === 'stage') {
+      const stage = stages.find((s) => s.id === node.stageId);
+      if (stage) {
+        const tableMount = hudLens.querySelector('#hud-table-mount');
+        if (tableMount) {
+          tableMount.appendChild(
+            renderComparisonTable(stage.rows.slice(0, 3), i18n.t('detail.col.android'), i18n.t('detail.col.ios'), false)
+          );
         }
-        return `
-          <li class="note-item-card" style="padding:10px 12px;">
-            <div class="note-item-text" style="font-size:12.5px;">${escapeHtml(text)}</div>
-          </li>
-        `;
-      })
-      .join('');
-
-    inspector.innerHTML = `
-      <div class="inspector-header">
-        <div>
-          <div class="inspector-stage-meta">
-            <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}" style="font-size:10px;padding:2px 6px;">
-              ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
-            </span>
-            <span style="font-size:12px;color:var(--color-ink-muted);font-weight:700;">STAGE ${String(stage.number).padStart(2, '0')}</span>
-          </div>
-          <h2 class="inspector-stage-title">${stage.number}. ${i18n.t(stage.titleKey)}</h2>
-        </div>
-        <button class="btn-ghost" id="btn-close-inspector" style="padding:6px;" title="关闭详情">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-
-      <div class="inspector-body">
-        <div>
-          <div class="inspector-section-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-            <span>阶段目标</span>
-          </div>
-          <div class="inspector-goal-box">${i18n.t(stage.goalKey)}</div>
-        </div>
-
-        <div>
-          <div class="inspector-section-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-            <span>核心语法与概念对照 (${stage.rows.length} 项)</span>
-          </div>
-          <div id="inspector-table-container"></div>
-        </div>
-
-        <div>
-          <div class="inspector-section-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-            <span>架构与层级结构全景</span>
-          </div>
-          <div id="inspector-diagram-container"></div>
-        </div>
-
-        <div>
-          <div class="inspector-section-title">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span>4 大黄金迁移避坑法则</span>
-          </div>
-          <ul class="notes-grid" style="gap:10px;">
-            ${noteCardsHtml}
-          </ul>
-        </div>
-      </div>
-
-      <div class="inspector-footer">
-        <div class="inspector-nav-group">
-          <button class="btn btn-secondary btn-sm" id="btn-inspector-prev" title="上一阶段">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-            <span>上一阶段</span>
-          </button>
-          <button class="btn btn-secondary btn-sm" id="btn-inspector-next" title="下一阶段">
-            <span>下一阶段</span>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-
-        <button class="btn btn-primary btn-sm" id="btn-open-doc-view">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span>在文档中打开</span>
-        </button>
-      </div>
-    `;
-
-    // Render Table
-    const tableContainer = inspector.querySelector('#inspector-table-container');
-    if (tableContainer) {
-      tableContainer.appendChild(
-        renderComparisonTable(
-          stage.rows.slice(0, 4),
-          i18n.t('detail.col.android'),
-          i18n.t('detail.col.ios'),
-          false
-        )
-      );
+        const diagMount = hudLens.querySelector('#hud-diagram-mount');
+        if (diagMount) {
+          diagMount.appendChild(renderArchitectureDiagram(stage.id, stage.extraHintKey));
+        }
+      }
     }
 
-    // Render Architecture Diagram
-    const diagContainer = inspector.querySelector('#inspector-diagram-container');
-    if (diagContainer) {
-      diagContainer.appendChild(renderArchitectureDiagram(stage.id, stage.extraHintKey));
-    }
+    hudLens.classList.add('active');
 
-    // Open Inspector Slide-in
-    inspector.classList.add('open');
-
-    // Event handlers inside Inspector
-    inspector.querySelector('#btn-close-inspector')?.addEventListener('click', () => {
-      inspector.classList.remove('open');
-      bottomTrack.querySelectorAll('.track-node-dot').forEach((d) => d.classList.remove('active'));
-      sceneManager.resetCamera([0, 2.0, 13], [0, 0, 0]);
+    hudLens.querySelector('#btn-close-hud')?.addEventListener('click', () => {
+      hudLens.classList.remove('active');
     });
 
-    inspector.querySelector('#btn-open-doc-view')?.addEventListener('click', () => {
-      onOpenStageInDoc(stage.id);
+    hudLens.querySelector('#btn-hud-open-doc')?.addEventListener('click', () => {
+      onOpenStageInDoc(node.stageId);
     });
 
-    inspector.querySelector('#btn-inspector-prev')?.addEventListener('click', () => {
-      const prevIdx = (stageIndex - 1 + stages.length) % stages.length;
-      selectNode(stages[prevIdx].id);
-    });
-
-    inspector.querySelector('#btn-inspector-next')?.addEventListener('click', () => {
-      const nextIdx = (stageIndex + 1) % stages.length;
-      selectNode(stages[nextIdx].id);
+    hudLens.querySelector('#btn-hud-focus-parent')?.addEventListener('click', () => {
+      const parentHub = allNodes.find((n) => n.type === 'stage' && n.stageId === node.stageId);
+      if (parentHub) flyToNode(parentHub);
     });
   };
 
-  const selectNode = (stageId: string) => {
-    const targetNode = nodes.find((n) => n.id === stageId);
-    if (!targetNode) return;
-
+  const flyToNode = (targetNode: PalaceNode) => {
     if (sceneManager.controls) {
       sceneManager.controls.autoRotate = false;
     }
     const spinBtn = topBar.querySelector('#btn-toggle-spin');
     spinBtn?.classList.remove('active');
 
-    // Camera fly to node with offset to leave room for inspector
     const isMobile = window.innerWidth <= 768;
-    const targetCamX = isMobile ? targetNode.pos.x : targetNode.pos.x - 2.2;
-    const targetCamY = targetNode.pos.y + 0.4;
-    const targetCamZ = targetNode.pos.z + 5.5;
+    const offsetZ = targetNode.type === 'stage' ? 5.5 : 3.8;
+    const offsetX = isMobile ? 0 : targetNode.type === 'stage' ? -1.8 : -1.2;
 
     gsap.to(camera.position, {
-      x: targetCamX,
-      y: targetCamY,
-      z: targetCamZ,
-      duration: 0.6,
+      x: targetNode.pos.x + offsetX,
+      y: targetNode.pos.y + 0.6,
+      z: targetNode.pos.z + offsetZ,
+      duration: 0.7,
       ease: 'power2.out',
     });
 
@@ -378,18 +492,18 @@ export function renderNeuralConstellationView(
         x: targetNode.pos.x,
         y: targetNode.pos.y,
         z: targetNode.pos.z,
-        duration: 0.6,
+        duration: 0.7,
         ease: 'power2.out',
       });
     }
 
-    renderInspector(stageId);
+    renderHudLens(targetNode);
   };
 
-  // 7. Raycaster Hover & Click Events
+  // 7. Raycaster Hover & Click
   const raycaster = new THREE.Raycaster();
   const mouse = new THREE.Vector2(-999, -999);
-  let hoveredNode: ConstellationNode | null = null;
+  let hoveredNode: PalaceNode | null = null;
 
   const onMouseMove = (e: MouseEvent) => {
     const rect = canvasWrap.getBoundingClientRect();
@@ -397,21 +511,22 @@ export function renderNeuralConstellationView(
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const meshes = nodes.filter((n) => n.mesh.visible).map((n) => n.mesh);
-    const intersects = raycaster.intersectObjects(meshes);
+    const visibleMeshes = allNodes.filter((n) => n.mesh.visible).map((n) => n.mesh);
+    const intersects = raycaster.intersectObjects(visibleMeshes);
 
     if (intersects.length > 0) {
       const hitMesh = intersects[0].object as THREE.Mesh;
-      const targetNode = nodes.find((n) => n.mesh === hitMesh);
+      const targetNode = allNodes.find((n) => n.mesh === hitMesh);
 
       if (targetNode && targetNode !== hoveredNode) {
         hoveredNode = targetNode;
         canvasWrap.style.cursor = 'pointer';
 
-        gsap.to(targetNode.mesh.scale, { x: 1.5, y: 1.5, z: 1.5, duration: 0.25 });
-        gsap.to(targetNode.glowMesh.scale, { x: 1.8, y: 1.8, z: 1.8, duration: 0.25 });
+        gsap.to(targetNode.mesh.scale, { x: 1.6, y: 1.6, z: 1.6, duration: 0.2 });
+        if (targetNode.haloMesh) {
+          gsap.to(targetNode.haloMesh.scale, { x: 1.9, y: 1.9, z: 1.9, duration: 0.2 });
+        }
 
-        // Tooltip
         const vector = targetNode.pos.clone().project(camera);
         const screenX = ((vector.x + 1) * rect.width) / 2;
         const screenY = ((-vector.y + 1) * rect.height) / 2;
@@ -419,15 +534,17 @@ export function renderNeuralConstellationView(
         tooltip.style.left = `${screenX}px`;
         tooltip.style.top = `${screenY}px`;
         tooltip.innerHTML = `
-          <div class="tooltip-num">STAGE ${String(targetNode.num).padStart(2, '0')} · ${targetNode.isAdv ? '进阶' : '核心主线'}</div>
+          <div class="tooltip-num">${targetNode.type === 'stage' ? 'STAGE ' + String(targetNode.stageNum).padStart(2, '0') : targetNode.type === 'spark' ? '✨ 避坑灵光' : '🎯 概念突触'}</div>
           <div class="tooltip-title">${targetNode.title}</div>
-          <div class="tooltip-desc">点击探索全景对照与避坑 ➔</div>
+          <div class="tooltip-desc">${targetNode.subtitle || '点击穿梭展开 ➔'}</div>
         `;
         tooltip.classList.add('visible');
       }
     } else if (hoveredNode) {
-      gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.25 });
-      gsap.to(hoveredNode.glowMesh.scale, { x: 1, y: 1, z: 1, duration: 0.25 });
+      gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+      if (hoveredNode.haloMesh) {
+        gsap.to(hoveredNode.haloMesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+      }
       hoveredNode = null;
       canvasWrap.style.cursor = 'grab';
       tooltip.classList.remove('visible');
@@ -436,28 +553,50 @@ export function renderNeuralConstellationView(
 
   const onClick = () => {
     if (hoveredNode) {
-      selectNode(hoveredNode.id);
+      flyToNode(hoveredNode);
     }
   };
 
   canvasWrap.addEventListener('mousemove', onMouseMove);
   canvasWrap.addEventListener('click', onClick);
 
-  // 8. Top Tools Event Listeners
+  // 8. Search Input Event (Instant Mind Warp)
+  const searchInput = topBar.querySelector('#palace-search-input') as HTMLInputElement;
+  searchInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const q = searchInput.value.trim().toLowerCase();
+      if (!q) return;
+
+      const matchedNode = allNodes.find((n) =>
+        n.title.toLowerCase().includes(q) ||
+        (n.androidCode && n.androidCode.toLowerCase().includes(q)) ||
+        (n.iosCode && n.iosCode.toLowerCase().includes(q)) ||
+        (n.noteBody && n.noteBody.toLowerCase().includes(q))
+      );
+
+      if (matchedNode) {
+        flyToNode(matchedNode);
+        searchInput.blur();
+      }
+    }
+  });
+
+  // Top Filter Tabs
   topBar.querySelectorAll('.constellation-tab-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       topBar.querySelectorAll('.constellation-tab-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
 
       const filter = btn.getAttribute('data-filter') || 'all';
-      nodes.forEach((n) => {
+      allNodes.forEach((n) => {
         const isVisible = filter === 'all' || (filter === 'main' && !n.isAdv) || (filter === 'adv' && n.isAdv);
         n.mesh.visible = isVisible;
-        n.glowMesh.visible = isVisible;
+        if (n.haloMesh) n.haloMesh.visible = isVisible;
       });
     });
   });
 
+  // Spin & Reset Controls
   let isSpinning = true;
   const spinBtn = topBar.querySelector('#btn-toggle-spin');
   spinBtn?.addEventListener('click', () => {
@@ -469,21 +608,12 @@ export function renderNeuralConstellationView(
   });
 
   topBar.querySelector('#btn-reset-cam')?.addEventListener('click', () => {
-    inspector.classList.remove('open');
-    bottomTrack.querySelectorAll('.track-node-dot').forEach((d) => d.classList.remove('active'));
-    sceneManager.resetCamera([0, 2.0, 13], [0, 0, 0]);
+    hudLens.classList.remove('active');
+    sceneManager.resetCamera([0, 16, 32], [0, 0, 0]);
   });
 
   topBar.querySelector('#btn-switch-doc-mode')?.addEventListener('click', () => {
     onSwitchToDocMode();
-  });
-
-  // Bottom Track Clicks
-  bottomTrack.querySelectorAll('.track-node-dot').forEach((dot) => {
-    dot.addEventListener('click', () => {
-      const stageId = dot.getAttribute('data-stage');
-      if (stageId) selectNode(stageId);
-    });
   });
 
   // 9. Animation Loop
@@ -491,27 +621,29 @@ export function renderNeuralConstellationView(
   setInterval(() => {
     time += 0.015;
 
-    // Moving Synaptic Pulses
+    // Moving Highway Pulses
     pulseSpheres.forEach((ps) => {
-      ps.progress += 0.007;
+      ps.progress += 0.006;
       if (ps.progress >= 1) {
         ps.progress = 0;
-        ps.fromIdx = (ps.fromIdx + 1) % nodes.length;
+        ps.fromIdx = (ps.fromIdx + 1) % stageHubPositions.length;
       }
-      const toIdx = (ps.fromIdx + 1) % nodes.length;
-      const p1 = nodes[ps.fromIdx].pos;
-      const p2 = nodes[toIdx].pos;
+      const toIdx = (ps.fromIdx + 1) % stageHubPositions.length;
+      const p1 = stageHubPositions[ps.fromIdx].pos;
+      const p2 = stageHubPositions[toIdx].pos;
       ps.mesh.position.lerpVectors(p1, p2, ps.progress);
     });
 
-    // Star Rotation
-    starField.rotation.y += 0.0004;
+    // Starfield rotation
+    starField.rotation.y += 0.0003;
 
-    // Gentle Node Pulse
-    nodes.forEach((n, idx) => {
-      n.glowMesh.rotation.y += 0.015;
-      n.glowMesh.rotation.z += 0.008;
-      n.mesh.position.y = n.pos.y + Math.sin(time * 2 + idx) * 0.06;
+    // Gentle Node Pulse & Halo Rotation
+    allNodes.forEach((n, idx) => {
+      if (n.haloMesh) {
+        n.haloMesh.rotation.y += 0.015;
+        n.haloMesh.rotation.z += 0.008;
+      }
+      n.mesh.position.y = n.pos.y + Math.sin(time * 2 + idx) * 0.04;
     });
   }, 16);
 
