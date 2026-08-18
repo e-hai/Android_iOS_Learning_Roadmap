@@ -184,15 +184,7 @@ class AppController {
 
     // If in 3D Constellation Mode:
     if (this.currentViewMode === '3d') {
-      const constellationView = renderNeuralConstellationView(
-        (stageId) => {
-          this.switchViewMode('doc');
-          this.navigate(stageId);
-        },
-        () => {
-          this.switchViewMode('doc');
-        }
-      );
+      const constellationView = renderNeuralConstellationView();
       app.appendChild(constellationView);
       return;
     }

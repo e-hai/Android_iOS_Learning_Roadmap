@@ -11,7 +11,6 @@ interface PalaceNode {
   haloMesh?: THREE.Mesh;
   type: 'stage' | 'concept' | 'spark';
   stageId: string;
-  stageNum: number;
   stageTitle: string;
   isAdv: boolean;
   title: string;
@@ -24,10 +23,7 @@ interface PalaceNode {
   pos: THREE.Vector3;
 }
 
-export function renderNeuralConstellationView(
-  onOpenStageInDoc: (stageId: string) => void,
-  onSwitchToDocMode: () => void
-): HTMLElement {
+export function renderNeuralConstellationView(): HTMLElement {
   const container = document.createElement('div');
   container.className = 'constellation-view-container';
 
@@ -87,7 +83,7 @@ export function renderNeuralConstellationView(
     opacity: 0.35,
   });
 
-  // Level 1: 16 Stage Hubs
+  // Level 1: Stage Hubs
   stages.forEach((stage, idx) => {
     const isAdv = stage.isAdvanced;
     const angle = (idx / stages.length) * Math.PI * 2;
@@ -124,16 +120,17 @@ export function renderNeuralConstellationView(
     haloMesh.position.copy(hubPos);
     palaceGroup.add(haloMesh);
 
+    const stageTitle = i18n.t(stage.titleKey);
+
     allNodes.push({
       mesh: hubMesh,
       haloMesh,
       type: 'stage',
       stageId: stage.id,
-      stageNum: stage.number,
-      stageTitle: i18n.t(stage.titleKey),
+      stageTitle,
       isAdv,
-      title: `${stage.number}. ${i18n.t(stage.titleKey)}`,
-      subtitle: `${stage.rows.length} 核心概念 · 4 黄金避坑秘籍`,
+      title: stageTitle,
+      subtitle: '核心概念 · 黄金避坑秘籍',
       explanation: i18n.t(stage.goalKey),
       pos: hubPos,
     });
@@ -169,11 +166,10 @@ export function renderNeuralConstellationView(
         mesh: cMesh,
         type: 'concept',
         stageId: stage.id,
-        stageNum: stage.number,
-        stageTitle: i18n.t(stage.titleKey),
+        stageTitle,
         isAdv,
         title: `${row.android.split('(')[0].trim()} ➔ ${row.ios.split('(')[0].trim()}`,
-        subtitle: `概念对照 #${rIdx + 1}`,
+        subtitle: '核心语法对照',
         androidCode: row.android,
         iosCode: row.ios,
         explanation: i18n.t(row.note || 'detail.col.android'),
@@ -210,18 +206,17 @@ export function renderNeuralConstellationView(
 
       const fullText = i18n.t(nk);
       const tagMatch = fullText.match(/^【([^】]+)】\s*(.*)$/) || fullText.match(/^\[([^\]]+)\]\s*(.*)$/);
-      const tag = tagMatch ? tagMatch[1] : `避坑法则 #${nIdx + 1}`;
+      const tag = tagMatch ? tagMatch[1] : '避坑法则';
       const body = tagMatch ? tagMatch[2] : fullText;
 
       allNodes.push({
         mesh: sMesh,
         type: 'spark',
         stageId: stage.id,
-        stageNum: stage.number,
-        stageTitle: i18n.t(stage.titleKey),
+        stageTitle,
         isAdv,
         title: `【${tag}】`,
-        subtitle: `黄金避坑秘籍 #${nIdx + 1}`,
+        subtitle: '黄金避坑秘籍',
         noteTag: tag,
         noteBody: body,
         explanation: body,
@@ -230,7 +225,7 @@ export function renderNeuralConstellationView(
     });
   });
 
-  // Inter-Hub Synaptic Highways (Connecting 16 hubs sequentially)
+  // Inter-Hub Synaptic Highways (Connecting hubs sequentially)
   for (let i = 0; i < stageHubPositions.length; i++) {
     const nextIdx = (i + 1) % stageHubPositions.length;
     const p1 = stageHubPositions[i].pos;
@@ -262,7 +257,7 @@ export function renderNeuralConstellationView(
     });
   }
 
-  // 3. Top Floating Bar (Search + Filters + Modes)
+  // 3. Top Floating Bar (Search + Filters + Orbit tools)
   const topBar = document.createElement('div');
   topBar.className = 'constellation-top-bar';
   topBar.innerHTML = `
@@ -280,7 +275,7 @@ export function renderNeuralConstellationView(
     </div>
 
     <div class="constellation-filter-tabs">
-      <button class="constellation-tab-btn active" data-filter="all">全部节点 (${allNodes.length})</button>
+      <button class="constellation-tab-btn active" data-filter="all">全部节点</button>
       <button class="constellation-tab-btn" data-filter="main">核心主线</button>
       <button class="constellation-tab-btn" data-filter="adv">进阶扩展</button>
     </div>
@@ -294,10 +289,6 @@ export function renderNeuralConstellationView(
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
         <span>全景</span>
       </button>
-      <button class="tool-pill-btn" id="btn-switch-doc-mode" style="color:var(--color-accent);font-weight:700;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
-        <span>文档模式</span>
-      </button>
     </div>
   `;
   container.appendChild(topBar);
@@ -308,15 +299,15 @@ export function renderNeuralConstellationView(
   legend.innerHTML = `
     <div class="legend-item">
       <span class="legend-dot legend-dot-hub"></span>
-      <span>阶段中心星核 (16 Hubs)</span>
+      <span>阶段中心星核</span>
     </div>
     <div class="legend-item">
       <span class="legend-dot legend-dot-concept"></span>
-      <span>核心语法概念突触 (Concepts)</span>
+      <span>核心语法概念突触</span>
     </div>
     <div class="legend-item">
       <span class="legend-dot legend-dot-spark"></span>
-      <span>黄金避坑记忆灵光 (Sparks)</span>
+      <span>黄金避坑记忆灵光</span>
     </div>
   `;
   container.appendChild(legend);
@@ -343,9 +334,9 @@ export function renderNeuralConstellationView(
               <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}" style="font-size:10px;padding:2px 6px;">
                 ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
               </span>
-              <span>STAGE ${String(stage.number).padStart(2, '0')}</span>
+              <span>阶段星核</span>
             </div>
-            <h3 class="hud-lens-title">${stage.number}. ${i18n.t(stage.titleKey)}</h3>
+            <h3 class="hud-lens-title">${i18n.t(stage.titleKey)}</h3>
           </div>
           <button class="btn-ghost" id="btn-close-hud" style="padding:4px;" title="关闭">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -360,9 +351,6 @@ export function renderNeuralConstellationView(
         </div>
         <div class="hud-lens-footer">
           <span style="font-size:11.5px;color:var(--color-ink-muted);">点击周围子节点查看代码</span>
-          <button class="btn btn-primary btn-sm" id="btn-hud-open-doc">
-            <span>在文档中查看</span>
-          </button>
         </div>
       `;
     } else if (node.type === 'concept') {
@@ -370,7 +358,7 @@ export function renderNeuralConstellationView(
         <div class="hud-lens-header">
           <div>
             <div class="hud-lens-badge" style="color:var(--color-ios);">
-              <span>🎯 概念突触 · STAGE ${String(node.stageNum).padStart(2, '0')}</span>
+              <span>🎯 核心概念突触 · ${node.stageTitle}</span>
             </div>
             <h3 class="hud-lens-title">${node.title}</h3>
           </div>
@@ -399,9 +387,6 @@ export function renderNeuralConstellationView(
           <button class="btn btn-secondary btn-sm" id="btn-hud-focus-parent">
             <span>🔍 聚焦父星核 (${node.stageTitle})</span>
           </button>
-          <button class="btn btn-primary btn-sm" id="btn-hud-open-doc">
-            <span>在文档中查看</span>
-          </button>
         </div>
       `;
     } else {
@@ -410,7 +395,7 @@ export function renderNeuralConstellationView(
         <div class="hud-lens-header">
           <div>
             <div class="hud-lens-badge" style="color:#fbbf24;">
-              <span>✨ 黄金避坑灵光 · STAGE ${String(node.stageNum).padStart(2, '0')}</span>
+              <span>✨ 黄金避坑灵光 · ${node.stageTitle}</span>
             </div>
             <h3 class="hud-lens-title">${node.title}</h3>
           </div>
@@ -426,9 +411,6 @@ export function renderNeuralConstellationView(
         <div class="hud-lens-footer">
           <button class="btn btn-secondary btn-sm" id="btn-hud-focus-parent">
             <span>🔍 聚焦父星核 (${node.stageTitle})</span>
-          </button>
-          <button class="btn btn-primary btn-sm" id="btn-hud-open-doc">
-            <span>在文档中查看</span>
           </button>
         </div>
       `;
@@ -456,10 +438,6 @@ export function renderNeuralConstellationView(
 
     hudLens.querySelector('#btn-close-hud')?.addEventListener('click', () => {
       hudLens.classList.remove('active');
-    });
-
-    hudLens.querySelector('#btn-hud-open-doc')?.addEventListener('click', () => {
-      onOpenStageInDoc(node.stageId);
     });
 
     hudLens.querySelector('#btn-hud-focus-parent')?.addEventListener('click', () => {
@@ -534,7 +512,7 @@ export function renderNeuralConstellationView(
         tooltip.style.left = `${screenX}px`;
         tooltip.style.top = `${screenY}px`;
         tooltip.innerHTML = `
-          <div class="tooltip-num">${targetNode.type === 'stage' ? 'STAGE ' + String(targetNode.stageNum).padStart(2, '0') : targetNode.type === 'spark' ? '✨ 避坑灵光' : '🎯 概念突触'}</div>
+          <div class="tooltip-num">${targetNode.type === 'stage' ? '阶段星核' : targetNode.type === 'spark' ? '✨ 避坑灵光' : '🎯 概念突触'}</div>
           <div class="tooltip-title">${targetNode.title}</div>
           <div class="tooltip-desc">${targetNode.subtitle || '点击穿梭展开 ➔'}</div>
         `;
@@ -610,10 +588,6 @@ export function renderNeuralConstellationView(
   topBar.querySelector('#btn-reset-cam')?.addEventListener('click', () => {
     hudLens.classList.remove('active');
     sceneManager.resetCamera([0, 16, 32], [0, 0, 0]);
-  });
-
-  topBar.querySelector('#btn-switch-doc-mode')?.addEventListener('click', () => {
-    onSwitchToDocMode();
   });
 
   // 9. Animation Loop
