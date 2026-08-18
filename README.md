@@ -451,29 +451,81 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑦ 异步与并发
 
-会 Kotlin 协程的话，Swift Concurrency 上手很快，但要习惯 **async 函数染色** 与 **Actor 隔离**。
+**阶段目标：** 深入掌握 Kotlin 协程与 Swift Concurrency 并发体系：Task、TaskGroup、Flow/StateFlow/SharedFlow 响应式流与 Actor 状态隔离。  
+**核心认知：** 两端并发模型高度同构：挂起函数 (`suspend` ↔ `async`)、并发任务 (`launch` ↔ `Task`)、数据流 (`Flow` ↔ `AsyncSequence`)、线程安全 (`Mutex` ↔ `actor`)。
+
+### 模块一：协程、任务与调度（任务并发）
 
 | 概念 / API | Android (Kotlin 协程) | iOS (Swift Concurrency) | 核心说明 |
 | --- | --- | --- | --- |
 | 异步挂起函数 | `suspend fun load()` | `func load() async` | 异步函数标记（不卡线程） |
 | 启动并发任务 | `CoroutineScope.launch { }` | `Task { }` | 启动异步并发任务 |
 | 并发合并等待 | `async { } / await()` | `async let / await` | 并发执行并合并等待 |
-| 主线程调度 | `withContext(Dispatchers.Main)` | `@MainActor / MainActor.run` | 切主线程刷 UI |
-| 异步数据流 | `Flow<T>` | `AsyncSequence<T>` | 异步冷数据流 |
-| 异步事件管道 | `Channel<T>` | `AsyncStream<T>` | 异步热事件通道 |
-| 并发数据保护 | `Mutex` | `actor` | 线程安全与并发隔离 |
+| 任务组动态并发 | `coroutineScope { ... }` | `withTaskGroup { group in ... }` | 任务组动态并发 |
+| 主线程 UI 调度 | `withContext(Dispatchers.Main)` | `@MainActor / MainActor.run` | 切主线程刷 UI |
+| 后台 IO 调度 | `withContext(Dispatchers.IO)` | `Task.detached` | 切后台 IO 线程 |
+| 非阻塞延时休眠 | `delay(1000)` | `try await Task.sleep(for: .seconds(1))` | 非阻塞延时休眠 |
+| 任务协作式取消 | `job.cancel() / isActive` | `task.cancel() / Task.isCancelled` | 任务协作式取消 |
+
+### 模块二：数据流、热流与事件通道（响应式流）
+
+| 流类型 / 场景 | Android (Flow 体系) | iOS (Swift Concurrency / Combine) | 核心说明 |
+| --- | --- | --- | --- |
+| 异步冷数据流 | `Flow<T> / flow { emit(x) }` | `AsyncSequence<T>` | 异步冷数据流 |
+| 状态热流 (UI 状态) | `StateFlow / MutableStateFlow(x)` | `@Observable 属性 / CurrentValueSubject` | 状态热流（防抖保底） |
+| 事件广播热流 (单次事件) | `SharedFlow / MutableSharedFlow()` | `AsyncStream<T> / PassthroughSubject` | 事件广播热流（一次性事件） |
+| 管道队列通道 (队列分发) | `Channel<T>()` | `AsyncStream<T> / AsyncChannel` | 管道队列通道（一对一消费） |
 | 回调转异步流 | `callbackFlow { }` | `AsyncStream { continuation in }` | 旧回调转异步流 |
+| 监听与消费流 | `flow.collect { item -> }` | `for await item in stream { }` | 监听并消费数据流 |
+| 流操作符变换 | `.map { }.filter { }` | `.map { }.filter { }` | 流操作符变换处理 |
 
-学习路径：
+### 模块三：并发安全与状态隔离（线程安全）
+
+| 同步机制 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 引用类型状态隔离 | `Mutex` | `actor` | 线程安全与并发隔离 |
+| 原子变量与无锁操作 | `AtomicInteger / AtomicBoolean` | `OSAllocatedUnfairLock / Atomic` | 原子变量与无锁同步 |
+
+**异步并发与数据流体系全景对照：**
 
 ```
-Android: Thread → Coroutine → Flow → Channel
-iOS:     Thread → Task → AsyncSequence → Actor
+[ 异步并发与响应式流全景对照 ]
+
+ 1. 基础任务启动与合并:
+    Android: CoroutineScope.launch { } | async { } / await() | coroutineScope { }
+    iOS:     Task { }                  | async let / await   | withTaskGroup { }
+
+ 2. 线程切换与调度:
+    主线程 UI: Android: withContext(Dispatchers.Main) ↔ iOS: @MainActor / MainActor.run
+    后台 IO:   Android: withContext(Dispatchers.IO)   ↔ iOS: Task.detached
+
+ 3. 响应式流对标 (冷流 vs 状态热流 vs 事件热流):
+    【冷数据流 (按需拉取)】:
+      Android: flow { emit(1) }
+      iOS:     AsyncStream { continuation in continuation.yield(1) } / AsyncSequence
+    【状态热流 (UI 状态 / 有默认值 / 防抖)】:
+      Android: val uiState = MutableStateFlow(initialState)
+      iOS:     @Observable class ViewModel (属性级追踪) 或 CurrentValueSubject
+    【事件广播热流 (弹窗/Toast/单次事件)】:
+      Android: val eventFlow = MutableSharedFlow<UiEvent>()
+      iOS:     AsyncStream<UiEvent> 或 PassthroughSubject
+    【管道队列 (生产者-消费者)】:
+      Android: val channel = Channel<Task>()
+      iOS:     AsyncChannel<Task> / AsyncStream
+
+ 4. 线程安全与并发锁:
+    Android: val mutex = Mutex(); mutex.withLock { ... }
+    iOS:     actor BankAccount { var balance = 0; func deposit() { ... } } (编译器强制数据隔离)
 ```
 
-**迁移注意：** UI 更新必须上主线程——Android 用 Main dispatcher，iOS 用 `@MainActor`。
+**迁移避坑指南：**
+1. **UI 刷新切主线程**：Android 使用 `Dispatchers.Main`，iOS 在 UI 类（如 ViewModel）前加 `@MainActor`，或在需要时调用 `MainActor.run { ... }`。
+2. **StateFlow vs SharedFlow 在 iOS 的映射**：
+   - `StateFlow` 对应 iOS 17+ 的 `@Observable` 模型属性（或 Combine 的 `CurrentValueSubject`），具备最新状态保持与防抖机制；
+   - `SharedFlow` / `Channel` 对应 Swift 的 `AsyncStream`（或 Combine 的 `PassthroughSubject`），适合一次性弹窗、导航跳转或事件总线。
+3. **Actor 彻底消除数据竞争**：Swift 编译器对 `actor` 实施严格的隔离检查，跨 actor 访问必须 `await`，从编译期杜绝多线程竞争。
 
-**练手：** 用 `Task` + `URLSession` 拉 JSON，再改成可取消的 `task` 修饰符版本。
+**练手实战任务：** 使用 `Task` + `withTaskGroup` 并发请求多个 API，并在 ViewModel 中分别使用 `StateFlow`/`@Observable` 驱动界面状态，用 `SharedFlow`/`AsyncStream` 广播一次性 Toast 提示，使用 `actor` 实现一个并发安全的自增计数器。
 
 ---
 
