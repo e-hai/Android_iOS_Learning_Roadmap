@@ -176,26 +176,26 @@ MyApplication/                      MyApplication.xcodeproj/ (或 .xcworkspace)
 
 ### 3.1 模块一：传统时代（命令式 UI：Activity / Fragment ↔ UIKit）
 
-| 职责 / 阶段 | Android (传统 View 体系) | iOS (传统 UIKit 体系) |
-| --- | --- | --- |
-| 全局应用 | `Application` | `UIApplicationDelegate` / `AppDelegate` |
-| 页面级控制器 | **`Activity`** | **`UIViewController`** |
-| 子页面/片段 | **`Fragment`** | **`Child UIViewController`** |
-| 视图初始化 | `onCreate()` / `setContentView()` | `viewDidLoad()` / `loadView()` |
-| 页面即将/已经可见 | `onStart()` ➔ `onResume()` | `viewWillAppear()` ➔ `viewDidAppear()` |
-| 页面离开/不可见 | `onPause()` ➔ `onStop()` | `viewWillDisappear()` ➔ `viewDidDisappear()` |
-| 销毁与释放 | `onDestroy()` | `deinit` |
+| 职责 / 阶段 | Android (传统 View 体系) | iOS (传统 UIKit 体系) | 核心特性说明 |
+| --- | --- | --- | --- |
+| 全局应用 | `Application` | `UIApplicationDelegate` / `AppDelegate` | 应用级全局入口与生命周期分发 |
+| 页面级控制器 | `Activity` | `UIViewController` | 经典屏幕级视图控制器与上下文容器 |
+| 子页面/片段 | `Fragment` | `Child UIViewController` | 可复用子页面模块与多窗容器 |
+| 视图初始化 | `onCreate()` / `setContentView()` | `viewDidLoad()` / `loadView()` | 视图层级首次加载与内存初始化 |
+| 页面即将/已经可见 | `onStart()` ➔ `onResume()` | `viewWillAppear()` ➔ `viewDidAppear()` | 视图进入视口并获取交互焦点 |
+| 页面离开/不可见 | `onPause()` ➔ `onStop()` | `viewWillDisappear()` ➔ `viewDidDisappear()` | 视图失去焦点与退出屏幕视口 |
+| 销毁与释放 | `onDestroy()` | `deinit` | 控制器实例销毁与资源彻底回收 |
 
 ### 3.2 模块二：现代时代（声明式 UI：Jetpack Compose ↔ SwiftUI）
 
-| 职责 / 概念 | Android (Jetpack Compose) | iOS (SwiftUI) |
-| --- | --- | --- |
-| 应用根入口 | `Single Activity` + `setContent { App() }` | `@main struct App: App` (`WindowGroup`) |
-| UI 基本单元 | **`@Composable fun Screen()`**（函数） | **`struct ScreenView: View`**（值类型结构体） |
-| 挂载异步任务 | `LaunchedEffect(key) { ... }` | **`.task { ... }`**（进入启动协程，离开自动取消） |
-| 视图出现 / 消失 | `DisposableEffect` 的 `onDispose` | **`.onAppear { }`** / **`.onDisappear { }`** |
-| 系统前后台状态 | `LifecycleEventObserver` (ON_RESUME / ON_PAUSE) | **`@Environment(\.scenePhase)`** (`.active` / `.background`) |
-| 业务状态持有者 | `ViewModel` (`onCleared`) | **`@Observable class ViewModel`** (`deinit`) |
+| 职责 / 概念 | Android (Jetpack Compose) | iOS (SwiftUI) | 核心特性说明 |
+| --- | --- | --- | --- |
+| 应用根入口 | `Single Activity + setContent` | `@main struct App: App` (`WindowGroup`) | 声明式应用主窗口与场景根节点 |
+| UI 基本单元 | `@Composable fun Screen()` | `struct ScreenView: View` | 纯无状态函数 vs 不可变值类型结构体 |
+| 挂载异步任务 | `LaunchedEffect(key) { }` | `.task(id:) { }` | 挂载并发任务，进入启动，离开自动取消 |
+| 视图出现 / 消失 | `DisposableEffect / onDispose` | `.onAppear` / `.onDisappear` | 视图挂载与脱离渲染树生命周期钩子 |
+| 系统前后台状态 | `LifecycleEventObserver` | `@Environment(\.scenePhase)` | 监听 `.active` / `.background` 场景状态 |
+| 业务状态持有者 | `ViewModel` (`onCleared`) | `@Observable class ViewModel` (`deinit`) | 独立于视图树的业务模型生命周期 |
 
 **代际与层级对照：**
 
@@ -228,23 +228,23 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 | 布局类型 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
-| 垂直排列 | `Column` (垂直线性) | `VStack` (垂直堆叠) | 主轴纵向排列，默认包裹内容高度 |
-| 水平排列 | `Row` (水平线性) | `HStack` (水平堆叠) | 主轴横向排列，默认包裹内容宽度 |
-| 层叠覆盖 | `Box` (层叠覆盖) | `ZStack` (层叠堆叠) | Z 轴深度层叠，后声明的 View 在最上层 |
-| 惰性纵向列表 | `LazyColumn` | `List` (系统样式) / `LazyVStack` (自定义) | 列表复用（`List` 自带原生分割线与滑动删除） |
+| 垂直排列 | `Column` | `VStack` | 主轴纵向排列，默认包裹内容高度 |
+| 水平排列 | `Row` | `HStack` | 主轴横向排列，默认包裹内容宽度 |
+| 层叠覆盖 | `Box` | `ZStack` | Z 轴深度层叠，后声明的 View 在最上层 |
+| 惰性纵向列表 | `LazyColumn` | `List` / `LazyVStack` | 列表复用（`List` 自带原生分割线与系统样式，`LazyVStack` 纯自定义） |
 | 惰性网格布局 | `LazyVerticalGrid` | `LazyVGrid(columns:)` | 响应式多列瀑布流与宫格布局 |
 | 基础滚动容器 | `Modifier.verticalScroll()` | `ScrollView` | 非复用型滚动视图容器 |
-| 弹性占位扩展 | `Spacer()` / `.weight(1f)` | `Spacer()` | 自动挤开剩余空间（两端弹簧效果） |
-| 分割线 | `HorizontalDivider()` | `Divider()` | 系统自适应 1px/0.5px 分割线 |
+| 弹性占位扩展 | `Spacer()` / `Modifier.weight(1f)` | `Spacer()` | 自动挤开剩余空间（两端弹簧效果） |
+| 分割线 | `HorizontalDivider()` | `Divider()` | 系统自适应分割线 |
 
 ### 模块二：常用基础控件（原子组件）
 
 | 控件类型 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
 | 文本显示 | `Text("...")` | `Text("...")` | 支持字号、加粗、颜色与行数截断 |
-| 文本输入 | `TextField` / `BasicTextField` | `TextField` / `SecureField` (密码框) | 绑定双向字符串状态 `$text` |
+| 文本输入 | `TextField` / `BasicTextField` | `TextField` / `SecureField` | 绑定双向字符串状态 `$text`，支持密码框 |
 | 交互按钮 | `Button(onClick = { })` | `Button("...", action: { })` | 原生交互与点击波纹/透明度反馈 |
-| 图标与图片 | `Image` / `Icon` | `Image("...")` / `Image(systemName:)` | iOS 原生支持 **SF Symbols 系统矢量图标** |
+| 图标与图片 | `Image` / `Icon` | `Image("...")` / `Image(systemName:)` | 本地资源图片与 SF Symbols 系统矢量图标 |
 | 开关与选择 | `Switch` / `Checkbox` | `Toggle(isOn: $isOn)` | 绑定 Boolean 状态并触发动画切换 |
 | 进度指示器 | `CircularProgressIndicator` | `ProgressView()` | 自适应环形/条形加载指示器 |
 
@@ -252,12 +252,12 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 | 修饰类型 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
-| 链式包装 | `Modifier.padding().background()` | `.padding().background()` | **从上至下依次包装**（顺序不同效果截然不同） |
-| 尺寸撑满 | `fillMaxWidth()` / `fillMaxSize()` | `.frame(maxWidth: .infinity)` | 声明式弹性尺寸适配 |
-| 点击手势 | `Modifier.clickable { }` | `.onTapGesture { }` | 任意 View 挂载点击手势 |
-| 圆角裁剪 | `Modifier.clip(RoundedCornerShape(8.dp))` | `.clipShape(RoundedRectangle(cornerRadius: 8))` | 视图边框与裁剪控制 |
-| 投影阴影 | `Modifier.shadow(4.dp)` | `.shadow(radius: 4)` | 深度与高斯模糊投影 |
-| 安全区域 | `Modifier.systemBarsPadding()` | 默认遵循安全区 / `.ignoresSafeArea()` | 顶底安全区域避让机制 |
+| 链式包装 | `Modifier.padding().background()` | `.padding().background()` | 洋葱模型：从上至下依次向外包装新 View |
+| 尺寸撑满 | `fillMaxWidth()` / `fillMaxSize()` | `.frame(maxWidth: .infinity)` | 声明式弹性尺寸与最大空间拉伸 |
+| 点击手势 | `Modifier.clickable { }` | `.onTapGesture { }` | 任意 View 挂载点击手势与交互识别 |
+| 圆角裁剪 | `Modifier.clip(RoundedCornerShape(8.dp))` | `.clipShape(RoundedRectangle(cornerRadius: 8))` | 视图边框与几何形状裁剪 |
+| 投影阴影 | `Modifier.shadow(4.dp)` | `.shadow(radius: 4)` | 深度与高斯模糊投影效果 |
+| 安全区域 | `Modifier.systemBarsPadding()` | `.ignoresSafeArea()` | 默认遵循系统安全区，按需忽略安全区 |
 
 **布局容器与修饰符思维映射：**
 
@@ -287,24 +287,24 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 | 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
-| **视图内部私有状态** | `remember { mutableStateOf(x) }` | `@State private var x` | 仅限本组件内部使用（展开/开关/计数/临时输入） |
-| **父子双向绑定传递** | `(value, onValueChange)` 状态提升 | `@Binding var value` (父传 `$value`) | 向子组件开放读写权限，子组件修改直接作用于父数据源 |
-| **派生计算与缓存** | `remember(key) { derivedStateOf { } }` | 计算属性 `var isReady: Bool { ... }` | 依赖其他状态自动重算，SwiftUI 具备自动依赖追踪 |
+| 视图内部私有状态 | `remember { mutableStateOf(x) }` | `@State private var x` | 仅限本组件内部使用（展开/开关/计数/临时输入） |
+| 父子双向绑定传递 | `(value, onValueChange)` | `@Binding var value` | 状态提升，向子组件传递引用指针 `$value` |
+| 派生计算与缓存 | `remember { derivedStateOf { } }` | `var prop: Type { ... }` | 依赖其他状态自动重算，SwiftUI 具备自动依赖追踪 |
 
 ### 模块二：业务状态流与 ViewModel 响应式模型（页面级状态）
 
 | 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
-| **现代响应式 ViewModel** | `class MyVM : ViewModel() + StateFlow` | `@Observable @MainActor class MyVM` | iOS 17+ 宏驱动，页面级复杂业务与异步数据持有者 |
-| **UI 订阅与消费流** | `collectAsStateWithLifecycle()` | 直接访问属性 / `@Bindable var vm = vm` | 属性级精准追踪，仅读取的字段变动才触发重绘 |
+| 现代响应式 ViewModel | `class MyVM : ViewModel() + StateFlow` | `@Observable @MainActor class MyVM` | iOS 17+ 宏驱动，页面级复杂业务与异步数据持有者 |
+| UI 订阅与消费流 | `collectAsStateWithLifecycle()` | `vm.prop` / `@Bindable` | 属性级精准追踪，仅读取的字段变动才触发重绘 |
 
 ### 模块三：持久化偏好、场景暂存与环境注入（全局与系统级）
 
 | 应用场景 | Android (Compose) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
-| **场景/多窗口草稿暂存** | `rememberSaveable { mutableStateOf(...) }` | `@SceneStorage("draft_id")` | 屏幕旋转/切后台暂存恢复（退出应用可能重置） |
-| **磁盘持久化用户偏好** | `DataStore (Flow 键值存储)` | `@AppStorage("setting_key")` | 直接绑定系统 `UserDefaults`，App 重启仍保留 |
-| **树级全局环境注入** | `CompositionLocalProvider / LocalContext` | `@Environment(\.colorScheme) / @Environment(User.self)` | 无需层层传递 Props，深层子组件直接获取环境属性 |
+| 场景/多窗口草稿暂存 | `rememberSaveable { ... }` | `@SceneStorage("draft_id")` | 屏幕旋转/多窗口暂存恢复（退出应用可能重置） |
+| 磁盘持久化用户偏好 | `DataStore` | `@AppStorage("setting_key")` | 直接绑定系统 `UserDefaults`，App 重启仍保留 |
+| 树级全局环境注入 | `CompositionLocalProvider / LocalContext` | `@Environment(\.colorScheme)` | 无需层层传递 Props，深层子组件直接获取环境属性 |
 
 **状态管理 API 核心应用场景选型矩阵：**
 
@@ -359,31 +359,31 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 | 导航操作 / 维度 | Android (Nav3 纯声明式) | iOS (SwiftUI 16+ NavigationStack) | 核心特性说明 |
 | --- | --- | --- | --- |
-| **强类型路由节点** | `@Serializable data class Detail(val id: String)` | `enum AppRoute: Hashable { case detail(id: String) }` | 编译期强类型，告别字符串拼写错误 |
-| **状态栈数据源** | `val backStack = rememberNavBackStack()` (Nav3) | `@State var path: [AppRoute] = []` | 纯状态驱动（数组列表） |
-| **页面跳转 (压栈)** | `backStack.add(Detail(...))` | `path.append(.detail(...))` | 状态驱动压入目标路由 |
-| **页面返回 (出栈)** | `backStack.pop()` / `backStack.removeLast()` | `path.removeLast()` / `@Environment(\.dismiss) var dismiss; dismiss()` | 弹出顶层路由返回上一级 |
-| **一键回首页** | `backStack.clear()` | `path.removeAll()` | **Pop to Root** 一键清栈回首页 |
+| 强类型路由节点 | `@Serializable data class Detail(id: String)` | `enum AppRoute: Hashable { case detail(id: String) }` | 编译期强类型，告别字符串拼写错误 |
+| 状态栈数据源 | `val backStack = rememberNavBackStack()` | `@State var path: [AppRoute] = []` | 纯状态驱动（数组列表） |
+| 页面跳转 (压栈) | `backStack.add(Detail(...))` | `path.append(.detail(...))` | 状态驱动压入目标路由 |
+| 页面返回 (出栈) | `backStack.pop()` / `backStack.removeLast()` | `path.removeLast()` / `dismiss()` | 弹出顶层路由返回上一级 |
+| 一键回首页 | `backStack.clear()` | `path.removeAll()` | Pop to Root 一键清栈回首页 |
 
 ### 模块二：参数传递与页面结果回传
 
-| 数据传递场景 | Android (Nav3 体系) | iOS (SwiftUI 体系) | 核心机制与模式说明 |
+| 数据传递场景 | Android (Nav3 体系) | iOS (SwiftUI 体系) | 核心特性说明 |
 | --- | --- | --- | --- |
-| **正向参数传递** | Route 数据类构造字段：`Detail(val id: String)` | enum 关联值 / View 初始化器：`case detail(id: String)` | 强类型入参，随路由节点直接下发 |
-| **Nav3 官方结果总线** | `ResultEventBus: sendResult(data)` | `@Binding var selected: Item`（**SwiftUI 首选**） | **Nav3 最新 API**：`LocalResultEventBus.current` 发送单次结果事件 |
-| **结果监听响应** | `ResultEffect<T> { data -> ... }` / `conflateAsState()` | `@Binding` 自动刷新父 View / 闭包响应 | 声明式响应回传数据，自动处理生命周期 |
-| **函数式状态提升回调** | `NavDisplay` 注入 `onResult: (T) -> Unit` + `backStack.pop()` | `navigationDestination` 注入闭包 `onResult: (T) -> Void` + `path.removeLast()` | 经典状态提升模式，在路由容器层完成出栈 |
-| **共享域模型写入** | 共享父级 ViewModel 的 `StateFlow` | 共享 `@Observable` ViewModel / `@Environment` | 跨页面共享域模型，写入单一真实数据源 |
-| **模态弹窗选择回传** | `ModalBottomSheet { onSelect(it) }` | `.sheet(isPresented:) { Picker(result: $selected) }` | 弹层选择器闭环，关闭弹窗自动同步状态 |
+| 正向参数传递 | `Detail(id: String)` | `case detail(id: String)` | 强类型入参，随路由节点直接下发 |
+| Nav3 官方结果总线 | `LocalResultEventBus.current.sendResult(data)` | `@Binding var selected: Item` | Nav3 结果总线 vs SwiftUI 原生 @Binding 双向绑定指针 |
+| 结果监听响应 | `ResultEffect<T> { result -> ... }` | `@Binding` 自动同步 / 闭包响应 | 声明式响应回传数据，自动处理生命周期 |
+| 函数式状态提升回调 | `NavDisplay` 注入 `onResult: (T) -> Unit` | `navigationDestination` 注入 `onResult` 闭包 | 经典状态提升模式，在路由容器层完成出栈 |
+| 共享域模型写入 | 共享 ViewModel `StateFlow` | 共享 `@Observable` ViewModel | 跨页面共享域模型，写入单一真实数据源 |
+| 模态弹窗选择回传 | `ModalBottomSheet` | `.sheet(isPresented:)` | 弹层选择器闭环，关闭弹窗自动同步状态 |
 
 ### 模块三：页面呈现容器与多端适配
 
 | 容器类型 / 场景 | Android (Nav3) | iOS (SwiftUI) | 核心特性说明 |
 | --- | --- | --- | --- |
-| **路由呈现容器** | `NavDisplay(backStack) { route -> when(route) }` | `NavigationStack(path: $path) + .navigationDestination` | 惰性解耦构建目标 View |
-| **大屏/分屏支持** | `NavDisplay` (多窗分栏支持) | `NavigationSplitView(sidebar:detail:)` | iPad / 折叠屏双栏分栏 |
-| **底部导航选项卡** | `NavigationBar + NavDisplay` | `TabView(selection: $tab)` | 根级多分支页面容器 |
-| **模态弹窗/抽屉** | `ModalBottomSheet / Dialog` | `.sheet(isPresented:) / .fullScreenCover` | 独立弹层容器 |
+| 路由呈现容器 | `NavDisplay(backStack) { route -> when(route) }` | `NavigationStack(path: $path) + .navigationDestination` | 惰性解耦构建目标 View |
+| 大屏/分屏支持 | `NavDisplay` | `NavigationSplitView(sidebar:detail:)` | iPad / 折叠屏双栏及三栏分屏布局 |
+| 底部导航选项卡 | `NavigationBar + NavDisplay` | `TabView(selection: $tab)` | 根级多分支页面容器 |
+| 模态弹窗/抽屉 | `ModalBottomSheet / Dialog` | `.sheet(isPresented:) / .fullScreenCover` | 独立弹层与全屏模态呈现容器 |
 
 **Nav3 ↔ SwiftUI 纯数据驱动路由与 ResultEventBus 结果回传闭环：**
 
@@ -453,16 +453,16 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 会 Kotlin 协程的话，Swift Concurrency 上手很快，但要习惯 **async 函数染色** 与 **Actor 隔离**。
 
-| Kotlin | Swift |
-| --- | --- |
-| `suspend` | `async` |
-| `launch` | `Task { }` |
-| `async` / `await` | `async let` / `await` |
-| `withContext(Dispatchers.Main)` | `@MainActor` / `MainActor.run` |
-| Flow | AsyncSequence / AsyncStream |
-| Channel | `AsyncChannel`（swift-async-algorithms）或 Actor 封装 |
-| Mutex / 共享可变状态 | **Actor** |
-| `callbackFlow` | `AsyncStream` |
+| 概念 / API | Android (Kotlin 协程) | iOS (Swift Concurrency) | 核心特性说明 |
+| --- | --- | --- | --- |
+| 异步挂起函数 | `suspend fun load()` | `func load() async` | 异步挂起函数标记与非阻塞执行 |
+| 启动并发任务 | `CoroutineScope.launch { }` | `Task { }` | 启动不受调用处阻塞的异步任务 |
+| 并发合并等待 | `async { } / await()` | `async let / await` | 并发异步绑定与合并等待结果 |
+| 主线程调度 | `withContext(Dispatchers.Main)` | `@MainActor / MainActor.run` | 主线程调度与 UI 线程隔离 |
+| 异步数据流 | `Flow<T>` | `AsyncSequence<T>` | 冷异步数据流与按需拉取 |
+| 异步事件管道 | `Channel<T>` | `AsyncStream<T>` | 热事件流与异步通道 |
+| 并发数据保护 | `Mutex` | `actor` | 状态隔离与无锁数据竞争安全 |
+| 回调转异步流 | `callbackFlow { }` | `AsyncStream { continuation in }` | 将传统监听器包装转换为异步流 |
 
 学习路径：
 
@@ -479,12 +479,12 @@ iOS:     Thread → Task → AsyncSequence → Actor
 
 ## ⑧ 网络请求与数据解析
 
-| Android | iOS |
-| --- | --- |
-| OkHttp（底层 HTTP） | URLSession |
-| Retrofit（API 层） | URLSession + 自己的 API Client（或 Alamofire） |
-| Ktor Client | URLSession / 第三方 |
-| Gson / kotlinx.serialization | **Codable** + `JSONDecoder` |
+| 层次 / 功能 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 底层 HTTP 引擎 | `OkHttp` | `URLSession` | 底层网络会话管理与拦截器 |
+| 声明式 API 客户端 | `Retrofit` | `URLSession + API Client` | 接口声明与 RESTful 请求封装 |
+| 现代纯异步客户端 | `Ktor Client` | `Async/Await 原生客户端` | 纯异步非阻塞轻量网络库 |
+| JSON 序列化解析 | `Gson / kotlinx.serialization` | `Codable + JSONDecoder` | 高性能模型自动编解码 |
 
 建议顺序：
 
@@ -499,14 +499,14 @@ iOS:     URLSession → Codable/JSONDecoder → 封装 API Client
 
 ## ⑨ 本地数据存储
 
-| Android | iOS | 用途 |
-| --- | --- | --- |
-| SharedPreferences | UserDefaults / `@AppStorage` | 轻量偏好 |
-| DataStore | UserDefaults 或小文件 | 稍规范的偏好/数据 |
-| — | **Keychain** | 令牌等敏感信息（Android 侧多为 EncryptedSharedPreferences / Keystore） |
-| Room | **SwiftData**（新）/ CoreData（存量） | 本地数据库 |
-| SQLDelight / SQLite | SQLite / GRDB 等 | SQL 层 |
-| 文件 / Cache | FileManager | 文件缓存 |
+| 存储维度 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 轻量偏好存储 | `SharedPreferences` | `UserDefaults / @AppStorage` | 简单键值偏好持久化 |
+| 响应式数据存储 | `DataStore` | `UserDefaults / 文件缓存` | 类型安全与响应式数据持久化 |
+| 敏感安全加密 | `EncryptedSharedPreferences / Keystore` | `Keychain` | 安全加密存储 Token 与敏感凭据 |
+| 对象关系数据库 | `Room` | `SwiftData / CoreData` | 原生 ORM 数据库与对象关系映射 |
+| 底层 SQL 操作 | `SQLDelight / SQLite` | `GRDB / SQLite.swift` | 灵活执行原生 SQL 查询 |
+| 沙盒文件读写 | `Context.filesDir / cacheDir` | `FileManager` | 应用专属沙盒与缓存目录管理 |
 
 学习路径：
 
@@ -522,6 +522,14 @@ iOS:     UserDefaults → Keychain → SwiftData（需要时再补 CoreData）
 ## ⑩ 应用架构
 
 两端几乎同一套：**MVVM + Repository**。
+
+| 架构分层 | Android 体系 | iOS 体系 | 核心职责说明 |
+| --- | --- | --- | --- |
+| 声明式 UI 层 | `Compose (@Composable)` | `SwiftUI (View)` | UI 渲染与捕获用户意图 |
+| 业务状态层 | `ViewModel + StateFlow` | `ViewModel (@Observable)` | 持有业务状态与处理领域逻辑 |
+| 数据仓库层 | `Repository` | `Repository` | 统一管理本地与远程数据源 |
+| 数据源接口 | `DataSource` | `Service / Client` | 封装底层具体获取行为 |
+| 基础设施层 | `Retrofit / Room` | `URLSession / SwiftData` | 网络传输与数据库底层持久化 |
 
 ```
 Android: UI(Compose) → ViewModel → Repository → DataSource → Network/DB
@@ -544,57 +552,58 @@ iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
 
 ### ⑪ 依赖注入
 
-| Android | iOS |
-| --- | --- |
-| Koin | Factory |
-| Hilt / Dagger | Swinject / Resolver |
+| 模式 / 框架 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 轻量服务定位容器 | `Koin` | `Factory` | 模块化工厂注册与轻量解析 |
+| 大型编译期生成框架 | `Hilt / Dagger` | `Swinject / Resolver` | 编译期强类型或运行时容器注入 |
+| 原生构造解耦 | 构造函数手动注入 | `protocol + init 构造注入` | iOS 强烈推荐：纯协议 + 构造函数注入 |
 
 很多 iOS 项目直接：**protocol + 构造函数注入**，未必上框架。
 
 ### ⑫ 图片与静态资源
 
-| Android | iOS |
-| --- | --- |
-| drawable / mipmap | Assets.xcassets |
-| Bitmap | UIImage |
-| Coil / Glide | AsyncImage / Kingfisher 等 |
-| Painter / ImageBitmap | Image / UIImage |
+| 资产类型 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 资源目录 | `res/drawable / mipmap` | `Assets.xcassets` | 静态图片、色彩集与矢量资产 |
+| 内存位图 | `Bitmap` | `UIImage` | 内存中光栅化位图对象 |
+| 网络图片异步加载 | `Coil / Glide` | `AsyncImage / Kingfisher` | 异步下载、多级缓存与过渡淡入 |
+| 界面渲染绘制 | `Painter / ImageBitmap` | `Image / UIImage` | UI 视图绘制与展示 |
 
 ### ⑬ 动画与转场动效
 
-| Android | iOS |
-| --- | --- |
-| Compose Animation | SwiftUI `withAnimation` / `animation` |
-| `AnimatedVisibility` | `transition` |
-| MotionLayout / Shared Element | `matchedGeometryEffect` |
+| 动画类型 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 状态驱动属性动画 | `animate*AsState / updateTransition` | `withAnimation / .animation` | 状态触发平滑插值过渡 |
+| 元素转场进出 | `AnimatedVisibility` | `.transition` | 视图插入与移除时的淡入/滑出动效 |
+| 跨层级共享元素 | `MotionLayout / SharedElement` | `matchedGeometryEffect` | 跨视图平滑几何形变与位置转场 |
 
 ### ⑭ 系统能力
 
 实战高频，主路径未展开，迁移时优先补：
 
-| 能力 | Android | iOS |
-| --- | --- | --- |
-| 权限 | Manifest + runtime permission | Info.plist 用途说明 + 系统弹窗 |
-| 后台任务 | WorkManager | BackgroundTasks |
-| 推送 | FCM | APNs |
-| 深链 | App Links / Intent | Universal Links / URL Scheme |
+| 系统能力 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 敏感权限申请 | `Manifest + runtime permission` | `Info.plist + 系统授权弹窗` | 动态向用户申请相机、相册、定位等权限 |
+| 后台任务调度 | `WorkManager` | `BackgroundTasks (BGTaskScheduler)` | 满足系统约束条件下的延时后台作业 |
+| 远程消息推送 | `FCM (Firebase Cloud Messaging)` | `APNs` | 系统级推送服务通道与消息唤醒 |
+| 外部深链直达 | `App Links / Intent Filter` | `Universal Links / URL Scheme` | 浏览器或外部 App 唤醒直达指定页面 |
 
 ### ⑮ 单元测试与 UI 测试
 
-| Android | iOS |
-| --- | --- |
-| JUnit | XCTest |
-| Espresso / Compose UI Test | XCUITest |
-| 协程测试 | async 测试 / 期望值 |
+| 测试类型 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 单元测试框架 | `JUnit` | `XCTest` | 业务逻辑测试与断言机制 |
+| 自动化 UI 测试 | `Espresso / Compose UI Test` | `XCUITest` | 界面元素定位与自动化交互测试 |
+| 异步数据流测试 | `runTest / Turbine` | `async/await XCTest / expectation` | 协程异步任务与 Flow 流时序验证 |
 
 ### ⑯ 打包构建与应用发布
 
-| Android | iOS |
-| --- | --- |
-| Debug / Release | Debug / Release |
-| APK / AAB | IPA / Archive |
-| Google Play Console | App Store Connect |
-| 签名 / Play App Signing | Certificates / Profiles / Notarization（Mac 相关另说） |
+| 发布阶段 | Android 体系 | iOS 体系 | 核心特性说明 |
+| --- | --- | --- | --- |
+| 构建多环境配置 | `Build Variants / Flavors` | `Build Schemes / Configurations` | Debug / Staging / Release 差异化编译 |
+| 打包产物格式 | `APK / AAB` | `IPA / Xcode Archive` | 应用分发归档安装包 |
+| 应用管理后台 | `Google Play Console` | `App Store Connect` | 版本发布、元数据审核与 TestFlight 分发 |
+| 代码签名与安全 | `Keystore / Play App Signing` | `Certificates / Provisioning Profiles` | 开发者身份证书与设备描述文件校验 |
 
 ---
 
