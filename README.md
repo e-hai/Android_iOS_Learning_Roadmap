@@ -736,28 +736,126 @@ iOS:     @main App → WindowGroup (Scene) → SwiftUI View 结构体
 
 ## ⑩ 应用架构
 
-两端几乎同一套：**MVVM + Repository**。
+**阶段目标：** 深入掌握现代移动端架构全景：Clean Architecture 分层体系、UDF 单向数据流、MVI/TCA 状态建模与 SPM/Gradle 模块解耦。  
+**核心认知：** 两端架构思想高度统一：View 声明式渲染 UI，ViewModel 单向流出不可变 `UiState`，领域用例与 `Repository` 统管数据源，通过 `Protocol` / `interface` 依赖倒置实现跨模块解耦。
 
-| 架构分层 | Android 体系 | iOS 体系 | 核心说明 |
+### 模块一：架构分层与数据流向（Clean Architecture）
+
+| 架构分层 / 职责 | Android 体系 | iOS 体系 | 核心说明 |
 | --- | --- | --- | --- |
-| 声明式 UI 层 | `Compose (@Composable)` | `SwiftUI (View)` | 声明式 UI 渲染层 |
-| 业务状态层 | `ViewModel + StateFlow` | `ViewModel (@Observable)` | 业务逻辑与状态层 |
-| 数据仓库层 | `Repository` | `Repository` | 数据仓库层（统管本地/网络） |
-| 数据源接口 | `DataSource` | `Service / Client` | 数据源接口 |
-| 基础设施层 | `Retrofit / Room` | `URLSession / SwiftData` | 底层网络与数据库 |
+| 声明式 UI 表现层 | `Compose (@Composable)` | `SwiftUI (View)` | 声明式 UI 渲染层 |
+| 业务状态管理层 | `class VM : ViewModel() + StateFlow` | `@Observable @MainActor class VM` | 业务逻辑与状态层 |
+| 领域用例层 (Clean) | `class GetUserUseCase(repo)` | `struct GetUserUseCase` | 领域用例与业务规则 |
+| 数据仓库抽象与实现 | `interface Repo / RepoImpl` | `protocol Repo / RepoImpl` | 数据仓库层（统管本地/网络） |
+| 远程与本地底层数据源 | `RemoteDataSource / LocalDataSource` | `RemoteService / LocalStore` | 远程与本地底层数据源 |
+| 统一结果与响应封包 | `Result<T> / UiState<T>` | `Result<T, Error> / AsyncPhase<T>` | 统一结果与状态封包 |
+
+### 模块二：单向数据流与状态建模（UDF / MVI / TCA）
+
+| 机制 / 模式 | Android 体系 | iOS 体系 | 核心说明 |
+| --- | --- | --- | --- |
+| 不可变状态数据模型 | `data class UiState(...)` | `struct UiState` | 不可变 UI 状态数据模型 |
+| 交互意图事件定义 | `sealed interface UiIntent` | `enum UiIntent` | 用户交互意图事件定义 |
+| 单向数据流闭环 | `Intent ➔ ViewModel ➔ State ➔ UI` | `Intent ➔ ViewModel ➔ State ➔ UI` | 单向数据流闭环 |
+| 单次副作用（弹窗/导航） | `Channel<UiEffect> / SharedFlow` | `AsyncStream<UiEffect>` | 单次副作用事件（弹窗/跳转） |
+| 主流架构模式选型 | `MVVM / MVI (Orbit)` | `MVVM / TCA (The Composable Architecture)` | 主流应用架构模式选型 |
+
+### 模块三：工程组件化与模块解耦（Modularity & Decoupling）
+
+| 组件化策略 | Android 体系 (Gradle) | iOS 体系 (SPM / Targets) | 核心说明 |
+| --- | --- | --- | --- |
+| 功能与核心分包 | `:app / :core / :feature:login` | `App Target / Core SPM / Feature SPM` | 功能与核心组件化分包 |
+| 依赖倒置与接口下沉 | `interface 下沉 domain 模块` | `protocol 下沉 Core 模块` | 依赖倒置与接口下沉 |
+| 依赖注入装配根节点 | `Hilt @Module / Koin module` | `AppContainer / Factory` | 依赖注入组装根节点 |
+
+**现代移动端应用架构与单向数据流全景对照：**
 
 ```
-Android: UI(Compose) → ViewModel → Repository → DataSource → Network/DB
-iOS:     View(SwiftUI) → ViewModel → Repository → Service → API/Store
+[ 现代移动端应用架构与单向数据流全景对照 ]
+
+ 1. Clean Architecture + UDF 状态流向:
+    【UI 层 (View)】
+      用户点击 "刷新" ➔ 发送 Intent: .refresh
+    【ViewModel 层】
+      接收 Intent ➔ 将 uiState 置为 .loading ➔ 调用 GetNewsUseCase / Repository
+    【Repository 仓库层】
+      网络拉取 (URLSession) ➔ 本地缓存入库 (SwiftData) ➔ 返回领域模型
+    【ViewModel 层】
+      将 uiState 置为 .success(newsList)
+    【UI 层 (View)】
+      SwiftUI / Compose 监测到 State 变更 ➔ 细粒度精准重绘列表
+
+ 2. 现代 iOS Clean MVVM + UDF 代码实现范式:
+    【State 与 Intent 状态建模】
+      struct NewsUiState {
+          var isLoading: Bool = false
+          var items: [NewsItem] = []
+          var errorMessage: String? = nil
+      }
+
+      enum NewsUiIntent {
+          case loadInitial
+          case refresh
+          case toggleBookmark(id: String)
+      }
+
+    【ViewModel 业务状态机】
+      @Observable
+      @MainActor
+      final class NewsViewModel {
+          private(set) var uiState = NewsUiState()
+          private let repository: NewsRepositoryProtocol
+
+          init(repository: NewsRepositoryProtocol) {
+              self.repository = repository
+          }
+
+          func send(_ intent: NewsUiIntent) async {
+              switch intent {
+              case .loadInitial, .refresh:
+                  uiState.isLoading = true
+                  do {
+                      let items = try await repository.fetchLatestNews()
+                      uiState.items = items
+                      uiState.isLoading = false
+                  } catch {
+                      uiState.errorMessage = error.localizedDescription
+                      uiState.isLoading = false
+                  }
+              case .toggleBookmark(let id):
+                  try? await repository.toggleBookmark(id: id)
+              }
+          }
+      }
+
+    【声明式 View 消费】
+      struct NewsListView: View {
+          @State private var viewModel: NewsViewModel
+
+          var body: some View {
+              List(viewModel.uiState.items) { item in
+                  NewsRow(item: item)
+              }
+              .overlay {
+                  if viewModel.uiState.isLoading { ProgressView() }
+              }
+              .task {
+                  await viewModel.send(.loadInitial)
+              }
+              .refreshable {
+                  await viewModel.send(.refresh)
+              }
+          }
+      }
 ```
 
-**迁移注意**
+**迁移避坑指南：**
+1. **MVVM + UDF 核心心智**：View 保持极简纯净（只绑 State、发 Intent）；ViewModel 拥有唯一的真实状态源 (`StateFlow` / `@Observable`)；禁止在 View 内部直接发起数据库或网络请求。
+2. **Repository 单一数据源**：Repository 统管内存缓存、本地数据库 (`Room` / `SwiftData`) 与网络请求 (`Retrofit` / `URLSession`)，向上层暴露统一的 Flow 或 async 方法，屏蔽数据来源细节。
+3. **MVI 与 TCA 架构演进**：对于复杂交互流，使用 sealed class / enum 将用户动作建模为严格的 Intent，状态建模为不可变 State，彻底杜绝多线程状态不一致与 race condition。
+4. **工程组件化最佳实践**：Android 依赖 Gradle 多模块，iOS 优先使用 SPM Package 多 Target 拆分（Domain / Data / Feature），通过 Protocol 依赖倒置实现跨模块完全解耦与独立编译加速。
 
-- View 保持瘦：只绑状态、发意图
-- 网络/数据库细节进 Repository，不要堆在 View
-- iOS 的 ViewModel 常用 `@Observable` + `@MainActor`，不一定继承某个基类
-
-**练手：** 用同一架构完成「列表 + 详情 + 收藏（本地）+ 网络刷新」。
+**练手实战任务：** 按照 Clean Architecture + MVVM + UDF 架构重构一个完整的资讯阅读器 App：包含 `UiState` 不可变状态、`UiIntent` 意图驱动、`Repository` 统一拉取与本地收藏缓存、以及基于 Protocol 的 Mock 测试注入。
 
 ---
 
