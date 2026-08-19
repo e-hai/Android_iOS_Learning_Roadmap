@@ -1,6 +1,5 @@
 import { ComparisonRow } from '../models/types';
 import { i18n } from '../services/i18n';
-import { showToast } from './Toast';
 
 export function renderComparisonTable(
   rows: ComparisonRow[],
@@ -51,22 +50,10 @@ export function renderComparisonTable(
     const tdAndroid = document.createElement('td');
     tdAndroid.className = 'cell-code cell-android';
     tdAndroid.textContent = androidText;
-    tdAndroid.title = i18n.t('web.copied');
-    tdAndroid.style.cursor = 'pointer';
-    tdAndroid.addEventListener('click', () => {
-      navigator.clipboard.writeText(androidText);
-      showToast(i18n.t('web.copied') + `: ${androidText}`);
-    });
 
     const tdIos = document.createElement('td');
     tdIos.className = 'cell-code cell-ios';
     tdIos.textContent = iosText;
-    tdIos.title = i18n.t('web.copied');
-    tdIos.style.cursor = 'pointer';
-    tdIos.addEventListener('click', () => {
-      navigator.clipboard.writeText(iosText);
-      showToast(i18n.t('web.copied') + `: ${iosText}`);
-    });
 
     tr.appendChild(tdAndroid);
     tr.appendChild(tdIos);
