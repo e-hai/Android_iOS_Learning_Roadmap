@@ -6,7 +6,7 @@
 
 - **平台**：现代浏览器 Web 应用（纯静态 SPA）
 - **技术栈**：Vite + TypeScript + Vanilla CSS
-- **目标**：Android 开发者学 iOS / SwiftUI 的陪伴式路线工具与概念速查表
+- **目标**：Android ⟷ iOS 双端开发者互相迁移、架构对齐与概念速查路线图手册
 
 ## 架构准则
 

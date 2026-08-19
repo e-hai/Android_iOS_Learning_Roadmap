@@ -19,7 +19,7 @@ export function renderHeader(
         <div class="brand-icon">AR</div>
         <div class="brand-text">
           <span class="brand-title">${i18n.t('app.display_name')}</span>
-          <span class="brand-badge">Android ➔ iOS</span>
+          <span class="brand-badge">Android ⟷ iOS</span>
         </div>
       </div>
     </div>

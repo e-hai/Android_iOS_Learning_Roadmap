@@ -170,7 +170,7 @@ export function renderNeuralConstellationView(
         stageId: stage.id,
         stageTitle,
         isAdv,
-        title: `${row.android.split('(')[0].trim()} ➔ ${row.ios.split('(')[0].trim()}`,
+        title: `${row.android.split('(')[0].trim()} ⟷ ${row.ios.split('(')[0].trim()}`,
         subtitle: '核心语法对照',
         androidCode: row.android,
         iosCode: row.ios,
@@ -267,7 +267,7 @@ export function renderNeuralConstellationView(
       <div class="constellation-title-group">
         <div class="constellation-brand-badge">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-          <span>3D 认知星云</span>
+          <span>Android ⟷ iOS 3D 认知星云</span>
         </div>
       </div>
 

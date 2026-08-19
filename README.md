@@ -1,22 +1,23 @@
-# Android → iOS 学习路线图（LearningCockpit）
+# Android ⟷ iOS 双端开发者互相迁移与学习路线图（LearningCockpit）
 
-> 💡 **在线互动版与本地 Web 驾驶舱**：本项目已配套提供现代化静态 Web 单页应用，支持即时搜索、聚焦学习卡、中英双语与本地打卡进度持久化。
+> 💡 **在线互动版与本地 Web 驾驶舱**：本项目配套提供现代化静态 Web 单页应用，支持 3D 认知星云/记忆宫殿、即时搜索、中英双语与双端概念精准对齐。
 > - **本地运行**：`npm install && npm run dev`（访问 `http://localhost:3000`）
 > - **静态构建**：`npm run build`（纯静态产物输出至 `dist/`）
 > - **自动部署**：支持 GitHub Pages、Cloudflare Pages、Vercel 等零服务器免费托管。
 
 ---
 
-# Android → iOS 学习路线图
+# Android ⟷ iOS 双端学习与互相迁移路线图
 
-目标：从 **Android（Kotlin）** 迁移到 **iOS（Swift）**。
+目标：构建 **Android（Kotlin / Compose）** 与 **iOS（Swift / SwiftUI）** 双端双向知识映射与无缝迁移能力。
 
-按**移动端开发知识体系**学，而不是按语法逐条背。Kotlin / Swift 只是工具；真正要迁移的是 App 开发能力。
+按**移动端通用架构与开发知识体系**学习，而不是按语法死记硬背。Kotlin / Swift 只是表现工具；真正互通的是端到端的 App 架构与工程开发能力。
 
 **怎么用这份资料**
 
-- 已会 Android：每阶段重点看 **iOS 列** 和「迁移注意」
-- 两端都在学：先 Android 模块，再立刻学 iOS 对应模块，形成映射
+- **Android ➔ iOS 迁移**：每阶段重点对照 **iOS 侧** 与「双端避坑指南」
+- **iOS ➔ Android 迁移**：每阶段重点对照 **Android 侧** 与 Kotlin 协程 / Compose 对应实现
+- **两端协同开发**：先对照基础语法，再横向对齐架构与状态流，形成双向对称映射
 - 路线分为 10 个核心主路径阶段与 6 个进阶扩展阶段
 
 ---
