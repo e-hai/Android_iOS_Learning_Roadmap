@@ -68,7 +68,7 @@ function renderSingleChapterView(
   breadcrumb.innerHTML = `
     <button class="breadcrumb-btn" id="btn-crumb-overview">5 大领域进阶</button>
     <span class="breadcrumb-sep">/</span>
-    <button class="breadcrumb-btn" id="btn-crumb-domain">${String(domain.number).padStart(2, '0')}. ${i18n.t(domain.titleKey)}</button>
+    <button class="breadcrumb-btn" id="btn-crumb-domain">${i18n.t(domain.titleKey)}</button>
     <span class="breadcrumb-sep">/</span>
     <span class="breadcrumb-current">第 ${chapterNumberStr} 节 · ${mod.tag}</span>
   `;
@@ -171,14 +171,14 @@ function renderSingleChapterView(
   if (prevChapter) {
     prevBtnHtml = `<button class="btn btn-secondary btn-sm" id="btn-prev-chap">← 上一节: ${prevChapter.tag} · ${truncateText(prevChapter.title, 14)}</button>`;
   } else if (prevDomain) {
-    prevBtnHtml = `<button class="btn btn-secondary btn-sm" id="btn-prev-chap">← 上一领域: ${String(prevDomain.number).padStart(2, '0')}. ${i18n.t(prevDomain.titleKey)}</button>`;
+    prevBtnHtml = `<button class="btn btn-secondary btn-sm" id="btn-prev-chap">← 上一领域: ${i18n.t(prevDomain.titleKey)}</button>`;
   }
 
   let nextBtnHtml = '<div></div>';
   if (nextChapter) {
     nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-next-chap">下一节: ${nextChapter.tag} · ${truncateText(nextChapter.title, 14)} →</button>`;
   } else if (nextDomain) {
-    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-next-chap">下一领域: ${String(nextDomain.number).padStart(2, '0')}. ${i18n.t(nextDomain.titleKey)} →</button>`;
+    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-next-chap">下一领域: ${i18n.t(nextDomain.titleKey)} →</button>`;
   } else {
     nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-finish-all">🎉 完成全部领域学习 ➔</button>`;
   }
@@ -234,7 +234,7 @@ function renderDomainTocView(
   breadcrumb.innerHTML = `
     <button class="breadcrumb-btn" id="btn-crumb-overview">5 大领域进阶</button>
     <span class="breadcrumb-sep">/</span>
-    <span class="breadcrumb-current">领域 ${String(domain.number).padStart(2, '0')} · ${i18n.t(domain.titleKey)}</span>
+    <span class="breadcrumb-current">${i18n.t(domain.titleKey)}</span>
   `;
   breadcrumb.querySelector('#btn-crumb-overview')?.addEventListener('click', () => onSelectStage('all'));
   container.appendChild(breadcrumb);
@@ -255,7 +255,7 @@ function renderDomainTocView(
       <span class="stage-number-large">${String(domain.number).padStart(2, '0')}</span>
     </div>
 
-    <h1 class="stage-title">${String(domain.number).padStart(2, '0')}. ${i18n.t(domain.titleKey)} · ${platformName} 进阶大纲</h1>
+    <h1 class="stage-title">${i18n.t(domain.titleKey)} · ${platformName} 进阶大纲</h1>
     <p class="stage-goal" style="margin-bottom:14px;">
       共包含 <strong>${modules.length} 个独立进阶章节</strong>。点击任意章节卡片进入独立研读与实操。
     </p>
@@ -322,8 +322,8 @@ function renderDomainTocView(
 
   navFooter.innerHTML = `
     <div class="stage-nav-buttons">
-      ${prevDomain ? `<button class="btn btn-secondary btn-sm" id="btn-prev-domain">← ${String(prevDomain.number).padStart(2, '0')}. ${i18n.t(prevDomain.titleKey)}</button>` : '<div></div>'}
-      ${nextDomain ? `<button class="btn btn-secondary btn-sm" id="btn-next-domain">${String(nextDomain.number).padStart(2, '0')}. ${i18n.t(nextDomain.titleKey)} →</button>` : '<div></div>'}
+      ${prevDomain ? `<button class="btn btn-secondary btn-sm" id="btn-prev-domain">← 上一领域: ${i18n.t(prevDomain.titleKey)}</button>` : '<div></div>'}
+      ${nextDomain ? `<button class="btn btn-secondary btn-sm" id="btn-next-domain">下一领域: ${i18n.t(nextDomain.titleKey)} →</button>` : '<div></div>'}
     </div>
   `;
 

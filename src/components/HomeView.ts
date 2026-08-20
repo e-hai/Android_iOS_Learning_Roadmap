@@ -154,7 +154,7 @@ export function renderHomeView(
     card.innerHTML = `
       <div class="matrix-card-num">${String(stage.number).padStart(2, '0')}</div>
       <div class="matrix-card-info">
-        <span class="matrix-card-title">${stage.number}. ${i18n.t(stage.titleKey)}</span>
+        <span class="matrix-card-title">${i18n.t(stage.titleKey)}</span>
         <div class="matrix-card-meta">
           <span>${stage.rows.length} 项对照</span>
         </div>

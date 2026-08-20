@@ -46,7 +46,7 @@ export function renderSidebar(
 
     stages.forEach((stage) => {
       const isActive = currentStageId === stage.id;
-      const displayTitle = `${stage.number}. ${i18n.t(stage.titleKey)}`;
+      const displayTitle = i18n.t(stage.titleKey);
 
       const item = document.createElement('button');
       item.className = `sidebar-item ${isActive ? 'active' : ''}`;
@@ -72,7 +72,7 @@ export function renderSidebar(
       const isDomainActive = currentStageId === domain.id;
       const isExpanded = isDomainActive || currentStageId.startsWith(`${domain.id}:`);
       const mods = deepDivePlatform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
-      const displayTitle = `${domain.number}. ${i18n.t(domain.titleKey)}`;
+      const displayTitle = i18n.t(domain.titleKey);
 
       // Domain accordion group
       const accordionGroup = document.createElement('div');

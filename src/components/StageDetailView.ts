@@ -23,7 +23,7 @@ export function renderStageDetail(
       </div>
       <span class="stage-number-large">${String(stage.number).padStart(2, '0')}</span>
     </div>
-    <h1 class="stage-detail-title">${String(stage.number).padStart(2, '0')}. ${i18n.t(stage.titleKey)}</h1>
+    <h1 class="stage-detail-title">${i18n.t(stage.titleKey)}</h1>
   `;
   container.appendChild(header);
 
@@ -149,7 +149,7 @@ export function renderStageDetail(
   if (prevStage) {
     const prevBtn = document.createElement('button');
     prevBtn.className = 'btn btn-secondary';
-    prevBtn.innerHTML = `← ${i18n.t('web.prev_stage')}: ${prevStage.number}. ${i18n.t(prevStage.titleKey)}`;
+    prevBtn.innerHTML = `← ${i18n.t('web.prev_stage')}: ${i18n.t(prevStage.titleKey)}`;
     prevBtn.addEventListener('click', () => onNavigate(prevStage.id));
     navFooter.appendChild(prevBtn);
   } else {
@@ -159,7 +159,7 @@ export function renderStageDetail(
   if (nextStage) {
     const nextBtn = document.createElement('button');
     nextBtn.className = 'btn btn-primary';
-    nextBtn.innerHTML = `${i18n.t('web.next_stage')}: ${nextStage.number}. ${i18n.t(nextStage.titleKey)} →`;
+    nextBtn.innerHTML = `${i18n.t('web.next_stage')}: ${i18n.t(nextStage.titleKey)} →`;
     nextBtn.addEventListener('click', () => onNavigate(nextStage.id));
     navFooter.appendChild(nextBtn);
   }
