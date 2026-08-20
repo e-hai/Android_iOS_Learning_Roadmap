@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import { ThreeSceneManager } from '../core/ThreeSceneManager';
 import { stages } from '../../data/roadmap-data';
-import { deepDivesData } from '../../data/deep-dive-data';
+import { deepDiveDomains } from '../../data/deep-dive-data';
 import { i18n } from '../../services/i18n';
 import { renderComparisonTable } from '../../components/ComparisonTable';
 import { renderArchitectureDiagram } from '../../components/ArchitectureDiagram';
@@ -86,62 +86,62 @@ export function renderNeuralConstellationView(
   const platformColor = deepDivePlatform === 'android' ? 0x10b981 : 0x0ea5e9;
   const platformEmissive = deepDivePlatform === 'android' ? 0x047857 : 0x0369a1;
 
-  stages.forEach((stage, sIdx) => {
-    const stageAngle = (sIdx / stages.length) * Math.PI * 2;
-    const stageRadius = 11.0;
-    const hubX = Math.cos(stageAngle) * stageRadius;
-    const hubZ = Math.sin(stageAngle) * stageRadius;
-    const hubY = Math.sin(sIdx * 1.2) * 1.5;
-    const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
+  if (knowledgeMode === 'deepdive') {
+    // 5 Industrial Domains in Deep Dive Mode
+    deepDiveDomains.forEach((domain, sIdx) => {
+      const stageAngle = (sIdx / deepDiveDomains.length) * Math.PI * 2;
+      const stageRadius = 9.5;
+      const hubX = Math.cos(stageAngle) * stageRadius;
+      const hubZ = Math.sin(stageAngle) * stageRadius;
+      const hubY = Math.sin(sIdx * 1.2) * 1.5;
+      const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
 
-    const stageTitle = i18n.t(stage.titleKey);
+      const domainTitle = i18n.t(domain.titleKey);
 
-    // Level 1: Stage Core Hub
-    const hubGeom = new THREE.SphereGeometry(1.0, 32, 32);
-    const hubMat = new THREE.MeshStandardMaterial({
-      color: knowledgeMode === 'deepdive' ? platformColor : 0x0d9488,
-      emissive: knowledgeMode === 'deepdive' ? platformEmissive : 0x042f2e,
-      emissiveIntensity: 0.85,
-      roughness: 0.2,
-      metalness: 0.3,
-    });
-    const hubMesh = new THREE.Mesh(hubGeom, hubMat);
-    hubMesh.position.copy(hubPos);
-    palaceGroup.add(hubMesh);
+      // Level 1: Domain Core Hub
+      const hubGeom = new THREE.SphereGeometry(1.1, 32, 32);
+      const hubMat = new THREE.MeshStandardMaterial({
+        color: platformColor,
+        emissive: platformEmissive,
+        emissiveIntensity: 0.85,
+        roughness: 0.2,
+        metalness: 0.3,
+      });
+      const hubMesh = new THREE.Mesh(hubGeom, hubMat);
+      hubMesh.position.copy(hubPos);
+      palaceGroup.add(hubMesh);
 
-    // Dynamic Halo Ring
-    const haloGeom = new THREE.RingGeometry(1.35, 1.55, 32);
-    const haloMat = new THREE.MeshBasicMaterial({
-      color: knowledgeMode === 'deepdive' ? platformColor : 0x14b8a6,
-      side: THREE.DoubleSide,
-      transparent: true,
-      opacity: 0.6,
-    });
-    const haloMesh = new THREE.Mesh(haloGeom, haloMat);
-    haloMesh.position.copy(hubPos);
-    haloMesh.rotation.x = Math.PI / 2;
-    palaceGroup.add(haloMesh);
+      // Dynamic Halo Ring
+      const haloGeom = new THREE.RingGeometry(1.45, 1.7, 32);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: platformColor,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6,
+      });
+      const haloMesh = new THREE.Mesh(haloGeom, haloMat);
+      haloMesh.position.copy(hubPos);
+      haloMesh.rotation.x = Math.PI / 2;
+      palaceGroup.add(haloMesh);
 
-    allNodes.push({
-      mesh: hubMesh,
-      haloMesh,
-      type: 'stage',
-      stageId: stage.id,
-      stageTitle,
-      isAdv: false,
-      title: `${String(stage.number).padStart(2, '0')}. ${stageTitle} · ${knowledgeMode === 'deepdive' ? `${platformName} 进阶` : '对照星核'}`,
-      subtitle: `模块 ${String(stage.number).padStart(2, '0')} 星核`,
-      pos: hubPos,
-    });
+      allNodes.push({
+        mesh: hubMesh,
+        haloMesh,
+        type: 'stage',
+        stageId: domain.id,
+        stageTitle: domainTitle,
+        isAdv: false,
+        title: `${String(domain.number).padStart(2, '0')}. ${domainTitle} · ${platformName} 进阶`,
+        subtitle: `领域 ${String(domain.number).padStart(2, '0')} 星核`,
+        pos: hubPos,
+      });
 
-    if (knowledgeMode === 'deepdive') {
-      // Deep Dive Mode: Orbiting Single-Platform Deep Dive Module Nodes
-      const stageDeepData = deepDivesData[stage.id];
-      const modules = stageDeepData ? (deepDivePlatform === 'android' ? stageDeepData.android : stageDeepData.ios) : [];
+      // Orbiting Single-Platform Deep Dive Module Nodes
+      const modules = deepDivePlatform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
 
       modules.forEach((mod, mIdx) => {
         const mAngle = (mIdx / modules.length) * Math.PI * 2 + 0.4;
-        const mRadius = 2.8 + mIdx * 0.4;
+        const mRadius = 2.8 + mIdx * 0.3;
         const mPos = new THREE.Vector3(
           hubX + Math.cos(mAngle) * mRadius,
           hubY + Math.sin(mAngle * 2) * 0.8,
@@ -167,8 +167,8 @@ export function renderNeuralConstellationView(
         allNodes.push({
           mesh: mMesh,
           type: 'deepdive',
-          stageId: stage.id,
-          stageTitle,
+          stageId: domain.id,
+          stageTitle: domainTitle,
           isAdv: false,
           title: `【${mod.tag}】${mod.title}`,
           subtitle: `${platformName} 底层机制专题`,
@@ -178,9 +178,59 @@ export function renderNeuralConstellationView(
           pos: mPos,
         });
       });
-    } else {
+    });
+  } else {
+    // 16 Stages in Dual-Platform Roadmap Mode
+    stages.forEach((stage, sIdx) => {
+      const stageAngle = (sIdx / stages.length) * Math.PI * 2;
+      const stageRadius = 13.0;
+      const hubX = Math.cos(stageAngle) * stageRadius;
+      const hubZ = Math.sin(stageAngle) * stageRadius;
+      const hubY = Math.sin(sIdx * 0.8) * 1.8;
+      const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
+
+      const stageTitle = i18n.t(stage.titleKey);
+
+      // Level 1: Stage Core Hub
+      const hubGeom = new THREE.SphereGeometry(0.85, 32, 32);
+      const hubMat = new THREE.MeshStandardMaterial({
+        color: 0x0d9488,
+        emissive: 0x042f2e,
+        emissiveIntensity: 0.85,
+        roughness: 0.2,
+        metalness: 0.3,
+      });
+      const hubMesh = new THREE.Mesh(hubGeom, hubMat);
+      hubMesh.position.copy(hubPos);
+      palaceGroup.add(hubMesh);
+
+      // Dynamic Halo Ring
+      const haloGeom = new THREE.RingGeometry(1.15, 1.35, 32);
+      const haloMat = new THREE.MeshBasicMaterial({
+        color: 0x14b8a6,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.6,
+      });
+      const haloMesh = new THREE.Mesh(haloGeom, haloMat);
+      haloMesh.position.copy(hubPos);
+      haloMesh.rotation.x = Math.PI / 2;
+      palaceGroup.add(haloMesh);
+
+      allNodes.push({
+        mesh: hubMesh,
+        haloMesh,
+        type: 'stage',
+        stageId: stage.id,
+        stageTitle,
+        isAdv: false,
+        title: `${String(stage.number).padStart(2, '0')}. ${stageTitle} · 对照星核`,
+        subtitle: `阶段 ${String(stage.number).padStart(2, '0')} 星核`,
+        pos: hubPos,
+      });
+
       // Roadmap Mode: Concept Orbit Nodes & Golden Spark Nodes
-      const topRows = stage.rows.slice(0, 6);
+      const topRows = stage.rows.slice(0, 4);
       topRows.forEach((row, rIdx) => {
         const cAngle = (rIdx / topRows.length) * Math.PI * 2 + 0.3;
         const cRadius = 2.4;
@@ -225,16 +275,16 @@ export function renderNeuralConstellationView(
         const gRadius = 3.6;
         const gPos = new THREE.Vector3(
           hubX + Math.cos(gAngle) * gRadius,
-          hubY - 0.7 + Math.sin(gAngle) * 0.3,
+          hubY - 0.7 + Math.cos(gAngle) * 0.4,
           hubZ + Math.sin(gAngle) * gRadius
         );
 
-        const gGeom = new THREE.DodecahedronGeometry(0.18);
+        const gGeom = new THREE.OctahedronGeometry(0.18);
         const gMat = new THREE.MeshStandardMaterial({
-          color: 0xfbbf24,
+          color: 0xf59e0b,
           emissive: 0xd97706,
           emissiveIntensity: 0.9,
-          roughness: 0.1,
+          roughness: 0.2,
         });
         const gMesh = new THREE.Mesh(gGeom, gMat);
         gMesh.position.copy(gPos);
@@ -246,7 +296,7 @@ export function renderNeuralConstellationView(
 
         const noteText = i18n.t(noteKey);
         const tagMatch = noteText.match(/^【([^】]+)】\s*(.*)$/) || noteText.match(/^\[([^\]]+)\]\s*(.*)$/);
-        const tag = tagMatch ? tagMatch[1] : '避坑秘籍';
+        const tag = tagMatch ? tagMatch[1] : '双端避坑';
         const body = tagMatch ? tagMatch[2] : noteText;
 
         allNodes.push({
@@ -255,21 +305,22 @@ export function renderNeuralConstellationView(
           stageId: stage.id,
           stageTitle,
           isAdv: false,
-          title: `【${tag}】`,
-          subtitle: '黄金避坑灵光',
+          title: `【${tag}】${stageTitle}避坑`,
+          subtitle: '双端互通关键陷阱',
           noteTag: tag,
           noteBody: body,
           pos: gPos,
         });
       });
-    }
-  });
+    });
+  }
 
-  // Inter-Stage Macro Constellation Beams
-  for (let i = 0; i < stages.length; i++) {
-    const nextIdx = (i + 1) % stages.length;
-    const p1 = allNodes.find((n) => n.type === 'stage' && n.stageId === stages[i].id)?.pos;
-    const p2 = allNodes.find((n) => n.type === 'stage' && n.stageId === stages[nextIdx].id)?.pos;
+  // Inter-Stage / Inter-Domain Macro Constellation Beams
+  const currentList = knowledgeMode === 'deepdive' ? deepDiveDomains : stages;
+  for (let i = 0; i < currentList.length; i++) {
+    const nextIdx = (i + 1) % currentList.length;
+    const p1 = allNodes.find((n) => n.type === 'stage' && n.stageId === currentList[i].id)?.pos;
+    const p2 = allNodes.find((n) => n.type === 'stage' && n.stageId === currentList[nextIdx].id)?.pos;
     if (p1 && p2) {
       const beamGeom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
       const beamMat = new THREE.LineDashedMaterial({

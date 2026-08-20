@@ -12,7 +12,7 @@ export function renderHeader(
 
   const isRoadmap = docMode === 'roadmap';
   const mainTitle = isRoadmap ? 'Android ⟷ iOS · 双端路线图' : '单端深度进阶';
-  const badgeTitle = isRoadmap ? '双端对照' : (deepDivePlatform === 'android' ? 'Android 内幕' : 'iOS 内幕');
+  const badgeTitle = isRoadmap ? '双端对照 (16 阶段)' : (deepDivePlatform === 'android' ? 'Android 内幕 (5 领域)' : 'iOS 内幕 (5 领域)');
 
   let centerPlatformSwitchHtml = '';
   if (!isRoadmap) {

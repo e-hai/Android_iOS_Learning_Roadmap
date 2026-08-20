@@ -1,4 +1,4 @@
-import { PlatformDeepDive } from '../models/types';
+import { DeepDiveDomain, PlatformDeepDive } from '../models/types';
 
 export const deepDivesData: Record<string, PlatformDeepDive> = {
   domain_01_basics: {
@@ -492,3 +492,41 @@ func requestTrackingAuthorization() {
     ],
   },
 };
+
+export const deepDiveDomains: DeepDiveDomain[] = [
+  {
+    id: 'domain_01_basics',
+    number: 1,
+    titleKey: 'stage.domain_01_basics.title',
+    descKey: 'stage.domain_01_basics.goal',
+    deepDive: deepDivesData.domain_01_basics,
+  },
+  {
+    id: 'domain_02_arch',
+    number: 2,
+    titleKey: 'stage.domain_02_arch.title',
+    descKey: 'stage.domain_02_arch.goal',
+    deepDive: deepDivesData.domain_02_arch,
+  },
+  {
+    id: 'domain_03_perf',
+    number: 3,
+    titleKey: 'stage.domain_03_perf.title',
+    descKey: 'stage.domain_03_perf.goal',
+    deepDive: deepDivesData.domain_03_perf,
+  },
+  {
+    id: 'domain_04_media',
+    number: 4,
+    titleKey: 'stage.domain_04_media.title',
+    descKey: 'stage.domain_04_media.goal',
+    deepDive: deepDivesData.domain_04_media,
+  },
+  {
+    id: 'domain_05_global',
+    number: 5,
+    titleKey: 'stage.domain_05_global.title',
+    descKey: 'stage.domain_05_global.goal',
+    deepDive: deepDivesData.domain_05_global,
+  },
+];

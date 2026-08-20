@@ -38,6 +38,14 @@ export interface LearningStage {
   deepDive?: PlatformDeepDive;
 }
 
+export interface DeepDiveDomain {
+  id: string;
+  number: number;
+  titleKey: string;
+  descKey: string;
+  deepDive: PlatformDeepDive;
+}
+
 export type Language = 'zh-Hans' | 'en';
 
 export type NavigationTarget = 'home' | string; // 'home' or stage id

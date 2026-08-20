@@ -128,19 +128,19 @@ export function renderHomeView(
   `;
   container.appendChild(personasSection);
 
-  personasSection.querySelector('#btn-persona-compose')?.addEventListener('click', () => onNavigate('domain_01_basics'));
-  personasSection.querySelector('#btn-persona-xml')?.addEventListener('click', () => onNavigate('domain_01_basics'));
-  personasSection.querySelector('#btn-persona-arch')?.addEventListener('click', () => onNavigate('domain_02_arch'));
+  personasSection.querySelector('#btn-persona-compose')?.addEventListener('click', () => onNavigate('ui'));
+  personasSection.querySelector('#btn-persona-xml')?.addEventListener('click', () => onNavigate('env'));
+  personasSection.querySelector('#btn-persona-arch')?.addEventListener('click', () => onNavigate('arch'));
 
-  // 4. 5-Domain Full Roadmap Matrix
+  // 4. 16-Stage Full Roadmap Matrix
   const matrixSection = document.createElement('div');
   matrixSection.id = 'home-roadmap-matrix';
   matrixSection.innerHTML = `
     <div class="section-header" style="margin-top:20px;">
       <div class="section-header-bar" style="background:linear-gradient(90deg, var(--color-android), var(--color-ios));"></div>
-      <span class="section-header-title">5 大核心领域工程矩阵</span>
+      <span class="section-header-title">${i18n.t('home.matrix.title')}</span>
     </div>
-    <p style="font-size:13.5px;color:var(--color-ink-muted);margin-bottom:16px;">全 5 大核心领域双端工程对照矩阵，点击直接开启对应领域探索：</p>
+    <p style="font-size:13.5px;color:var(--color-ink-muted);margin-bottom:16px;">全 16 阶段双端工程对照矩阵，点击直接开启对应阶段探索：</p>
 
     <div class="matrix-grid" id="matrix-grid-all"></div>
   `;
