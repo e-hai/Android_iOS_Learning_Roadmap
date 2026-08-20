@@ -56,8 +56,6 @@ function renderSingleChapterView(
 ) {
   const mod = modules[chapterIndex];
   const domainIndex = deepDiveDomains.findIndex((d) => d.id === domain.id);
-  const platformName = platform === 'android' ? 'Android' : 'iOS';
-  const platformColor = platform === 'android' ? 'var(--color-android)' : 'var(--color-ios)';
   const totalChapters = modules.length;
   const chapterNumberStr = String(chapterIndex + 1).padStart(2, '0');
   const totalChaptersStr = String(totalChapters).padStart(2, '0');
@@ -76,31 +74,11 @@ function renderSingleChapterView(
   breadcrumb.querySelector('#btn-crumb-domain')?.addEventListener('click', () => onSelectStage(domain.id));
   container.appendChild(breadcrumb);
 
-  // Chapter Header
+  // Chapter Header (Clean title only)
   const header = document.createElement('div');
   header.className = 'stage-detail-header chapter-page-header';
   header.innerHTML = `
-    <div class="stage-detail-meta">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span class="chip chip-main" style="background:${platform === 'android' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.15)'};color:${platformColor};font-weight:700;border:1px solid ${platformColor};">
-          ${platform === 'android' ? '🟢 Android' : '🔵 iOS'} 单端进阶
-        </span>
-        <span class="chip chip-main">
-          领域 ${String(domain.number).padStart(2, '0')} · ${i18n.t(domain.titleKey)}
-        </span>
-        <span class="deep-dive-tag" style="background:${platform === 'android' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(14, 165, 233, 0.12)'};color:${platformColor};border:1px solid ${platform === 'android' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(14, 165, 233, 0.3)'};">
-          ${mod.tag}
-        </span>
-      </div>
-      <span class="stage-number-large">${chapterNumberStr} / ${totalChaptersStr}</span>
-    </div>
-
-    <h1 class="stage-title" style="font-size:25px;margin-top:4px;">${mod.title}</h1>
-    <div class="chapter-quick-meta" style="display:flex;gap:16px;font-size:12.5px;color:var(--color-ink-muted);margin-top:6px;flex-wrap:wrap;">
-      <span>📖 章节进度：<strong>第 ${chapterNumberStr} / ${totalChaptersStr} 节</strong></span>
-      <span>🏷️ 核心分类：<strong>${mod.tag}</strong></span>
-      <span>⚡ 技术层级：<strong>${platformName} 底层运行机制与源码实战</strong></span>
-    </div>
+    <h1 class="stage-title" style="font-size:26px;margin-top:4px;">${mod.title}</h1>
   `;
   container.appendChild(header);
 
@@ -239,36 +217,12 @@ function renderDomainTocView(
   breadcrumb.querySelector('#btn-crumb-overview')?.addEventListener('click', () => onSelectStage('all'));
   container.appendChild(breadcrumb);
 
-  // Domain Header
+  // Domain Header (Clean title only)
   const header = document.createElement('div');
   header.className = 'stage-detail-header';
   header.innerHTML = `
-    <div class="stage-detail-meta">
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span class="chip chip-main" style="background:${platform === 'android' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.15)'};color:${platformColor};font-weight:700;border:1px solid ${platformColor};">
-          ${platform === 'android' ? '🟢 Android' : '🔵 iOS'} 单端进阶
-        </span>
-        <span class="chip chip-main">
-          领域 ${String(domain.number).padStart(2, '0')} · 共 ${modules.length} 节
-        </span>
-      </div>
-      <span class="stage-number-large">${String(domain.number).padStart(2, '0')}</span>
-    </div>
-
     <h1 class="stage-title">${i18n.t(domain.titleKey)} · ${platformName} 进阶大纲</h1>
-    <p class="stage-goal" style="margin-bottom:14px;">
-      共包含 <strong>${modules.length} 个独立进阶章节</strong>。点击任意章节卡片进入独立研读与实操。
-    </p>
-
-    <div>
-      <button class="btn btn-primary btn-sm" id="btn-start-first-chapter" style="background:${platformColor};border:none;">
-        🚀 从第 01 节开始学习 ➔
-      </button>
-    </div>
   `;
-  header.querySelector('#btn-start-first-chapter')?.addEventListener('click', () => {
-    onSelectStage(`${domain.id}:0`);
-  });
   container.appendChild(header);
 
   // Chapter Cards Grid

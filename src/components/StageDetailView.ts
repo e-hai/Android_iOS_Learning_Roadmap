@@ -11,18 +11,10 @@ export function renderStageDetail(
   const container = document.createElement('div');
   container.className = 'content-container';
 
-  // Header
+  // Header (Clean title only)
   const header = document.createElement('div');
   header.className = 'stage-detail-header';
   header.innerHTML = `
-    <div class="stage-detail-meta">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span class="chip chip-main">
-          双端对照 · 模块 ${String(stage.number).padStart(2, '0')}
-        </span>
-      </div>
-      <span class="stage-number-large">${String(stage.number).padStart(2, '0')}</span>
-    </div>
     <h1 class="stage-detail-title">${i18n.t(stage.titleKey)}</h1>
   `;
   container.appendChild(header);
