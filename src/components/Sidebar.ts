@@ -29,7 +29,7 @@ export function renderSidebar(
   } else {
     topItem.innerHTML = `
       <span style="font-size:15px;flex-shrink:0;">${deepDivePlatform === 'android' ? '🟢' : '🔵'}</span>
-      <span class="sidebar-item-title" style="font-weight:700;">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 进阶总览 (16 阶段)</span>
+      <span class="sidebar-item-title" style="font-weight:700;">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 进阶总览 (5 大领域)</span>
     `;
     topItem.addEventListener('click', () => onSelect('all'));
   }
@@ -37,10 +37,10 @@ export function renderSidebar(
   topSection.appendChild(topItem);
   sidebar.appendChild(topSection);
 
-  // 2. Unified 16 Stages Section
+  // 2. Unified 5 Domains Section
   const stagesSection = document.createElement('div');
   stagesSection.className = 'sidebar-section';
-  stagesSection.innerHTML = `<span class="sidebar-section-title main-title">${docMode === 'roadmap' ? '16 个学习阶段' : `${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 16 阶段进阶`}</span>`;
+  stagesSection.innerHTML = `<span class="sidebar-section-title main-title">${docMode === 'roadmap' ? '5 大核心领域' : `${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 5 大领域进阶`}</span>`;
 
   stages.forEach((stage) => {
     const isActive = currentStageId === stage.id;

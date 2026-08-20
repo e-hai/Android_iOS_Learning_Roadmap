@@ -88,16 +88,16 @@ export function renderNeuralConstellationView(
 
   stages.forEach((stage, sIdx) => {
     const stageAngle = (sIdx / stages.length) * Math.PI * 2;
-    const stageRadius = 13.0;
+    const stageRadius = 11.0;
     const hubX = Math.cos(stageAngle) * stageRadius;
     const hubZ = Math.sin(stageAngle) * stageRadius;
-    const hubY = Math.sin(sIdx * 0.8) * 1.8;
+    const hubY = Math.sin(sIdx * 1.2) * 1.5;
     const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
 
     const stageTitle = i18n.t(stage.titleKey);
 
     // Level 1: Stage Core Hub
-    const hubGeom = new THREE.SphereGeometry(0.85, 32, 32);
+    const hubGeom = new THREE.SphereGeometry(1.0, 32, 32);
     const hubMat = new THREE.MeshStandardMaterial({
       color: knowledgeMode === 'deepdive' ? platformColor : 0x0d9488,
       emissive: knowledgeMode === 'deepdive' ? platformEmissive : 0x042f2e,
@@ -110,7 +110,7 @@ export function renderNeuralConstellationView(
     palaceGroup.add(hubMesh);
 
     // Dynamic Halo Ring
-    const haloGeom = new THREE.RingGeometry(1.15, 1.35, 32);
+    const haloGeom = new THREE.RingGeometry(1.35, 1.55, 32);
     const haloMat = new THREE.MeshBasicMaterial({
       color: knowledgeMode === 'deepdive' ? platformColor : 0x14b8a6,
       side: THREE.DoubleSide,
@@ -180,7 +180,7 @@ export function renderNeuralConstellationView(
       });
     } else {
       // Roadmap Mode: Concept Orbit Nodes & Golden Spark Nodes
-      const topRows = stage.rows.slice(0, 4);
+      const topRows = stage.rows.slice(0, 6);
       topRows.forEach((row, rIdx) => {
         const cAngle = (rIdx / topRows.length) * Math.PI * 2 + 0.3;
         const cRadius = 2.4;

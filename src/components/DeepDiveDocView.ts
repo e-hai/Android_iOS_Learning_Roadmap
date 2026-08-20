@@ -179,8 +179,8 @@ function renderPlatformOverview(
     <h1 class="portal-hero-title">${platformName} 单端底层运行内幕与高级调优</h1>
     <p class="portal-hero-desc">
       ${platform === 'android'
-        ? '深挖 Android 底层运行原理：从 JVM/ART 垃圾回收、LeakCanary 内存探测、Compose 插槽表与重组稳定性，到 Kotlin 协程 CPS 状态机、OkHttp 连接池复用、Room InvalidationTracker 源码与 R8 混淆优化。'
-        : '深挖 iOS 底层运行原理：从 Swift 内存布局与 COW、ARC 引用计数与 Side Table、SwiftUI 属性图与依赖追踪，到 Swift 严格并发 Actor 隔离、URLSession 后台守护进程、SwiftData 多线程 ModelContext 与 Apple 签名证书体系。'
+        ? '深挖 Android 底层运行原理：从 Kotlin 协程 K1/K2 状态机、JVM/ART 垃圾回收、Compose Slot Table 插槽表与重组优化，到 MVI 单向数据流、Perfetto 链路分析、Baseline Profiles 预编译、OpenGL ES/MediaCodec 管线与 Google Play Billing v6+ 出海订阅。'
+        : '深挖 iOS 底层运行原理：从 Swift 并发 Actor 隔离与 Task 树、Swift 内存布局与 COW、SwiftUI AttributeGraph 属性图，到 TCA 状态机、MetricKit 性能度量、Metal 图形渲染、VideoToolbox 硬编解码与 Apple StoreKit 2 全球订阅。'
       }
     </p>
   `;
