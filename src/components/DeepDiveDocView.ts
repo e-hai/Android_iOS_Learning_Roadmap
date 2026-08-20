@@ -18,7 +18,7 @@ export function renderDeepDiveDocView(
 
   // 2. Parse Domain ID and Chapter Index
   let domainId = currentStageId;
-  let chapterIndex: number | null = null;
+  let chapterIndex: number = 0;
 
   if (currentStageId.includes(':')) {
     const parts = currentStageId.split(':');
@@ -31,15 +31,10 @@ export function renderDeepDiveDocView(
 
   const domain = deepDiveDomains.find((d) => d.id === domainId) || deepDiveDomains[0];
   const modules: DeepDiveModule[] = platform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
+  const validChapterIndex = chapterIndex >= 0 && chapterIndex < modules.length ? chapterIndex : 0;
 
-  // 3. If a specific chapter index is specified, render the Single Chapter Page
-  if (chapterIndex !== null && chapterIndex >= 0 && chapterIndex < modules.length) {
-    renderSingleChapterView(container, domain, chapterIndex, modules, platform, onSelectStage);
-    return container;
-  }
-
-  // 4. Otherwise, render the Domain Table of Contents (大纲概览页)
-  renderDomainTocView(container, domain, modules, platform, onSelectStage);
+  // 3. Render the Single Chapter Page directly
+  renderSingleChapterView(container, domain, validChapterIndex, modules, platform, onSelectStage);
   return container;
 }
 
@@ -57,8 +52,6 @@ function renderSingleChapterView(
   const mod = modules[chapterIndex];
   const domainIndex = deepDiveDomains.findIndex((d) => d.id === domain.id);
   const totalChapters = modules.length;
-  const chapterNumberStr = String(chapterIndex + 1).padStart(2, '0');
-  const totalChaptersStr = String(totalChapters).padStart(2, '0');
 
   // Chapter Header (Clean title only)
   const header = document.createElement('div');
@@ -150,9 +143,6 @@ function renderSingleChapterView(
   navFooter.innerHTML = `
     <div class="stage-nav-buttons">
       ${prevBtnHtml}
-      <button class="btn btn-secondary btn-sm" id="btn-toc-jump" style="background:var(--color-surface);border:1px solid var(--color-border);">
-        📋 本领域大纲 (${chapterNumberStr}/${totalChaptersStr})
-      </button>
       ${nextBtnHtml}
     </div>
   `;
@@ -165,102 +155,12 @@ function renderSingleChapterView(
     navFooter.querySelector('#btn-prev-chap')?.addEventListener('click', () => onSelectStage(`${prevDomain.id}:${prevDomainMods.length - 1}`));
   }
 
-  navFooter.querySelector('#btn-toc-jump')?.addEventListener('click', () => onSelectStage(domain.id));
-
   if (nextChapter) {
     navFooter.querySelector('#btn-next-chap')?.addEventListener('click', () => onSelectStage(`${domain.id}:${chapterIndex + 1}`));
   } else if (nextDomain) {
     navFooter.querySelector('#btn-next-chap')?.addEventListener('click', () => onSelectStage(`${nextDomain.id}:0`));
   } else {
     navFooter.querySelector('#btn-finish-all')?.addEventListener('click', () => onSelectStage('all'));
-  }
-
-  container.appendChild(navFooter);
-}
-
-/**
- * Renders the Domain Table of Contents (TOC) Page.
- */
-function renderDomainTocView(
-  container: HTMLElement,
-  domain: DeepDiveDomain,
-  modules: DeepDiveModule[],
-  platform: 'android' | 'ios',
-  onSelectStage: (stageId: string) => void
-) {
-  const domainIndex = deepDiveDomains.findIndex((d) => d.id === domain.id);
-  const platformName = platform === 'android' ? 'Android' : 'iOS';
-  const platformColor = platform === 'android' ? 'var(--color-android)' : 'var(--color-ios)';
-
-  // Domain Header (Clean title only)
-  const header = document.createElement('div');
-  header.className = 'stage-detail-header';
-  header.innerHTML = `
-    <h1 class="stage-title">${i18n.t(domain.titleKey)} · ${platformName} 进阶大纲</h1>
-  `;
-  container.appendChild(header);
-
-  // Chapter Cards Grid
-  const tocSection = document.createElement('section');
-  tocSection.className = 'domain-toc-section';
-  tocSection.innerHTML = `
-    <div class="section-header">
-      <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-      <h2 class="section-header-title">领域章节目录清单</h2>
-    </div>
-  `;
-
-  const cardsGrid = document.createElement('div');
-  cardsGrid.className = 'domain-toc-grid';
-
-  modules.forEach((mod, mIdx) => {
-    const card = document.createElement('div');
-    card.className = 'domain-toc-card';
-    card.style.cursor = 'pointer';
-
-    card.innerHTML = `
-      <div class="domain-toc-card-header">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span class="domain-toc-chap-num">第 ${String(mIdx + 1).padStart(2, '0')} 节</span>
-          <span class="deep-dive-tag" style="background:${platform === 'android' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(14, 165, 233, 0.12)'};color:${platformColor};border:1px solid ${platform === 'android' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(14, 165, 233, 0.3)'};">
-            ${mod.tag}
-          </span>
-        </div>
-        <span class="domain-toc-enter-link" style="color:var(--color-accent);font-size:12px;font-weight:600;">进入 ➔</span>
-      </div>
-      <h3 class="domain-toc-card-title">${mod.title}</h3>
-      <p class="domain-toc-card-desc">${truncateText(mod.explanation, 95)}</p>
-    `;
-
-    card.addEventListener('click', () => {
-      onSelectStage(`${domain.id}:${mIdx}`);
-    });
-
-    cardsGrid.appendChild(card);
-  });
-
-  tocSection.appendChild(cardsGrid);
-  container.appendChild(tocSection);
-
-  // Bottom Navigator: Prev / Next Domain only
-  const navFooter = document.createElement('div');
-  navFooter.className = 'stage-nav-footer';
-
-  const prevDomain = domainIndex > 0 ? deepDiveDomains[domainIndex - 1] : null;
-  const nextDomain = domainIndex < deepDiveDomains.length - 1 ? deepDiveDomains[domainIndex + 1] : null;
-
-  navFooter.innerHTML = `
-    <div class="stage-nav-buttons">
-      ${prevDomain ? `<button class="btn btn-secondary btn-sm" id="btn-prev-domain">← 上一领域: ${i18n.t(prevDomain.titleKey)}</button>` : '<div></div>'}
-      ${nextDomain ? `<button class="btn btn-secondary btn-sm" id="btn-next-domain">下一领域: ${i18n.t(nextDomain.titleKey)} →</button>` : '<div></div>'}
-    </div>
-  `;
-
-  if (prevDomain) {
-    navFooter.querySelector('#btn-prev-domain')?.addEventListener('click', () => onSelectStage(prevDomain.id));
-  }
-  if (nextDomain) {
-    navFooter.querySelector('#btn-next-domain')?.addEventListener('click', () => onSelectStage(nextDomain.id));
   }
 
   container.appendChild(navFooter);
@@ -321,13 +221,7 @@ function renderPlatformOverview(
         <h2 class="portal-stage-title" style="font-size:15.5px;">${i18n.t(domain.titleKey)}</h2>
         <span style="font-size:12px;color:var(--color-ink-muted);">(${modules.length} 节)</span>
       </div>
-      <button class="btn btn-ghost btn-sm" id="btn-view-domain-toc-${domain.id}" style="color:var(--color-accent);font-weight:600;font-size:12px;padding:2px 8px;">
-        大纲 ➔
-      </button>
     `;
-    groupHeader.querySelector(`#btn-view-domain-toc-${domain.id}`)?.addEventListener('click', () => {
-      onSelectStage(domain.id);
-    });
     domainGroup.appendChild(groupHeader);
 
     // Streamlined compact chapter cards

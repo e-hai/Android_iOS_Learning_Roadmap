@@ -69,7 +69,6 @@ export function renderSidebar(
     domainsSection.innerHTML = `<span class="sidebar-section-title main-title">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 进阶知识树</span>`;
 
     deepDiveDomains.forEach((domain) => {
-      const isDomainActive = currentStageId === domain.id;
       const mods = deepDivePlatform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
       const displayTitle = i18n.t(domain.titleKey);
 
@@ -77,15 +76,14 @@ export function renderSidebar(
       const domainGroup = document.createElement('div');
       domainGroup.className = 'sidebar-domain-group';
 
-      // Domain Section Header (Clickable to view Domain TOC)
-      const domainHeader = document.createElement('button');
-      domainHeader.className = `sidebar-domain-header ${isDomainActive ? 'active' : ''}`;
+      // Domain Section Header (Static divider label, not clickable)
+      const domainHeader = document.createElement('div');
+      domainHeader.className = 'sidebar-domain-header';
       domainHeader.innerHTML = `
         <span class="sidebar-domain-num">${String(domain.number).padStart(2, '0')}</span>
         <span class="sidebar-domain-title">${displayTitle}</span>
         <span class="sidebar-domain-count">${mods ? mods.length : 0} 节</span>
       `;
-      domainHeader.addEventListener('click', () => onSelect(domain.id));
       domainGroup.appendChild(domainHeader);
 
       // Flat Knowledge Point List
