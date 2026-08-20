@@ -64,7 +64,7 @@ function renderSingleChapterView(
   const breadcrumb = document.createElement('nav');
   breadcrumb.className = 'chapter-breadcrumb';
   breadcrumb.innerHTML = `
-    <button class="breadcrumb-btn" id="btn-crumb-overview">5 大领域进阶</button>
+    <button class="breadcrumb-btn" id="btn-crumb-overview">进阶总览</button>
     <span class="breadcrumb-sep">/</span>
     <button class="breadcrumb-btn" id="btn-crumb-domain">${i18n.t(domain.titleKey)}</button>
     <span class="breadcrumb-sep">/</span>
@@ -210,7 +210,7 @@ function renderDomainTocView(
   const breadcrumb = document.createElement('nav');
   breadcrumb.className = 'chapter-breadcrumb';
   breadcrumb.innerHTML = `
-    <button class="breadcrumb-btn" id="btn-crumb-overview">5 大领域进阶</button>
+    <button class="breadcrumb-btn" id="btn-crumb-overview">进阶总览</button>
     <span class="breadcrumb-sep">/</span>
     <span class="breadcrumb-current">${i18n.t(domain.titleKey)}</span>
   `;
@@ -318,7 +318,7 @@ function renderPlatformOverview(
       <span class="portal-hero-badge" style="color:${platform === 'android' ? '#059669' : '#0284c7'};background:${platform === 'android' ? 'rgba(16,185,129,0.1)' : 'rgba(14,165,233,0.1)'};border-color:${platform === 'android' ? 'rgba(16,185,129,0.25)' : 'rgba(14,165,233,0.25)'};">
         ${platform === 'android' ? '🟢 Android' : '🔵 iOS'} 单端深度进阶
       </span>
-      <span class="portal-hero-subtag">5 大领域 · 共 ${totalModules} 个独立进阶章节</span>
+      <span class="portal-hero-subtag">共 ${totalModules} 个独立进阶章节</span>
     </div>
     <h1 class="portal-hero-title" style="font-size:22px;">${platformName} 底层运行机制与实战手册</h1>
     <p class="portal-hero-desc" style="font-size:13.5px;">

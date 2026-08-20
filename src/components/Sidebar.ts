@@ -30,7 +30,7 @@ export function renderSidebar(
   } else {
     topItem.innerHTML = `
       <span style="font-size:15px;flex-shrink:0;">${deepDivePlatform === 'android' ? '🟢' : '🔵'}</span>
-      <span class="sidebar-item-title" style="font-weight:700;">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 进阶总览 (5 大领域)</span>
+      <span class="sidebar-item-title" style="font-weight:700;">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 进阶总览</span>
     `;
     topItem.addEventListener('click', () => onSelect('all'));
   }
@@ -63,10 +63,10 @@ export function renderSidebar(
 
     sidebar.appendChild(stagesSection);
   } else {
-    // 2. Single-Platform Deep Dive: 5 Industrial Domains Accordion
+    // 2. Single-Platform Deep Dive: Domains Accordion
     const domainsSection = document.createElement('div');
     domainsSection.className = 'sidebar-section';
-    domainsSection.innerHTML = `<span class="sidebar-section-title main-title">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 5 大领域进阶</span>`;
+    domainsSection.innerHTML = `<span class="sidebar-section-title main-title">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 进阶领域</span>`;
 
     deepDiveDomains.forEach((domain) => {
       const isDomainActive = currentStageId === domain.id;
@@ -159,7 +159,7 @@ export function renderSidebar(
         <span style="font-size:18px;">💡</span>
         <div style="flex:1;overflow:hidden;">
           <div style="font-size:12px;font-weight:700;color:var(--color-ink);line-height:1.2;">切换至：单端深度进阶</div>
-          <div style="font-size:11px;color:var(--color-ink-muted);margin-top:2px;">5 大工业级领域底层内幕 ➔</div>
+          <div style="font-size:11px;color:var(--color-ink-muted);margin-top:2px;">单端底层运行机制与进阶实战 ➔</div>
         </div>
       `;
       switchBtn.addEventListener('click', () => onSwitchDocMode('deepdive'));
