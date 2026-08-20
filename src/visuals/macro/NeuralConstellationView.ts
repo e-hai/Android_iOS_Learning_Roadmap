@@ -24,8 +24,10 @@ interface PalaceNode {
   pos: THREE.Vector3;
 }
 
+export type AppViewMode = 'roadmap' | 'deepdive' | '3d';
+
 export function renderNeuralConstellationView(
-  onSwitchViewMode: (mode: '3d' | 'doc') => void
+  onSwitchViewMode: (mode: AppViewMode) => void
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = 'constellation-view-container';
@@ -50,80 +52,69 @@ export function renderNeuralConstellationView(
   const starCount = 450;
   const starPositions = new Float32Array(starCount * 3);
   for (let i = 0; i < starCount * 3; i += 3) {
-    starPositions[i] = (Math.random() - 0.5) * 80;
-    starPositions[i + 1] = (Math.random() - 0.5) * 60;
-    starPositions[i + 2] = (Math.random() - 0.5) * 80;
+    starPositions[i] = (Math.random() - 0.5) * 120;
+    starPositions[i + 1] = (Math.random() - 0.5) * 120;
+    starPositions[i + 2] = (Math.random() - 0.5) * 120;
   }
   starGeom.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
   const starMat = new THREE.PointsMaterial({
-    color: sceneManager.theme.isDark ? 0x64748b : 0x94a3b8,
-    size: 0.18,
+    color: 0x94a3b8,
+    size: 0.6,
     transparent: true,
-    opacity: 0.65,
+    opacity: 0.7,
   });
-  const starField = new THREE.Points(starGeom, starMat);
-  scene.add(starField);
+  const stars = new THREE.Points(starGeom, starMat);
+  scene.add(stars);
 
-  // 2. Build Memory Palace Node Graph
+  // 2. Build 3D Holmes Memory Palace Node Network
   const allNodes: PalaceNode[] = [];
-  const stageHubPositions: { id: string; pos: THREE.Vector3 }[] = [];
-
-  const lineMatDim = new THREE.LineBasicMaterial({
-    color: sceneManager.theme.isDark ? 0x1e293b : 0xcbd5e1,
-    transparent: true,
-    opacity: 0.35,
-  });
-
   const lineMatSynapse = new THREE.LineBasicMaterial({
-    color: 0x14b8a6,
+    color: 0x38bdf8,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.25,
   });
-
-  const lineMatSpark = new THREE.LineBasicMaterial({
+  const lineMatGolden = new THREE.LineBasicMaterial({
     color: 0xfbbf24,
     transparent: true,
     opacity: 0.35,
   });
 
-  // Level 1: Stage Hubs
-  stages.forEach((stage, idx) => {
+  stages.forEach((stage, sIdx) => {
+    const stageAngle = (sIdx / stages.length) * Math.PI * 2;
     const isAdv = stage.isAdvanced;
-    const angle = (idx / stages.length) * Math.PI * 2;
-    const ringRadius = isAdv ? 17.5 : 13.0;
-    const hubX = Math.cos(angle) * ringRadius;
-    const hubY = Math.sin(angle * 2) * 2.5 + (isAdv ? -1.0 : 1.0);
-    const hubZ = Math.sin(angle) * ringRadius;
+    const stageRadius = isAdv ? 16 : 10;
+    const hubX = Math.cos(stageAngle) * stageRadius;
+    const hubZ = Math.sin(stageAngle) * stageRadius;
+    const hubY = Math.sin(sIdx * 0.9) * 2.2;
     const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
-    stageHubPositions.push({ id: stage.id, pos: hubPos });
 
-    // Stage Hub Mesh
-    const hubGeom = new THREE.SphereGeometry(0.48, 24, 24);
-    const hubColor = isAdv ? 0x38bdf8 : 0x22c55e;
+    const stageTitle = i18n.t(stage.titleKey);
+
+    // Level 1: Stage Core Hub
+    const hubGeom = new THREE.SphereGeometry(isAdv ? 0.7 : 0.9, 32, 32);
     const hubMat = new THREE.MeshStandardMaterial({
-      color: hubColor,
-      emissive: hubColor,
-      emissiveIntensity: 0.75,
+      color: isAdv ? 0xa855f7 : 0x0d9488,
+      emissive: isAdv ? 0x6b21a8 : 0x042f2e,
+      emissiveIntensity: 0.8,
       roughness: 0.2,
-      metalness: 0.8,
+      metalness: 0.3,
     });
     const hubMesh = new THREE.Mesh(hubGeom, hubMat);
     hubMesh.position.copy(hubPos);
     palaceGroup.add(hubMesh);
 
-    // Outer Rotating Halo
-    const haloGeom = new THREE.SphereGeometry(0.72, 16, 16);
+    // Dynamic Halo Ring
+    const haloGeom = new THREE.RingGeometry(isAdv ? 1.0 : 1.3, isAdv ? 1.15 : 1.45, 32);
     const haloMat = new THREE.MeshBasicMaterial({
-      color: hubColor,
+      color: isAdv ? 0xc084fc : 0x14b8a6,
+      side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.22,
-      wireframe: true,
+      opacity: 0.6,
     });
     const haloMesh = new THREE.Mesh(haloGeom, haloMat);
     haloMesh.position.copy(hubPos);
+    haloMesh.rotation.x = Math.PI / 2;
     palaceGroup.add(haloMesh);
-
-    const stageTitle = i18n.t(stage.titleKey);
 
     allNodes.push({
       mesh: hubMesh,
@@ -133,8 +124,7 @@ export function renderNeuralConstellationView(
       stageTitle,
       isAdv,
       title: stageTitle,
-      subtitle: '核心概念 · 黄金避坑秘籍',
-      explanation: i18n.t(stage.goalKey),
+      subtitle: isAdv ? '进阶扩展星域' : '核心主线星核',
       pos: hubPos,
     });
 
@@ -180,84 +170,70 @@ export function renderNeuralConstellationView(
       });
     });
 
-    // Level 3: Golden Pitfall Spark Nodes (4 golden memory sparks)
-    const noteKeys = stage.noteKeys || [];
-    noteKeys.forEach((nk, nIdx) => {
-      const sAngle = (nIdx / 4) * Math.PI * 2 + 0.7;
-      const sRadius = 1.8;
-      const sPos = new THREE.Vector3(
-        hubX + Math.cos(sAngle) * sRadius,
-        hubY - 0.9 - Math.sin(sAngle) * 0.3,
-        hubZ + Math.sin(sAngle) * sRadius
+    // Level 3: Golden Spark Nodes (4 Pitfall Rules)
+    stage.noteKeys.forEach((noteKey, nIdx) => {
+      const gAngle = (nIdx / stage.noteKeys.length) * Math.PI * 2 - 0.5;
+      const gRadius = 3.6;
+      const gPos = new THREE.Vector3(
+        hubX + Math.cos(gAngle) * gRadius,
+        hubY - 0.7 + Math.sin(gAngle) * 0.3,
+        hubZ + Math.sin(gAngle) * gRadius
       );
 
-      const sGeom = new THREE.SphereGeometry(0.16, 16, 16);
-      const sMat = new THREE.MeshStandardMaterial({
+      const gGeom = new THREE.DodecahedronGeometry(0.18);
+      const gMat = new THREE.MeshStandardMaterial({
         color: 0xfbbf24,
         emissive: 0xd97706,
         emissiveIntensity: 0.9,
         roughness: 0.1,
       });
-      const sMesh = new THREE.Mesh(sGeom, sMat);
-      sMesh.position.copy(sPos);
-      palaceGroup.add(sMesh);
+      const gMesh = new THREE.Mesh(gGeom, gMat);
+      gMesh.position.copy(gPos);
+      palaceGroup.add(gMesh);
 
-      // Spark connection to Hub
-      const sLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, sPos]);
-      const sLine = new THREE.Line(sLineGeom, lineMatSpark);
-      palaceGroup.add(sLine);
+      // Golden Fiber Connection
+      const gLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, gPos]);
+      const gLine = new THREE.Line(gLineGeom, lineMatGolden);
+      palaceGroup.add(gLine);
 
-      const fullText = i18n.t(nk);
-      const tagMatch = fullText.match(/^【([^】]+)】\s*(.*)$/) || fullText.match(/^\[([^\]]+)\]\s*(.*)$/);
-      const tag = tagMatch ? tagMatch[1] : '避坑法则';
-      const body = tagMatch ? tagMatch[2] : fullText;
+      const noteText = i18n.t(noteKey);
+      const tagMatch = noteText.match(/^【([^】]+)】\s*(.*)$/) || noteText.match(/^\[([^\]]+)\]\s*(.*)$/);
+      const tag = tagMatch ? tagMatch[1] : '避坑秘籍';
+      const body = tagMatch ? tagMatch[2] : noteText;
 
       allNodes.push({
-        mesh: sMesh,
+        mesh: gMesh,
         type: 'spark',
         stageId: stage.id,
         stageTitle,
         isAdv,
         title: `【${tag}】`,
-        subtitle: '黄金避坑秘籍',
+        subtitle: '黄金避坑灵光',
         noteTag: tag,
         noteBody: body,
-        explanation: body,
-        pos: sPos,
+        pos: gPos,
       });
     });
   });
 
-  // Inter-Hub Synaptic Highways
-  for (let i = 0; i < stageHubPositions.length; i++) {
-    const nextIdx = (i + 1) % stageHubPositions.length;
-    const p1 = stageHubPositions[i].pos;
-    const p2 = stageHubPositions[nextIdx].pos;
-
-    const curve = new THREE.QuadraticBezierCurve3(
-      p1,
-      new THREE.Vector3((p1.x + p2.x) / 2, (p1.y + p2.y) / 2 + 1.2, (p1.z + p2.z) / 2),
-      p2
-    );
-    const points = curve.getPoints(24);
-    const geom = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(geom, lineMatDim);
-    palaceGroup.add(line);
-  }
-
-  // Moving Highway Electrons
-  const pulseGeom = new THREE.SphereGeometry(0.1, 12, 12);
-  const pulseMat = new THREE.MeshBasicMaterial({ color: 0x2dd4bf });
-  const pulseSpheres: { mesh: THREE.Mesh; fromIdx: number; progress: number }[] = [];
-
-  for (let i = 0; i < 10; i++) {
-    const p = new THREE.Mesh(pulseGeom, pulseMat);
-    palaceGroup.add(p);
-    pulseSpheres.push({
-      mesh: p,
-      fromIdx: Math.floor(Math.random() * (stageHubPositions.length - 1)),
-      progress: Math.random(),
-    });
+  // Inter-Stage Macro Constellation Beams
+  for (let i = 0; i < stages.length; i++) {
+    const nextIdx = (i + 1) % stages.length;
+    const p1 = allNodes.find((n) => n.type === 'stage' && n.stageId === stages[i].id)?.pos;
+    const p2 = allNodes.find((n) => n.type === 'stage' && n.stageId === stages[nextIdx].id)?.pos;
+    if (p1 && p2) {
+      const beamGeom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
+      const beamMat = new THREE.LineDashedMaterial({
+        color: 0x0d9488,
+        dashSize: 0.6,
+        gapSize: 0.4,
+        transparent: true,
+        opacity: 0.35,
+      });
+      const beam = new THREE.Line(beamGeom, beamMat);
+      beam.computeLineDistances();
+      palaceGroup.add(beam);
+    }
   }
 
   // 3. Unified 3D Mode Top Bar (Dedicated in 3D Mode)
@@ -273,22 +249,20 @@ export function renderNeuralConstellationView(
       </div>
 
       <div class="view-mode-toggle">
+        <button class="view-mode-btn" id="btn-mode-roadmap" title="切换为双端路线图">
+          🗺️ 路线图
+        </button>
+        <button class="view-mode-btn" id="btn-mode-deepdive" title="切换为单端深度进阶">
+          🌊 深度进阶
+        </button>
         <button class="view-mode-btn active" id="btn-mode-3d" title="当前：3D 星云模式">
           🌌 3D 星云
-        </button>
-        <button class="view-mode-btn" id="btn-mode-doc" title="切换为文档路线模式">
-          📄 文档
         </button>
       </div>
     </div>
 
-    <!-- Center: Palace Search & Filters -->
+    <!-- Center: Filter Tabs -->
     <div class="top-bar-center">
-      <div class="palace-search-box">
-        <svg class="palace-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" class="palace-search-input" id="palace-search-input" placeholder="在记忆宫殿中穿梭检索..." />
-      </div>
-
       <div class="constellation-filter-tabs">
         <button class="constellation-tab-btn active" data-filter="all">全部节点</button>
         <button class="constellation-tab-btn" data-filter="main">核心主线</button>
@@ -569,28 +543,14 @@ export function renderNeuralConstellationView(
   canvasWrap.addEventListener('click', onClick);
 
   // 8. Top Bar Event Listeners
-  topBar.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
-    onSwitchViewMode('doc');
+  topBar.querySelector('#btn-mode-roadmap')?.addEventListener('click', () => {
+    onSwitchViewMode('roadmap');
   });
-
-  const searchInput = topBar.querySelector('#palace-search-input') as HTMLInputElement;
-  searchInput?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      const q = searchInput.value.trim().toLowerCase();
-      if (!q) return;
-
-      const matchedNode = allNodes.find((n) =>
-        n.title.toLowerCase().includes(q) ||
-        (n.androidCode && n.androidCode.toLowerCase().includes(q)) ||
-        (n.iosCode && n.iosCode.toLowerCase().includes(q)) ||
-        (n.noteBody && n.noteBody.toLowerCase().includes(q))
-      );
-
-      if (matchedNode) {
-        flyToNode(matchedNode);
-        searchInput.blur();
-      }
-    }
+  topBar.querySelector('#btn-mode-deepdive')?.addEventListener('click', () => {
+    onSwitchViewMode('deepdive');
+  });
+  topBar.querySelector('#btn-mode-3d')?.addEventListener('click', () => {
+    onSwitchViewMode('3d');
   });
 
   // Top Filter Tabs
@@ -636,21 +596,8 @@ export function renderNeuralConstellationView(
   setInterval(() => {
     time += 0.015;
 
-    // Moving Highway Pulses
-    pulseSpheres.forEach((ps) => {
-      ps.progress += 0.006;
-      if (ps.progress >= 1) {
-        ps.progress = 0;
-        ps.fromIdx = (ps.fromIdx + 1) % stageHubPositions.length;
-      }
-      const toIdx = (ps.fromIdx + 1) % stageHubPositions.length;
-      const p1 = stageHubPositions[ps.fromIdx].pos;
-      const p2 = stageHubPositions[toIdx].pos;
-      ps.mesh.position.lerpVectors(p1, p2, ps.progress);
-    });
-
     // Starfield rotation
-    starField.rotation.y += 0.0003;
+    stars.rotation.y += 0.0003;
 
     // Gentle Node Pulse & Halo Rotation
     allNodes.forEach((n, idx) => {

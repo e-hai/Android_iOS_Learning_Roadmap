@@ -1021,5 +1021,229 @@
   white-space: pre;
 }
 
+/* ==========================================================================
+   Deep Dive Dedicated Portal View
+   ========================================================================== */
+.sidebar-toggle-btn.hidden {
+  display: none !important;
+}
+
+.portal-fullwidth-content {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px 24px 80px 24px;
+  width: 100%;
+}
+
+.deepdive-body-mode {
+  justify-content: center;
+}
+
+.deep-dive-portal-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.deep-dive-portal-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 28px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.deep-dive-portal-hero::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #10b981, #0ea5e9, #a855f7);
+}
+
+.portal-badge-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.portal-hero-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0284c7;
+  background: #0ea5e915;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid #0ea5e933;
+}
+
+.portal-hero-subtag {
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+}
+
+.portal-hero-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-ink);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.portal-hero-desc {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+  margin: 0;
+  max-width: 860px;
+}
+
+.portal-platform-tabs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.portal-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
+}
+
+.portal-tab-btn:hover {
+  color: var(--color-ink);
+  border-color: var(--color-border-hover);
+  transform: translateY(-1px);
+}
+
+.portal-tab-btn.btn-android.active {
+  color: #059669;
+  border-color: #10b981;
+  background: #10b98110;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);
+}
+
+.portal-tab-btn.btn-ios.active {
+  color: #0284c7;
+  border-color: #0ea5e9;
+  background: #0ea5e910;
+  box-shadow: 0 2px 8px rgba(14, 165, 233, 0.15);
+}
+
+.portal-filter-bar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+
+.portal-filter-pill {
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.portal-filter-pill:hover {
+  color: var(--color-ink);
+  border-color: var(--color-border-hover);
+}
+
+.portal-filter-pill.active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.portal-modules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.portal-stage-group {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.portal-stage-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--color-border);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.portal-stage-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.portal-stage-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
+.portal-stage-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.portal-jump-roadmap-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+}
+
+.portal-jump-roadmap-btn:hover {
+  background: var(--color-accent-soft);
+  text-decoration: underline;
+}
+
+
 
 

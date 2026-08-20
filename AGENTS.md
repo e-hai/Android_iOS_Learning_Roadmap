@@ -20,10 +20,10 @@
 3. **响应式与无障碍**：兼容移动端、平板与桌面宽屏，支持深色/浅色主题。
 4. **零服务器部署**：保证 `base: './'` 相对路径打包，产物直接支持 GitHub Pages、Cloudflare Pages、Vercel 等静态托管。
 
-## 文案与国际化
+## 文案规范
 
-- 用户可见文案全部进 `src/data/locales/`（`zh-Hans.ts` 和 `en.ts`）。
-- 代码中调用 `i18n.t("key")` 获取翻译。
+- 用户可见文案统一录入 `src/data/locales/zh-Hans.ts`。
+- 代码中调用 `i18n.t("key")` 获取文案。
 
 ## 验证命令
 

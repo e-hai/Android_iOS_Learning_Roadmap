@@ -14,7 +14,7 @@ export function renderHomeView(
   hero.innerHTML = `
     <div class="home-bridge-badge">
       <span style="color:var(--color-android);font-weight:800;">ANDROID</span>
-      <span style="color:var(--color-ink-muted);">→</span>
+      <span style="color:var(--color-ink-muted);">⟷</span>
       <span style="color:var(--color-ios);font-weight:800;">iOS</span>
     </div>
     <h1 class="home-title">${i18n.t('home.brand')}</h1>

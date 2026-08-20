@@ -1,24 +1,21 @@
 import './styles/theme.css';
 import './styles/layout.css';
 import './styles/components.css';
-import './styles/search.css';
 import './styles/visuals.css';
 
 import { stages } from './data/roadmap-data';
-import { i18n } from './services/i18n';
-import { renderHeader } from './components/Header';
+import { renderHeader, AppViewMode } from './components/Header';
 import { renderSidebar } from './components/Sidebar';
 import { renderHomeView } from './components/HomeView';
 import { renderStageDetail } from './components/StageDetailView';
-import { renderGlobalSearch } from './components/GlobalSearch';
+import { renderDeepDivePortalView } from './components/DeepDivePortalView';
 import { renderNeuralConstellationView } from './visuals/macro/NeuralConstellationView';
 
 class AppController {
   private currentTarget: string = 'home';
-  private currentViewMode: '3d' | 'doc' = (localStorage.getItem('learning_cockpit_view_mode') as '3d' | 'doc') || 'doc';
+  private currentViewMode: AppViewMode = (localStorage.getItem('learning_cockpit_view_mode') as AppViewMode) || 'roadmap';
   private sidebarOpen = false;
   private desktopSidebarCollapsed = false;
-  private searchModalElement: HTMLElement | null = null;
 
   constructor() {
     this.desktopSidebarCollapsed = localStorage.getItem('learning_sidebar_collapsed') === 'true';
@@ -28,7 +25,6 @@ class AppController {
     this.initTheme();
     this.initRouting();
     this.initGlobalShortcuts();
-    this.setupSubscribers();
     this.render();
   }
 
@@ -45,10 +41,18 @@ class AppController {
   private initRouting() {
     const parseHash = () => {
       const hash = window.location.hash.replace('#', '').trim();
-      if (hash && stages.some((s) => s.id === hash)) {
+      if (hash === 'deepdive') {
+        this.currentViewMode = 'deepdive';
+      } else if (hash === '3d') {
+        this.currentViewMode = '3d';
+      } else if (hash && stages.some((s) => s.id === hash)) {
         this.currentTarget = hash;
+        this.currentViewMode = 'roadmap';
       } else {
         this.currentTarget = 'home';
+        if (this.currentViewMode !== 'deepdive' && this.currentViewMode !== '3d') {
+          this.currentViewMode = 'roadmap';
+        }
       }
     };
 
@@ -61,35 +65,30 @@ class AppController {
     parseHash();
   }
 
-  private switchViewMode(mode: '3d' | 'doc') {
+  private switchViewMode(mode: AppViewMode) {
     this.currentViewMode = mode;
     localStorage.setItem('learning_cockpit_view_mode', mode);
+    if (mode === 'deepdive') {
+      window.location.hash = 'deepdive';
+    } else if (mode === '3d') {
+      window.location.hash = '3d';
+    } else {
+      window.location.hash = this.currentTarget === 'home' ? '' : this.currentTarget;
+    }
     this.render();
   }
 
   private navigate(targetId: string) {
     this.currentTarget = targetId;
+    this.currentViewMode = 'roadmap';
     window.location.hash = targetId === 'home' ? '' : targetId;
     this.closeSidebar();
     this.render();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  private setupSubscribers() {
-    // When language updates, re-render the view
-    i18n.subscribe(() => {
-      document.title = i18n.t('app.display_name');
-      this.render();
-    });
-  }
-
   private initGlobalShortcuts() {
     window.addEventListener('keydown', (e) => {
-      // ⌘K or Ctrl+K for search
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        this.openSearchModal();
-      }
       // ⌘B or Ctrl+B for sidebar toggle
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
         e.preventDefault();
@@ -100,10 +99,10 @@ class AppController {
         e.preventDefault();
         this.navigate('home');
       }
-      // ⌘M for 3D/Doc mode toggle
+      // ⌘M for 3D/Roadmap toggle
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm') {
         e.preventDefault();
-        this.switchViewMode(this.currentViewMode === '3d' ? 'doc' : '3d');
+        this.switchViewMode(this.currentViewMode === '3d' ? 'roadmap' : '3d');
       }
     });
   }
@@ -132,32 +131,6 @@ class AppController {
     }
   }
 
-  private openSearchModal() {
-    document.querySelectorAll('.search-modal-backdrop, #search-modal-backdrop').forEach((el) => {
-      if (typeof el.remove === 'function') el.remove();
-      else el.parentNode?.removeChild(el);
-    });
-    this.searchModalElement = null;
-
-    this.searchModalElement = renderGlobalSearch(
-      (stageId) => {
-        this.switchViewMode('doc');
-        this.navigate(stageId);
-      },
-      () => {
-        if (this.searchModalElement) {
-          this.searchModalElement.remove();
-          this.searchModalElement = null;
-        }
-        document.querySelectorAll('.search-modal-backdrop, #search-modal-backdrop').forEach((el) => {
-          if (typeof el.remove === 'function') el.remove();
-          else el.parentNode?.removeChild(el);
-        });
-      }
-    );
-    document.body.appendChild(this.searchModalElement);
-  }
-
   private render() {
     const app = document.getElementById('app');
     if (!app) return;
@@ -169,29 +142,39 @@ class AppController {
     bg.className = 'atmosphere-bg';
     app.appendChild(bg);
 
-    // If in 3D Constellation Mode:
+    // 1. If in 3D Constellation Mode:
     if (this.currentViewMode === '3d') {
       const constellationView = renderNeuralConstellationView((mode) => this.switchViewMode(mode));
       app.appendChild(constellationView);
       return;
     }
 
-    // Header in Document Mode
+    // 2. Header (Shared between Roadmap and DeepDive modes)
     const header = renderHeader(
       () => this.toggleSidebar(),
-      () => this.openSearchModal(),
-      () => {
-        this.navigate('home');
-      },
+      () => this.navigate('home'),
       this.currentViewMode,
       (mode) => this.switchViewMode(mode)
     );
     app.appendChild(header);
 
-    // Body in Document Mode
+    // 3. Body
     const body = document.createElement('div');
-    body.className = 'app-body';
+    body.className = `app-body ${this.currentViewMode === 'deepdive' ? 'deepdive-body-mode' : ''}`;
 
+    // If in DeepDive Portal Mode:
+    if (this.currentViewMode === 'deepdive') {
+      const content = document.createElement('main');
+      content.className = 'app-content portal-fullwidth-content';
+      content.appendChild(
+        renderDeepDivePortalView((stageId) => this.navigate(stageId))
+      );
+      body.appendChild(content);
+      app.appendChild(body);
+      return;
+    }
+
+    // Otherwise in Dual-Platform Roadmap Mode:
     // Sidebar
     const sidebar = renderSidebar(this.currentTarget, (id) => this.navigate(id));
     body.appendChild(sidebar);
