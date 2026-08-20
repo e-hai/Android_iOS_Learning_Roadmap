@@ -1356,6 +1356,109 @@
   flex-wrap: wrap;
 }
 
+/* ==========================================================================
+   Deep Dive Overview Interactive Topics Grid
+   ========================================================================== */
+.overview-topics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.overview-topic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+  position: relative;
+}
+
+.overview-topic-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-accent);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-surface-hover);
+}
+
+.overview-topic-card.is-core {
+  border-left: 3px solid var(--color-accent);
+}
+
+.overview-topic-card.is-core.card-android {
+  border-left-color: #10b981;
+}
+
+.overview-topic-card.is-core.card-ios {
+  border-left-color: #0ea5e9;
+}
+
+.overview-topic-card.is-ext {
+  border-left: 3px solid var(--color-border);
+}
+
+.overview-topic-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.topic-priority-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 12px;
+}
+
+.priority-core {
+  color: #d97706;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.priority-ext {
+  color: var(--color-ink-muted);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+}
+
+.overview-topic-arrow {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+  transition: transform var(--transition-fast);
+}
+
+.overview-topic-card:hover .overview-topic-arrow {
+  color: var(--color-accent);
+  transform: translateX(3px);
+}
+
+.overview-topic-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.overview-topic-desc {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--color-ink-muted);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+
 
 
 
