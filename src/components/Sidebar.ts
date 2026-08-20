@@ -45,6 +45,21 @@ export function renderSidebar(
   const createStageRow = (stage: LearningStage) => {
     const isActive = currentStageId === stage.id;
 
+    let subHtml = '';
+    let displayTitle = i18n.t(stage.titleKey);
+
+    if (docMode === 'deepdive') {
+      const stageData = stages.find((s) => s.id === stage.id);
+      if (stageData && stageData.deepDive) {
+        const mods = deepDivePlatform === 'android' ? stageData.deepDive.android : stageData.deepDive.ios;
+        if (mods && mods.length > 0) {
+          const firstMod = mods[0];
+          subHtml = `<span class="sidebar-item-sub" style="font-size:11px;color:var(--color-ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:170px;">${firstMod.tag}: ${firstMod.title.split('(')[0].trim()}</span>`;
+        }
+      }
+      displayTitle = `${i18n.t(stage.titleKey)} · ${deepDivePlatform === 'android' ? 'Android' : 'iOS'}`;
+    }
+
     const row = document.createElement('button');
     row.className = `sidebar-item ${isActive ? 'active' : ''}`;
     row.innerHTML = `
@@ -52,7 +67,8 @@ export function renderSidebar(
         ${String(stage.number).padStart(2, '0')}
       </span>
       <div class="sidebar-item-info">
-        <span class="sidebar-item-title">${i18n.t(stage.titleKey)}</span>
+        <span class="sidebar-item-title">${displayTitle}</span>
+        ${subHtml}
       </div>
     `;
     row.addEventListener('click', () => onSelect(stage.id));
@@ -62,7 +78,7 @@ export function renderSidebar(
   // Main Path Section
   const mainSection = document.createElement('div');
   mainSection.className = 'sidebar-section';
-  mainSection.innerHTML = `<span class="sidebar-section-title main-title">${docMode === 'roadmap' ? i18n.t('sidebar.main') : '核心主线进阶'}</span>`;
+  mainSection.innerHTML = `<span class="sidebar-section-title main-title">${docMode === 'roadmap' ? i18n.t('sidebar.main') : `核心主线 · ${deepDivePlatform.toUpperCase()} 进阶`}</span>`;
 
   mainStages.forEach((stage) => {
     mainSection.appendChild(createStageRow(stage));
@@ -72,7 +88,7 @@ export function renderSidebar(
   // Advanced Section
   const advSection = document.createElement('div');
   advSection.className = 'sidebar-section';
-  advSection.innerHTML = `<span class="sidebar-section-title adv-title">${docMode === 'roadmap' ? i18n.t('sidebar.advanced') : '扩展专题进阶'}</span>`;
+  advSection.innerHTML = `<span class="sidebar-section-title adv-title">${docMode === 'roadmap' ? i18n.t('sidebar.advanced') : `扩展专题 · ${deepDivePlatform.toUpperCase()} 进阶`}</span>`;
 
   advancedStages.forEach((stage) => {
     advSection.appendChild(createStageRow(stage));

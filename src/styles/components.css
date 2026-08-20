@@ -1331,6 +1331,32 @@
   overflow: hidden;
 }
 
+/* Deep Dive Doc View Styles */
+.deep-dive-doc-container {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.deep-dive-stage-section {
+  margin-bottom: 24px;
+}
+
+.stage-nav-footer {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.stage-nav-buttons {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+
 
 
 
