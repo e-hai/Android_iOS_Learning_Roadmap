@@ -6,14 +6,16 @@ import { i18n } from '../services/i18n';
 const STORAGE_PLATFORM_KEY = 'learning_deepdive_portal_platform';
 
 export function renderDeepDivePortalView(
-  onNavigateStage: (stageId: string) => void
+  onNavigateRoadmapStage: (stageId: string) => void,
+  selectedStageId: string = 'all',
+  onSelectStage?: (stageId: string) => void
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = 'deep-dive-portal-container';
 
   let currentPlatform: 'android' | 'ios' =
     (localStorage.getItem(STORAGE_PLATFORM_KEY) as 'android' | 'ios') || 'android';
-  let currentStageFilter: string = 'all';
+  let currentStageFilter: string = selectedStageId || 'all';
 
   // 1. Hero Header
   const hero = document.createElement('div');
@@ -62,6 +64,7 @@ export function renderDeepDivePortalView(
     allBtn.textContent = `全部阶段 (16)`;
     allBtn.addEventListener('click', () => {
       currentStageFilter = 'all';
+      if (onSelectStage) onSelectStage('all');
       renderFilterPills();
       renderContent();
     });
@@ -77,6 +80,7 @@ export function renderDeepDivePortalView(
       pill.textContent = `${String(stage.number).padStart(2, '0')}. ${i18n.t(stage.titleKey)}`;
       pill.addEventListener('click', () => {
         currentStageFilter = stage.id;
+        if (onSelectStage) onSelectStage(stage.id);
         renderFilterPills();
         renderContent();
       });
@@ -120,7 +124,7 @@ export function renderDeepDivePortalView(
       `;
 
       groupHeader.querySelector('.portal-jump-roadmap-btn')?.addEventListener('click', () => {
-        onNavigateStage(stage.id);
+        onNavigateRoadmapStage(stage.id);
       });
 
       stageGroup.appendChild(groupHeader);

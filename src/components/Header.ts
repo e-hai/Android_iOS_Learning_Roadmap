@@ -1,46 +1,41 @@
-import { i18n } from '../services/i18n';
-
-export type AppViewMode = 'roadmap' | 'deepdive' | '3d';
-
 export function renderHeader(
   onToggleSidebar: () => void,
   onNavigateHome: () => void,
-  currentViewMode: AppViewMode = 'roadmap',
-  onToggleViewMode?: (mode: AppViewMode) => void
+  is3DMode: boolean = false,
+  docMode: 'roadmap' | 'deepdive' = 'roadmap',
+  onToggle3DDoc?: (mode: '3d' | 'doc') => void
 ): HTMLElement {
   const header = document.createElement('header');
   header.className = 'app-header';
 
+  const modeTitle = docMode === 'roadmap' ? '双端路线图' : '单端深度进阶';
+  const badgeTitle = docMode === 'roadmap' ? '双端对照' : '底层内幕';
+
   header.innerHTML = `
     <div class="header-left">
-      <button class="sidebar-toggle-btn ${currentViewMode === 'deepdive' ? 'hidden' : ''}" id="btn-sidebar-toggle" aria-label="Toggle Sidebar" title="展开/收起目录">
+      <button class="sidebar-toggle-btn" id="btn-sidebar-toggle" aria-label="Toggle Sidebar" title="展开/收起目录">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
       </button>
       <div class="header-logo" id="header-logo-btn">
         <div class="brand-icon">AR</div>
         <div class="brand-text">
-          <span class="brand-title">${i18n.t('app.display_name')}</span>
-          <span class="brand-badge">Android ⟷ iOS</span>
+          <span class="brand-title">Android ⟷ iOS · ${modeTitle}</span>
+          <span class="brand-badge">${badgeTitle}</span>
         </div>
       </div>
     </div>
 
-    <!-- Center Navigation: Roadmap vs DeepDive vs 3D -->
-    <div class="header-center">
+    <div class="header-right">
+      <!-- 3D Constellation vs Document Switcher -->
       <div class="view-mode-toggle">
-        <button class="view-mode-btn ${currentViewMode === 'roadmap' ? 'active' : ''}" id="btn-mode-roadmap" title="双端 16 阶段对照路线图">
-          🗺️ 双端路线图
-        </button>
-        <button class="view-mode-btn ${currentViewMode === 'deepdive' ? 'active' : ''}" id="btn-mode-deepdive" title="Android / iOS 单端底层内幕与高级调优">
-          🌊 单端深度进阶
-        </button>
-        <button class="view-mode-btn ${currentViewMode === '3d' ? 'active' : ''}" id="btn-mode-3d" title="3D 认知星云 · 记忆宫殿">
+        <button class="view-mode-btn ${is3DMode ? 'active' : ''}" id="btn-mode-3d" title="切换为 3D 认知星云模式">
           🌌 3D 星云
         </button>
+        <button class="view-mode-btn ${!is3DMode ? 'active' : ''}" id="btn-mode-doc" title="切换为文档模式">
+          📄 文档
+        </button>
       </div>
-    </div>
 
-    <div class="header-right">
       <button class="btn btn-ghost btn-icon" id="btn-theme-toggle" title="切换深色/浅色主题">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="theme-sun-icon"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
@@ -59,14 +54,11 @@ export function renderHeader(
     onNavigateHome();
   });
 
-  header.querySelector('#btn-mode-roadmap')?.addEventListener('click', () => {
-    if (onToggleViewMode) onToggleViewMode('roadmap');
-  });
-  header.querySelector('#btn-mode-deepdive')?.addEventListener('click', () => {
-    if (onToggleViewMode) onToggleViewMode('deepdive');
-  });
   header.querySelector('#btn-mode-3d')?.addEventListener('click', () => {
-    if (onToggleViewMode) onToggleViewMode('3d');
+    if (onToggle3DDoc) onToggle3DDoc('3d');
+  });
+  header.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
+    if (onToggle3DDoc) onToggle3DDoc('doc');
   });
 
   const themeBtn = header.querySelector('#btn-theme-toggle') as HTMLButtonElement;

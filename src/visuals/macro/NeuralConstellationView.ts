@@ -24,10 +24,8 @@ interface PalaceNode {
   pos: THREE.Vector3;
 }
 
-export type AppViewMode = 'roadmap' | 'deepdive' | '3d';
-
 export function renderNeuralConstellationView(
-  onSwitchViewMode: (mode: AppViewMode) => void
+  onSwitchViewMode: (mode: '3d' | 'doc') => void
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = 'constellation-view-container';
@@ -249,14 +247,11 @@ export function renderNeuralConstellationView(
       </div>
 
       <div class="view-mode-toggle">
-        <button class="view-mode-btn" id="btn-mode-roadmap" title="切换为双端路线图">
-          🗺️ 路线图
-        </button>
-        <button class="view-mode-btn" id="btn-mode-deepdive" title="切换为单端深度进阶">
-          🌊 深度进阶
-        </button>
         <button class="view-mode-btn active" id="btn-mode-3d" title="当前：3D 星云模式">
           🌌 3D 星云
+        </button>
+        <button class="view-mode-btn" id="btn-mode-doc" title="切换为文档模式">
+          📄 文档
         </button>
       </div>
     </div>
@@ -543,14 +538,8 @@ export function renderNeuralConstellationView(
   canvasWrap.addEventListener('click', onClick);
 
   // 8. Top Bar Event Listeners
-  topBar.querySelector('#btn-mode-roadmap')?.addEventListener('click', () => {
-    onSwitchViewMode('roadmap');
-  });
-  topBar.querySelector('#btn-mode-deepdive')?.addEventListener('click', () => {
-    onSwitchViewMode('deepdive');
-  });
-  topBar.querySelector('#btn-mode-3d')?.addEventListener('click', () => {
-    onSwitchViewMode('3d');
+  topBar.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
+    onSwitchViewMode('doc');
   });
 
   // Top Filter Tabs
