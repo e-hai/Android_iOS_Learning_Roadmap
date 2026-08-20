@@ -1459,8 +1459,107 @@
 }
 
 
+/* ==========================================================================
+   Sidebar Accordion (Deep Dive Mode)
+   ========================================================================== */
+.sidebar-accordion-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 2px;
+}
 
+.sidebar-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+}
 
+.sidebar-accordion-count {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  background: var(--color-surface-sunken);
+  padding: 1px 5px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.sidebar-accordion-chevron {
+  flex-shrink: 0;
+  color: var(--color-ink-muted);
+  transition: transform 0.25s ease;
+}
+
+.sidebar-accordion-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.sidebar-accordion-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.sidebar-accordion-body-inner {
+  overflow: hidden;
+}
+
+.sidebar-accordion-body.expanded {
+  grid-template-rows: 1fr;
+}
+
+.sidebar-accordion-child {
+  padding: 5px 10px 5px 30px;
+  gap: 8px;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.sidebar-accordion-child:first-child {
+  margin-top: 2px;
+}
+
+.sidebar-accordion-child:last-child {
+  margin-bottom: 4px;
+}
+
+.sidebar-child-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.sidebar-child-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  letter-spacing: 0.3px;
+  line-height: 1.2;
+}
+
+.sidebar-child-title {
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+/* Highlight Flash animation for scrolled-to cards */
+@keyframes highlightFlash {
+  0% { box-shadow: 0 0 0 0 rgba(13, 148, 136, 0.4); }
+  30% { box-shadow: 0 0 0 4px rgba(13, 148, 136, 0.25); }
+  100% { box-shadow: var(--shadow-sm); }
+}
+
+.deep-dive-card.highlight-flash {
+  animation: highlightFlash 1.5s ease-out;
+  border-color: var(--color-accent);
+}
 
 
 

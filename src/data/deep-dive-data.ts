@@ -489,6 +489,52 @@ func requestTrackingAuthorization() {
     }
 }`,
       },
+      {
+        tag: '归因深链',
+        title: 'Universal Links 与 SceneDelegate 路由重定向',
+        explanation: 'iOS 的 Universal Links 允许通过部署在服务器上的 apple-app-site-association (AASA) JSON 文件，将普通 HTTPS 链接直接映射至原生 App。配合 SwiftUI 的 onOpenURL 修饰符或 SceneDelegate 中的 delegate 方法，可以轻松解析跳转路径。针对新用户拉新，结合 AppsFlyer OneLink 处理延迟跳转，保障用户从社交媒体点击广告到商店下载并首次打开时，能精准承接到特定落地页。',
+        codeSnippet: `// SwiftUI 处理 Universal Links 与深链跳转
+@main
+struct MyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+                .onOpenURL { url in
+                    // 解析 Universal Link 路由信息
+                    if let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
+                       let queryItems = components.queryItems {
+                        let campaign = queryItems.first(where: { $0.name == "campaign" })?.value
+                        // 触发页面路由
+                        Router.shared.navigate(to: url.path, with: campaign)
+                    }
+                }
+        }
+    }
+}`,
+      },
+      {
+        tag: 'AB实验',
+        title: 'Remote Config 实验下发与 Activation 策略',
+        explanation: '在 iOS 中使用 Firebase Remote Config 进行 A/B 实验时，需要处理好默认配置与云端数据的时序问题。最佳实践是打包携带一份 Default.plist 防止首屏空白。应用启动时异步执行 fetch flow 拉取最新的实验条件及百分比分流数据，拉取成功后再 activate 生效。同时利用 ExperimentalValue 动态配置 UI 参数，使得客户端可灵活参与各类多变量测试。',
+        codeSnippet: `// iOS Firebase Remote Config 实验参数拉取
+import FirebaseRemoteConfig
+
+let remoteConfig = RemoteConfig.remoteConfig()
+let settings = RemoteConfigSettings()
+settings.minimumFetchInterval = 3600
+remoteConfig.configSettings = settings
+
+remoteConfig.fetchAndActivate { status, error in
+    guard error == nil else { return }
+    if status == .successFetchedFromRemote || status == .successUsingPreFetchedData {
+        let featureFlag = remoteConfig.configValue(forKey: "enable_new_onboarding").boolValue
+        DispatchQueue.main.async {
+            // 根据 A/B 实验开关渲染新手指引
+            self.updateUI(showNewOnboarding: featureFlag)
+        }
+    }
+}`,
+      },
     ],
   },
 };

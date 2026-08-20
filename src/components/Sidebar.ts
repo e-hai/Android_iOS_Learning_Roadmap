@@ -63,32 +63,80 @@ export function renderSidebar(
 
     sidebar.appendChild(stagesSection);
   } else {
-    // 2. Single-Platform Deep Dive: 5 Industrial Domains Section
+    // 2. Single-Platform Deep Dive: 5 Industrial Domains Accordion
     const domainsSection = document.createElement('div');
     domainsSection.className = 'sidebar-section';
     domainsSection.innerHTML = `<span class="sidebar-section-title main-title">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 5 大领域进阶</span>`;
 
     deepDiveDomains.forEach((domain) => {
       const isActive = currentStageId === domain.id;
+      const isExpanded = isActive;
       const mods = deepDivePlatform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
-      let subHtml = '';
-      if (mods && mods.length > 0) {
-        subHtml = `<span class="sidebar-item-sub" style="font-size:11px;color:var(--color-ink-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:170px;">${mods[0].tag}: ${mods[0].title.split('(')[0].trim()}</span>`;
-      }
       const displayTitle = `${domain.number}. ${i18n.t(domain.titleKey)}`;
 
-      const item = document.createElement('button');
-      item.className = `sidebar-item ${isActive ? 'active' : ''}`;
-      item.innerHTML = `
+      // Domain accordion group
+      const accordionGroup = document.createElement('div');
+      accordionGroup.className = 'sidebar-accordion-group';
+
+      // Accordion header button
+      const headerBtn = document.createElement('button');
+      headerBtn.className = `sidebar-item sidebar-accordion-header ${isActive ? 'active' : ''}`;
+      headerBtn.innerHTML = `
         <span class="sidebar-item-num">${String(domain.number).padStart(2, '0')}</span>
-        <div class="sidebar-item-text" style="display:flex;flex-direction:column;gap:2px;">
+        <div class="sidebar-item-text" style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:0;">
           <span class="sidebar-item-title">${displayTitle}</span>
-          ${subHtml}
         </div>
+        <span class="sidebar-accordion-count">${mods ? mods.length : 0}</span>
+        <svg class="sidebar-accordion-chevron ${isExpanded ? 'expanded' : ''}" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
       `;
 
-      item.addEventListener('click', () => onSelect(domain.id));
-      domainsSection.appendChild(item);
+      // Accordion body: knowledge point sub-items
+      const body = document.createElement('div');
+      body.className = `sidebar-accordion-body ${isExpanded ? 'expanded' : ''}`;
+
+      const bodyInner = document.createElement('div');
+      bodyInner.className = 'sidebar-accordion-body-inner';
+
+      if (mods && mods.length > 0) {
+        mods.forEach((mod, modIdx) => {
+          const modItem = document.createElement('button');
+          modItem.className = 'sidebar-item sidebar-accordion-child';
+          const truncTitle = mod.title.length > 24 ? mod.title.substring(0, 24) + '…' : mod.title;
+          modItem.innerHTML = `
+            <span class="sidebar-child-dot" style="background:${deepDivePlatform === 'android' ? 'var(--color-android, #10b981)' : 'var(--color-ios, #0ea5e9)'};"></span>
+            <div class="sidebar-item-text" style="display:flex;flex-direction:column;gap:1px;min-width:0;">
+              <span class="sidebar-child-tag">${mod.tag}</span>
+              <span class="sidebar-item-title sidebar-child-title">${truncTitle}</span>
+            </div>
+          `;
+
+          modItem.addEventListener('click', (e) => {
+            e.stopPropagation();
+            onSelect(domain.id);
+            // Scroll to the specific module card after render
+            requestAnimationFrame(() => {
+              setTimeout(() => {
+                const cards = document.querySelectorAll('.deep-dive-card');
+                if (cards[modIdx]) {
+                  cards[modIdx].scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  cards[modIdx].classList.add('highlight-flash');
+                  setTimeout(() => cards[modIdx].classList.remove('highlight-flash'), 1500);
+                }
+              }, 100);
+            });
+          });
+
+          bodyInner.appendChild(modItem);
+        });
+      }
+
+      body.appendChild(bodyInner);
+
+      headerBtn.addEventListener('click', () => onSelect(domain.id));
+
+      accordionGroup.appendChild(headerBtn);
+      accordionGroup.appendChild(body);
+      domainsSection.appendChild(accordionGroup);
     });
 
     sidebar.appendChild(domainsSection);
