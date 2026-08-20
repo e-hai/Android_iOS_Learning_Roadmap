@@ -5,6 +5,7 @@ import { stages } from '../../data/roadmap-data';
 import { i18n } from '../../services/i18n';
 import { renderComparisonTable } from '../../components/ComparisonTable';
 import { renderArchitectureDiagram } from '../../components/ArchitectureDiagram';
+import { renderDeepDiveSection } from '../../components/DeepDiveSection';
 
 interface PalaceNode {
   mesh: THREE.Mesh;
@@ -368,6 +369,7 @@ export function renderNeuralConstellationView(
           </div>
           <div id="hud-table-mount"></div>
           <div id="hud-diagram-mount"></div>
+          <div id="hud-deepdive-mount"></div>
         </div>
         <div class="hud-lens-footer">
           <span style="font-size:11.5px;color:var(--color-ink-muted);">点击周围子节点查看代码</span>
@@ -450,6 +452,12 @@ export function renderNeuralConstellationView(
         const diagMount = hudLens.querySelector('#hud-diagram-mount');
         if (diagMount) {
           diagMount.appendChild(renderArchitectureDiagram(stage.id, stage.extraHintKey));
+        }
+        if (stage.deepDive) {
+          const deepDiveMount = hudLens.querySelector('#hud-deepdive-mount');
+          if (deepDiveMount) {
+            deepDiveMount.appendChild(renderDeepDiveSection(stage.id, stage.deepDive));
+          }
         }
       }
     }

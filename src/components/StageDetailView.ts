@@ -2,6 +2,7 @@ import { LearningStage } from '../models/types';
 import { i18n } from '../services/i18n';
 import { renderComparisonTable } from './ComparisonTable';
 import { renderArchitectureDiagram } from './ArchitectureDiagram';
+import { renderDeepDiveSection } from './DeepDiveSection';
 import { stages } from '../data/roadmap-data';
 
 export function renderStageDetail(
@@ -119,6 +120,11 @@ export function renderStageDetail(
       </ul>
     `;
     container.appendChild(notesSection);
+  }
+
+  // Platform-Specific Deep Dive Section (if any)
+  if (stage.deepDive) {
+    container.appendChild(renderDeepDiveSection(stage.id, stage.deepDive));
   }
 
   // Practice Section

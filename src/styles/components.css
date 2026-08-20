@@ -820,4 +820,206 @@
   letter-spacing: 0;
 }
 
+/* ==========================================================================
+   Platform-Specific Deep Dive Tabs & Cards
+   ========================================================================== */
+.deep-dive-section {
+  margin-top: 36px;
+  margin-bottom: 24px;
+}
+
+.deep-dive-tabs {
+  display: inline-flex;
+  gap: 8px;
+  padding: 4px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+}
+
+.deep-dive-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.deep-dive-tab-btn:hover {
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+
+.deep-dive-tab-btn.btn-android.active {
+  color: #059669;
+  background: var(--color-surface);
+  border-color: #10b98155;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.12);
+}
+
+.deep-dive-tab-btn.btn-ios.active {
+  color: #0284c7;
+  background: var(--color-surface);
+  border-color: #0ea5e955;
+  box-shadow: 0 1px 3px rgba(14, 165, 233, 0.12);
+}
+
+.platform-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.dot-android {
+  background: #10b981;
+}
+
+.dot-ios {
+  background: #0ea5e9;
+}
+
+.tab-count-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.deep-dive-cards-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.deep-dive-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.deep-dive-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.deep-dive-card.card-android {
+  border-left: 4px solid #10b981;
+}
+
+.deep-dive-card.card-ios {
+  border-left: 4px solid #0ea5e9;
+}
+
+.deep-dive-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.deep-dive-tag {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  flex-shrink: 0;
+}
+
+.deep-dive-tag.tag-android {
+  color: #059669;
+  background: #10b98118;
+}
+
+.deep-dive-tag.tag-ios {
+  color: #0284c7;
+  background: #0ea5e918;
+}
+
+.deep-dive-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.deep-dive-card-desc {
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--color-ink-muted);
+  margin: 0 0 14px 0;
+}
+
+.deep-dive-code-block {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-sunken);
+}
+
+.code-block-lang {
+  font-size: 10.5px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  letter-spacing: 0.5px;
+}
+
+.code-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.code-copy-btn:hover {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border-color: var(--color-border);
+}
+
+.deep-dive-pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-ink);
+  tab-size: 2;
+  white-space: pre;
+}
+
+
 

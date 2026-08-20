@@ -1,4 +1,5 @@
 import { LearningStage } from '../models/types';
+import { deepDivesData } from './deep-dive-data';
 
 export const cheatSheetKeys: { android: string; ios: string }[] = Array.from({ length: 9 }, (_, i) => ({
   android: `cheat.${i}.a`,
@@ -934,4 +935,11 @@ export const stages: LearningStage[] = [
     ],
   },
 ];
+
+// Attach platform deep dive modules to each stage
+stages.forEach((stage) => {
+  if (deepDivesData[stage.id]) {
+    stage.deepDive = deepDivesData[stage.id];
+  }
+});
 
