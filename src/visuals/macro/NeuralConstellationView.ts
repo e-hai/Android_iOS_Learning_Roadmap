@@ -49,127 +49,83 @@ export function renderNeuralConstellationView(
   const palaceGroup = new THREE.Group();
   scene.add(palaceGroup);
 
-  const glowTexture = createGlowParticleTexture();
-
-  // 1. Multi-Spectral Volumetric Nebula Cloud (星云尘埃层)
-  const nebulaDust = createNebulaDust(scene, knowledgeMode === 'deepdive' ? deepDivePlatform : 'dual', glowTexture);
-
-  // 2. Sparkling Deep Space Starfield (璀璨深空星海)
-  const starCount = 600;
+  // 1. Subtle, Quiet Deep Space Starfield (极简深邃背景)
+  const starCount = 220;
   const starGeom = new THREE.BufferGeometry();
   const starPositions = new Float32Array(starCount * 3);
-  const starColors = new Float32Array(starCount * 3);
-
-  const starPalette = [
-    new THREE.Color(0xffffff),
-    new THREE.Color(0x38bdf8),
-    new THREE.Color(0x34d399),
-    new THREE.Color(0xfde047),
-    new THREE.Color(0xc084fc),
-  ];
 
   for (let i = 0; i < starCount; i++) {
-    starPositions[i * 3] = (Math.random() - 0.5) * 140;
-    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 140;
-    starPositions[i * 3 + 2] = (Math.random() - 0.5) * 140;
-
-    const chosen = starPalette[Math.floor(Math.random() * starPalette.length)];
-    starColors[i * 3] = chosen.r;
-    starColors[i * 3 + 1] = chosen.g;
-    starColors[i * 3 + 2] = chosen.b;
+    starPositions[i * 3] = (Math.random() - 0.5) * 120;
+    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 120;
+    starPositions[i * 3 + 2] = (Math.random() - 0.5) * 120;
   }
 
   starGeom.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-  starGeom.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
 
   const starMat = new THREE.PointsMaterial({
-    size: 1.6,
-    map: glowTexture,
-    vertexColors: true,
+    size: 0.8,
+    color: 0x94a3b8,
     transparent: true,
-    opacity: 0.85,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
+    opacity: 0.4,
   });
   const stars = new THREE.Points(starGeom, starMat);
   scene.add(stars);
 
-  // 3. Build 3D Memory Palace Node Network
+  // 2. Build 3D Memory Palace Node Network
   const allNodes: PalaceNode[] = [];
-  const secondaryRings: THREE.Mesh[] = [];
 
   const lineMatSynapse = new THREE.LineBasicMaterial({
     color: knowledgeMode === 'deepdive' ? (deepDivePlatform === 'android' ? 0x10b981 : 0x0ea5e9) : 0x38bdf8,
     transparent: true,
-    opacity: 0.45,
+    opacity: 0.22,
   });
   const lineMatGolden = new THREE.LineBasicMaterial({
-    color: 0xfbbf24,
+    color: 0xf59e0b,
     transparent: true,
-    opacity: 0.5,
+    opacity: 0.25,
   });
 
   const platformName = deepDivePlatform === 'android' ? 'Android' : 'iOS';
   const platformColor = deepDivePlatform === 'android' ? 0x10b981 : 0x0ea5e9;
-  const platformEmissive = deepDivePlatform === 'android' ? 0x059669 : 0x0284c7;
+  const platformEmissive = deepDivePlatform === 'android' ? 0x047857 : 0x0369a1;
 
   if (knowledgeMode === 'deepdive') {
     // 5 Industrial Domains in Deep Dive Mode
     deepDiveDomains.forEach((domain, sIdx) => {
       const stageAngle = (sIdx / deepDiveDomains.length) * Math.PI * 2;
-      const stageRadius = 10.5;
+      const stageRadius = 10.0;
       const hubX = Math.cos(stageAngle) * stageRadius;
       const hubZ = Math.sin(stageAngle) * stageRadius;
-      const hubY = Math.sin(sIdx * 1.3) * 1.8;
+      const hubY = Math.sin(sIdx * 1.2) * 1.2;
       const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
 
       const domainTitle = i18n.t(domain.titleKey);
 
-      // Level 1: Domain Star Core (Icosahedral high-refractive core)
-      const hubGeom = new THREE.IcosahedronGeometry(1.2, 4);
+      // Level 1: Domain Star Core (Clean, High-legibility Sphere)
+      const hubGeom = new THREE.SphereGeometry(1.0, 32, 32);
       const hubMat = new THREE.MeshStandardMaterial({
         color: platformColor,
         emissive: platformEmissive,
-        emissiveIntensity: 0.9,
-        roughness: 0.15,
-        metalness: 0.35,
+        emissiveIntensity: 0.75,
+        roughness: 0.2,
+        metalness: 0.2,
       });
       const hubMesh = new THREE.Mesh(hubGeom, hubMat);
       hubMesh.position.copy(hubPos);
       palaceGroup.add(hubMesh);
 
-      // PointLight on core for radiant local glow
-      const hubLight = new THREE.PointLight(platformColor, 1.2, 8);
-      hubLight.position.copy(hubPos);
-      palaceGroup.add(hubLight);
-
-      // Primary Luminous Halo Ring
-      const haloGeom = new THREE.RingGeometry(1.55, 1.85, 48);
+      // Clean Halo Ring
+      const haloGeom = new THREE.RingGeometry(1.35, 1.5, 32);
       const haloMat = new THREE.MeshBasicMaterial({
         color: platformColor,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.5,
       });
       const haloMesh = new THREE.Mesh(haloGeom, haloMat);
       haloMesh.position.copy(hubPos);
       haloMesh.rotation.x = Math.PI / 2;
       palaceGroup.add(haloMesh);
-
-      // Secondary Gyroscopic Outer Ring
-      const secHaloGeom = new THREE.RingGeometry(2.05, 2.2, 48);
-      const secHaloMat = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.3,
-      });
-      const secHaloMesh = new THREE.Mesh(secHaloGeom, secHaloMat);
-      secHaloMesh.position.copy(hubPos);
-      secHaloMesh.rotation.x = Math.PI / 4;
-      secHaloMesh.rotation.y = Math.PI / 6;
-      palaceGroup.add(secHaloMesh);
-      secondaryRings.push(secHaloMesh);
 
       allNodes.push({
         mesh: hubMesh,
@@ -188,26 +144,25 @@ export function renderNeuralConstellationView(
 
       modules.forEach((mod, mIdx) => {
         const mAngle = (mIdx / modules.length) * Math.PI * 2 + 0.4;
-        const mRadius = 3.2 + mIdx * 0.35;
+        const mRadius = 2.8 + mIdx * 0.25;
         const mPos = new THREE.Vector3(
           hubX + Math.cos(mAngle) * mRadius,
-          hubY + Math.sin(mAngle * 2) * 1.0,
+          hubY + Math.sin(mAngle * 2) * 0.7,
           hubZ + Math.sin(mAngle) * mRadius
         );
 
-        const mGeom = new THREE.DodecahedronGeometry(0.32);
+        const mGeom = new THREE.DodecahedronGeometry(0.28);
         const mMat = new THREE.MeshStandardMaterial({
           color: platformColor,
           emissive: platformEmissive,
-          emissiveIntensity: 0.85,
-          roughness: 0.2,
-          metalness: 0.4,
+          emissiveIntensity: 0.7,
+          roughness: 0.25,
         });
         const mMesh = new THREE.Mesh(mGeom, mMat);
         mMesh.position.copy(mPos);
         palaceGroup.add(mMesh);
 
-        // Connection Synapse Line
+        // Connection Line
         const mLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, mPos]);
         const mLine = new THREE.Line(mLineGeom, lineMatSynapse);
         palaceGroup.add(mLine);
@@ -231,58 +186,39 @@ export function renderNeuralConstellationView(
     // 16 Stages in Dual-Platform Roadmap Mode
     stages.forEach((stage, sIdx) => {
       const stageAngle = (sIdx / stages.length) * Math.PI * 2;
-      const stageRadius = 13.5;
+      const stageRadius = 13.0;
       const hubX = Math.cos(stageAngle) * stageRadius;
       const hubZ = Math.sin(stageAngle) * stageRadius;
-      const hubY = Math.sin(sIdx * 0.85) * 2.0;
+      const hubY = Math.sin(sIdx * 0.8) * 1.5;
       const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
 
       const stageTitle = i18n.t(stage.titleKey);
 
       // Level 1: Stage Core Hub
-      const hubGeom = new THREE.IcosahedronGeometry(0.95, 3);
+      const hubGeom = new THREE.SphereGeometry(0.85, 32, 32);
       const hubMat = new THREE.MeshStandardMaterial({
         color: 0x0ea5e9,
         emissive: 0x0284c7,
-        emissiveIntensity: 0.85,
-        roughness: 0.18,
-        metalness: 0.35,
+        emissiveIntensity: 0.75,
+        roughness: 0.2,
+        metalness: 0.2,
       });
       const hubMesh = new THREE.Mesh(hubGeom, hubMat);
       hubMesh.position.copy(hubPos);
       palaceGroup.add(hubMesh);
 
-      // PointLight on core
-      const hubLight = new THREE.PointLight(0x0ea5e9, 1.0, 7);
-      hubLight.position.copy(hubPos);
-      palaceGroup.add(hubLight);
-
       // Dynamic Halo Ring
-      const haloGeom = new THREE.RingGeometry(1.25, 1.48, 48);
+      const haloGeom = new THREE.RingGeometry(1.15, 1.3, 32);
       const haloMat = new THREE.MeshBasicMaterial({
         color: 0x38bdf8,
         side: THREE.DoubleSide,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.5,
       });
       const haloMesh = new THREE.Mesh(haloGeom, haloMat);
       haloMesh.position.copy(hubPos);
       haloMesh.rotation.x = Math.PI / 2;
       palaceGroup.add(haloMesh);
-
-      // Outer Secondary Gyroscopic Ring
-      const secHaloGeom = new THREE.RingGeometry(1.7, 1.82, 48);
-      const secHaloMat = new THREE.MeshBasicMaterial({
-        color: 0x10b981,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.35,
-      });
-      const secHaloMesh = new THREE.Mesh(secHaloGeom, secHaloMat);
-      secHaloMesh.position.copy(hubPos);
-      secHaloMesh.rotation.x = Math.PI / 3;
-      palaceGroup.add(secHaloMesh);
-      secondaryRings.push(secHaloMesh);
 
       allNodes.push({
         mesh: hubMesh,
@@ -300,19 +236,19 @@ export function renderNeuralConstellationView(
       const topRows = stage.rows.slice(0, 4);
       topRows.forEach((row, rIdx) => {
         const cAngle = (rIdx / topRows.length) * Math.PI * 2 + 0.3;
-        const cRadius = 2.6;
+        const cRadius = 2.4;
         const cPos = new THREE.Vector3(
           hubX + Math.cos(cAngle) * cRadius,
-          hubY + 0.9 + Math.sin(cAngle) * 0.5,
+          hubY + 0.7 + Math.sin(cAngle) * 0.4,
           hubZ + Math.sin(cAngle) * cRadius
         );
 
-        const cGeom = new THREE.OctahedronGeometry(0.24);
+        const cGeom = new THREE.SphereGeometry(0.22, 16, 16);
         const cMat = new THREE.MeshStandardMaterial({
           color: 0x38bdf8,
           emissive: 0x0284c7,
-          emissiveIntensity: 0.7,
-          roughness: 0.25,
+          emissiveIntensity: 0.6,
+          roughness: 0.3,
         });
         const cMesh = new THREE.Mesh(cGeom, cMat);
         cMesh.position.copy(cPos);
@@ -339,20 +275,19 @@ export function renderNeuralConstellationView(
 
       stage.noteKeys.forEach((noteKey, nIdx) => {
         const gAngle = (nIdx / stage.noteKeys.length) * Math.PI * 2 - 0.5;
-        const gRadius = 3.8;
+        const gRadius = 3.5;
         const gPos = new THREE.Vector3(
           hubX + Math.cos(gAngle) * gRadius,
-          hubY - 0.8 + Math.cos(gAngle) * 0.45,
+          hubY - 0.6 + Math.cos(gAngle) * 0.35,
           hubZ + Math.sin(gAngle) * gRadius
         );
 
-        const gGeom = new THREE.IcosahedronGeometry(0.2, 0);
+        const gGeom = new THREE.OctahedronGeometry(0.18);
         const gMat = new THREE.MeshStandardMaterial({
           color: 0xf59e0b,
           emissive: 0xd97706,
-          emissiveIntensity: 0.95,
+          emissiveIntensity: 0.85,
           roughness: 0.2,
-          metalness: 0.3,
         });
         const gMesh = new THREE.Mesh(gGeom, gMat);
         gMesh.position.copy(gPos);
@@ -393,10 +328,10 @@ export function renderNeuralConstellationView(
       const beamGeom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
       const beamMat = new THREE.LineDashedMaterial({
         color: knowledgeMode === 'deepdive' ? platformColor : 0x0ea5e9,
-        dashSize: 0.7,
-        gapSize: 0.35,
+        dashSize: 0.6,
+        gapSize: 0.4,
         transparent: true,
-        opacity: 0.45,
+        opacity: 0.25,
       });
       const beam = new THREE.Line(beamGeom, beamMat);
       beam.computeLineDistances();
@@ -791,25 +726,15 @@ export function renderNeuralConstellationView(
 
   // 9. Synchronized 3D Animation & Real-Time Star Core Tooltip Tracking
   sceneManager.onTickCallback = (_delta, time) => {
-    // Starfield & Nebula Rotation
-    stars.rotation.y += 0.0003;
-    nebulaDust.rotation.y -= 0.0005;
+    // Subtle star rotation
+    stars.rotation.y += 0.00015;
 
-    // Gentle Node Pulse, Halo & Gyroscopic Ring Rotation
+    // Gentle Node Floating & Halo Rotation
     allNodes.forEach((n, idx) => {
       if (n.haloMesh) {
-        n.haloMesh.rotation.y += 0.015;
-        n.haloMesh.rotation.z += 0.008;
+        n.haloMesh.rotation.z += 0.005;
       }
-      n.mesh.position.y = n.pos.y + Math.sin(time * 2 + idx) * 0.05;
-      n.mesh.rotation.y += 0.008;
-      n.mesh.rotation.x += 0.004;
-    });
-
-    // Secondary Gyroscopic Outer Rings
-    secondaryRings.forEach((ring, rIdx) => {
-      ring.rotation.z += 0.012 * (rIdx % 2 === 0 ? 1 : -1);
-      ring.rotation.x += 0.006;
+      n.mesh.position.y = n.pos.y + Math.sin(time * 1.5 + idx) * 0.03;
     });
 
     // Real-Time Tooltip Anchor Tracking (Directly above the hovered 3D star core)
@@ -834,105 +759,6 @@ export function renderNeuralConstellationView(
   };
 
   return container;
-}
-
-/**
- * Generates a soft circular radial alpha glow texture via HTML Canvas
- */
-function createGlowParticleTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d')!;
-
-  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-  gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.85)');
-  gradient.addColorStop(0.45, 'rgba(255, 255, 255, 0.35)');
-  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.08)');
-  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 64, 64);
-
-  const texture = new THREE.CanvasTexture(canvas);
-  return texture;
-}
-
-/**
- * Creates multi-spectral volumetric nebula dust particles in a galactic spiral disc
- */
-function createNebulaDust(
-  scene: THREE.Scene,
-  platform: 'android' | 'ios' | 'dual',
-  glowTexture: THREE.CanvasTexture
-): THREE.Points {
-  const particleCount = 1400;
-  const geom = new THREE.BufferGeometry();
-  const positions = new Float32Array(particleCount * 3);
-  const colors = new Float32Array(particleCount * 3);
-
-  const cAndroid = new THREE.Color(0x10b981);
-  const cIos = new THREE.Color(0x0ea5e9);
-  const cPurple = new THREE.Color(0xa855f7);
-  const cGold = new THREE.Color(0xf59e0b);
-  const cCyan = new THREE.Color(0x06b6d4);
-  const cWhite = new THREE.Color(0xffffff);
-
-  for (let i = 0; i < particleCount; i++) {
-    // Galactic spiral distribution
-    const r = 3.5 + Math.pow(Math.random(), 0.75) * 26;
-    const theta = Math.random() * Math.PI * 2;
-    const spiralAngle = theta + r * 0.22;
-    const spread = (Math.random() - 0.5) * 4.2;
-
-    positions[i * 3] = Math.cos(spiralAngle) * r + (Math.random() - 0.5) * 2.2;
-    positions[i * 3 + 1] = spread * (1 - r / 32);
-    positions[i * 3 + 2] = Math.sin(spiralAngle) * r + (Math.random() - 0.5) * 2.2;
-
-    // Palette mixing
-    const mix = Math.random();
-    const pColor = new THREE.Color();
-
-    if (platform === 'android') {
-      if (mix < 0.5) pColor.copy(cAndroid).lerp(cWhite, Math.random() * 0.35);
-      else if (mix < 0.75) pColor.copy(cCyan).lerp(cAndroid, 0.5);
-      else if (mix < 0.9) pColor.copy(cGold).lerp(cAndroid, 0.4);
-      else pColor.copy(cPurple).lerp(cAndroid, 0.6);
-    } else if (platform === 'ios') {
-      if (mix < 0.5) pColor.copy(cIos).lerp(cWhite, Math.random() * 0.35);
-      else if (mix < 0.75) pColor.copy(cPurple).lerp(cIos, 0.5);
-      else if (mix < 0.9) pColor.copy(cCyan).lerp(cIos, 0.4);
-      else pColor.copy(cGold).lerp(cIos, 0.4);
-    } else {
-      // Dual Roadmap
-      if (mix < 0.35) pColor.copy(cAndroid);
-      else if (mix < 0.68) pColor.copy(cIos);
-      else if (mix < 0.85) pColor.copy(cCyan);
-      else pColor.copy(cPurple).lerp(cGold, 0.5);
-    }
-
-    colors[i * 3] = pColor.r;
-    colors[i * 3 + 1] = pColor.g;
-    colors[i * 3 + 2] = pColor.b;
-  }
-
-  geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-
-  const mat = new THREE.PointsMaterial({
-    size: 2.2,
-    map: glowTexture,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.75,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  });
-
-  const nebula = new THREE.Points(geom, mat);
-  scene.add(nebula);
-  return nebula;
 }
 
 function escapeHtml(text: string): string {
