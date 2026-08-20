@@ -2,15 +2,15 @@ import * as THREE from 'three';
 import gsap from 'gsap';
 import { ThreeSceneManager } from '../core/ThreeSceneManager';
 import { stages } from '../../data/roadmap-data';
+import { deepDivesData } from '../../data/deep-dive-data';
 import { i18n } from '../../services/i18n';
 import { renderComparisonTable } from '../../components/ComparisonTable';
 import { renderArchitectureDiagram } from '../../components/ArchitectureDiagram';
-import { renderDeepDiveSection } from '../../components/DeepDiveSection';
 
 interface PalaceNode {
   mesh: THREE.Mesh;
   haloMesh?: THREE.Mesh;
-  type: 'stage' | 'concept' | 'spark';
+  type: 'stage' | 'concept' | 'spark' | 'deepdive';
   stageId: string;
   stageTitle: string;
   isAdv: boolean;
@@ -21,11 +21,15 @@ interface PalaceNode {
   explanation?: string;
   noteTag?: string;
   noteBody?: string;
+  codeSnippet?: string;
   pos: THREE.Vector3;
 }
 
 export function renderNeuralConstellationView(
-  onSwitchViewMode: (mode: '3d' | 'doc') => void
+  onSwitchViewMode: (mode: '3d' | 'doc') => void,
+  knowledgeMode: 'roadmap' | 'deepdive' = 'roadmap',
+  deepDivePlatform: 'android' | 'ios' = 'android',
+  onSwitchPlatform?: (platform: 'android' | 'ios') => void
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = 'constellation-view-container';
@@ -66,16 +70,21 @@ export function renderNeuralConstellationView(
 
   // 2. Build 3D Holmes Memory Palace Node Network
   const allNodes: PalaceNode[] = [];
+
   const lineMatSynapse = new THREE.LineBasicMaterial({
-    color: 0x38bdf8,
+    color: knowledgeMode === 'deepdive' ? (deepDivePlatform === 'android' ? 0x10b981 : 0x0ea5e9) : 0x38bdf8,
     transparent: true,
-    opacity: 0.25,
+    opacity: 0.3,
   });
   const lineMatGolden = new THREE.LineBasicMaterial({
     color: 0xfbbf24,
     transparent: true,
     opacity: 0.35,
   });
+
+  const platformName = deepDivePlatform === 'android' ? 'Android' : 'iOS';
+  const platformColor = deepDivePlatform === 'android' ? 0x10b981 : 0x0ea5e9;
+  const platformEmissive = deepDivePlatform === 'android' ? 0x047857 : 0x0369a1;
 
   stages.forEach((stage, sIdx) => {
     const stageAngle = (sIdx / stages.length) * Math.PI * 2;
@@ -91,9 +100,9 @@ export function renderNeuralConstellationView(
     // Level 1: Stage Core Hub
     const hubGeom = new THREE.SphereGeometry(isAdv ? 0.7 : 0.9, 32, 32);
     const hubMat = new THREE.MeshStandardMaterial({
-      color: isAdv ? 0xa855f7 : 0x0d9488,
-      emissive: isAdv ? 0x6b21a8 : 0x042f2e,
-      emissiveIntensity: 0.8,
+      color: knowledgeMode === 'deepdive' ? platformColor : (isAdv ? 0xa855f7 : 0x0d9488),
+      emissive: knowledgeMode === 'deepdive' ? platformEmissive : (isAdv ? 0x6b21a8 : 0x042f2e),
+      emissiveIntensity: 0.85,
       roughness: 0.2,
       metalness: 0.3,
     });
@@ -104,7 +113,7 @@ export function renderNeuralConstellationView(
     // Dynamic Halo Ring
     const haloGeom = new THREE.RingGeometry(isAdv ? 1.0 : 1.3, isAdv ? 1.15 : 1.45, 32);
     const haloMat = new THREE.MeshBasicMaterial({
-      color: isAdv ? 0xc084fc : 0x14b8a6,
+      color: knowledgeMode === 'deepdive' ? platformColor : (isAdv ? 0xc084fc : 0x14b8a6),
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.6,
@@ -121,97 +130,140 @@ export function renderNeuralConstellationView(
       stageId: stage.id,
       stageTitle,
       isAdv,
-      title: stageTitle,
+      title: `${stageTitle} · ${knowledgeMode === 'deepdive' ? `${platformName} 进阶` : '对照星核'}`,
       subtitle: isAdv ? '进阶扩展星域' : '核心主线星核',
       pos: hubPos,
     });
 
-    // Level 2: Concept Orbit Nodes (4 key concept pairs)
-    const topRows = stage.rows.slice(0, 4);
-    topRows.forEach((row, rIdx) => {
-      const cAngle = (rIdx / topRows.length) * Math.PI * 2 + 0.3;
-      const cRadius = 2.4;
-      const cPos = new THREE.Vector3(
-        hubX + Math.cos(cAngle) * cRadius,
-        hubY + 0.8 + Math.sin(cAngle) * 0.4,
-        hubZ + Math.sin(cAngle) * cRadius
-      );
+    if (knowledgeMode === 'deepdive') {
+      // Deep Dive Mode: Orbiting Single-Platform Deep Dive Module Nodes
+      const stageDeepData = deepDivesData[stage.id];
+      const modules = stageDeepData ? (deepDivePlatform === 'android' ? stageDeepData.android : stageDeepData.ios) : [];
 
-      const cGeom = new THREE.SphereGeometry(0.22, 16, 16);
-      const cMat = new THREE.MeshStandardMaterial({
-        color: 0x38bdf8,
-        emissive: 0x0284c7,
-        emissiveIntensity: 0.6,
-        roughness: 0.3,
+      modules.forEach((mod, mIdx) => {
+        const mAngle = (mIdx / modules.length) * Math.PI * 2 + 0.4;
+        const mRadius = 2.8 + mIdx * 0.4;
+        const mPos = new THREE.Vector3(
+          hubX + Math.cos(mAngle) * mRadius,
+          hubY + Math.sin(mAngle * 2) * 0.8,
+          hubZ + Math.sin(mAngle) * mRadius
+        );
+
+        const mGeom = new THREE.DodecahedronGeometry(0.28);
+        const mMat = new THREE.MeshStandardMaterial({
+          color: platformColor,
+          emissive: platformEmissive,
+          emissiveIntensity: 0.8,
+          roughness: 0.25,
+        });
+        const mMesh = new THREE.Mesh(mGeom, mMat);
+        mMesh.position.copy(mPos);
+        palaceGroup.add(mMesh);
+
+        // Connection Line
+        const mLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, mPos]);
+        const mLine = new THREE.Line(mLineGeom, lineMatSynapse);
+        palaceGroup.add(mLine);
+
+        allNodes.push({
+          mesh: mMesh,
+          type: 'deepdive',
+          stageId: stage.id,
+          stageTitle,
+          isAdv,
+          title: `【${mod.tag}】${mod.title}`,
+          subtitle: `${platformName} 底层机制专题`,
+          noteTag: mod.tag,
+          explanation: mod.explanation,
+          codeSnippet: mod.codeSnippet,
+          pos: mPos,
+        });
       });
-      const cMesh = new THREE.Mesh(cGeom, cMat);
-      cMesh.position.copy(cPos);
-      palaceGroup.add(cMesh);
+    } else {
+      // Roadmap Mode: Concept Orbit Nodes & Golden Spark Nodes
+      const topRows = stage.rows.slice(0, 4);
+      topRows.forEach((row, rIdx) => {
+        const cAngle = (rIdx / topRows.length) * Math.PI * 2 + 0.3;
+        const cRadius = 2.4;
+        const cPos = new THREE.Vector3(
+          hubX + Math.cos(cAngle) * cRadius,
+          hubY + 0.8 + Math.sin(cAngle) * 0.4,
+          hubZ + Math.sin(cAngle) * cRadius
+        );
 
-      // Connection to Stage Hub
-      const cLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, cPos]);
-      const cLine = new THREE.Line(cLineGeom, lineMatSynapse);
-      palaceGroup.add(cLine);
+        const cGeom = new THREE.SphereGeometry(0.22, 16, 16);
+        const cMat = new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0284c7,
+          emissiveIntensity: 0.6,
+          roughness: 0.3,
+        });
+        const cMesh = new THREE.Mesh(cGeom, cMat);
+        cMesh.position.copy(cPos);
+        palaceGroup.add(cMesh);
 
-      allNodes.push({
-        mesh: cMesh,
-        type: 'concept',
-        stageId: stage.id,
-        stageTitle,
-        isAdv,
-        title: `${row.android.split('(')[0].trim()} ⟷ ${row.ios.split('(')[0].trim()}`,
-        subtitle: '核心语法对照',
-        androidCode: row.android,
-        iosCode: row.ios,
-        explanation: i18n.t(row.note || 'detail.col.android'),
-        pos: cPos,
+        const cLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, cPos]);
+        const cLine = new THREE.Line(cLineGeom, lineMatSynapse);
+        palaceGroup.add(cLine);
+
+        allNodes.push({
+          mesh: cMesh,
+          type: 'concept',
+          stageId: stage.id,
+          stageTitle,
+          isAdv,
+          title: `${row.android.split('(')[0].trim()} ⟷ ${row.ios.split('(')[0].trim()}`,
+          subtitle: '核心语法对照',
+          androidCode: row.android,
+          iosCode: row.ios,
+          explanation: i18n.t(row.note || 'detail.col.android'),
+          pos: cPos,
+        });
       });
-    });
 
-    // Level 3: Golden Spark Nodes (4 Pitfall Rules)
-    stage.noteKeys.forEach((noteKey, nIdx) => {
-      const gAngle = (nIdx / stage.noteKeys.length) * Math.PI * 2 - 0.5;
-      const gRadius = 3.6;
-      const gPos = new THREE.Vector3(
-        hubX + Math.cos(gAngle) * gRadius,
-        hubY - 0.7 + Math.sin(gAngle) * 0.3,
-        hubZ + Math.sin(gAngle) * gRadius
-      );
+      stage.noteKeys.forEach((noteKey, nIdx) => {
+        const gAngle = (nIdx / stage.noteKeys.length) * Math.PI * 2 - 0.5;
+        const gRadius = 3.6;
+        const gPos = new THREE.Vector3(
+          hubX + Math.cos(gAngle) * gRadius,
+          hubY - 0.7 + Math.sin(gAngle) * 0.3,
+          hubZ + Math.sin(gAngle) * gRadius
+        );
 
-      const gGeom = new THREE.DodecahedronGeometry(0.18);
-      const gMat = new THREE.MeshStandardMaterial({
-        color: 0xfbbf24,
-        emissive: 0xd97706,
-        emissiveIntensity: 0.9,
-        roughness: 0.1,
+        const gGeom = new THREE.DodecahedronGeometry(0.18);
+        const gMat = new THREE.MeshStandardMaterial({
+          color: 0xfbbf24,
+          emissive: 0xd97706,
+          emissiveIntensity: 0.9,
+          roughness: 0.1,
+        });
+        const gMesh = new THREE.Mesh(gGeom, gMat);
+        gMesh.position.copy(gPos);
+        palaceGroup.add(gMesh);
+
+        const gLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, gPos]);
+        const gLine = new THREE.Line(gLineGeom, lineMatGolden);
+        palaceGroup.add(gLine);
+
+        const noteText = i18n.t(noteKey);
+        const tagMatch = noteText.match(/^【([^】]+)】\s*(.*)$/) || noteText.match(/^\[([^\]]+)\]\s*(.*)$/);
+        const tag = tagMatch ? tagMatch[1] : '避坑秘籍';
+        const body = tagMatch ? tagMatch[2] : noteText;
+
+        allNodes.push({
+          mesh: gMesh,
+          type: 'spark',
+          stageId: stage.id,
+          stageTitle,
+          isAdv,
+          title: `【${tag}】`,
+          subtitle: '黄金避坑灵光',
+          noteTag: tag,
+          noteBody: body,
+          pos: gPos,
+        });
       });
-      const gMesh = new THREE.Mesh(gGeom, gMat);
-      gMesh.position.copy(gPos);
-      palaceGroup.add(gMesh);
-
-      // Golden Fiber Connection
-      const gLineGeom = new THREE.BufferGeometry().setFromPoints([hubPos, gPos]);
-      const gLine = new THREE.Line(gLineGeom, lineMatGolden);
-      palaceGroup.add(gLine);
-
-      const noteText = i18n.t(noteKey);
-      const tagMatch = noteText.match(/^【([^】]+)】\s*(.*)$/) || noteText.match(/^\[([^\]]+)\]\s*(.*)$/);
-      const tag = tagMatch ? tagMatch[1] : '避坑秘籍';
-      const body = tagMatch ? tagMatch[2] : noteText;
-
-      allNodes.push({
-        mesh: gMesh,
-        type: 'spark',
-        stageId: stage.id,
-        stageTitle,
-        isAdv,
-        title: `【${tag}】`,
-        subtitle: '黄金避坑灵光',
-        noteTag: tag,
-        noteBody: body,
-        pos: gPos,
-      });
-    });
+    }
   });
 
   // Inter-Stage Macro Constellation Beams
@@ -222,7 +274,7 @@ export function renderNeuralConstellationView(
     if (p1 && p2) {
       const beamGeom = new THREE.BufferGeometry().setFromPoints([p1, p2]);
       const beamMat = new THREE.LineDashedMaterial({
-        color: 0x0d9488,
+        color: knowledgeMode === 'deepdive' ? platformColor : 0x0d9488,
         dashSize: 0.6,
         gapSize: 0.4,
         transparent: true,
@@ -235,16 +287,36 @@ export function renderNeuralConstellationView(
   }
 
   // 3. Unified 3D Mode Top Bar (Dedicated in 3D Mode)
+  const isDeepDive = knowledgeMode === 'deepdive';
   const topBar = document.createElement('div');
   topBar.className = 'constellation-top-bar';
+
+  let platformSwitchHtml = '';
+  if (isDeepDive) {
+    platformSwitchHtml = `
+      <div class="header-platform-toggle" style="margin-right:12px;">
+        <button class="platform-toggle-btn btn-android ${deepDivePlatform === 'android' ? 'active' : ''}" id="top-btn-android" title="切换为 Android 3D 进阶星云">
+          <span class="platform-dot dot-android"></span>
+          <span>Android</span>
+        </button>
+        <button class="platform-toggle-btn btn-ios ${deepDivePlatform === 'ios' ? 'active' : ''}" id="top-btn-ios" title="切换为 iOS 3D 进阶星云">
+          <span class="platform-dot dot-ios"></span>
+          <span>iOS</span>
+        </button>
+      </div>
+    `;
+  }
+
   topBar.innerHTML = `
     <div class="top-bar-left">
       <div class="constellation-title-group">
-        <div class="constellation-brand-badge">
+        <div class="constellation-brand-badge" style="${isDeepDive ? (deepDivePlatform === 'android' ? 'border-color:#10b981;color:#10b981;' : 'border-color:#0ea5e9;color:#0ea5e9;') : ''}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-          <span>Android ⟷ iOS 3D 认知星云</span>
+          <span>${isDeepDive ? `单端深度进阶 · ${platformName} 3D 星云` : 'Android ⟷ iOS 3D 认知星云'}</span>
         </div>
       </div>
+
+      ${platformSwitchHtml}
 
       <div class="view-mode-toggle">
         <button class="view-mode-btn active" id="btn-mode-3d" title="当前：3D 星云模式">
@@ -288,60 +360,149 @@ export function renderNeuralConstellationView(
   legend.className = 'palace-legend-hud';
   legend.innerHTML = `
     <div class="legend-item">
-      <span class="legend-dot legend-dot-hub"></span>
-      <span>阶段中心星核</span>
+      <span class="legend-dot" style="background:${isDeepDive ? (deepDivePlatform === 'android' ? '#10b981' : '#0ea5e9') : '#0d9488'};box-shadow:0 0 6px ${isDeepDive ? (deepDivePlatform === 'android' ? '#10b981' : '#0ea5e9') : '#0d9488'};"></span>
+      <span>${isDeepDive ? `${platformName} 阶段星核` : '核心主线星核'}</span>
     </div>
     <div class="legend-item">
-      <span class="legend-dot legend-dot-concept"></span>
-      <span>核心语法概念突触</span>
-    </div>
-    <div class="legend-item">
-      <span class="legend-dot legend-dot-spark"></span>
-      <span>黄金避坑记忆灵光</span>
+      <span class="legend-dot" style="background:${isDeepDive ? (deepDivePlatform === 'android' ? '#34d399' : '#38bdf8') : '#38bdf8'};"></span>
+      <span>${isDeepDive ? '底层机制 / 性能调优专题' : '核心语法对标突触'}</span>
     </div>
   `;
   container.appendChild(legend);
 
-  // 5. 3D Floating Anchor Tooltip (Directly on top of node in 3D space)
-  const anchorTooltip = document.createElement('div');
-  anchorTooltip.className = 'constellation-node-anchor-tooltip';
-  container.appendChild(anchorTooltip);
+  // 5. Floating Hover Tooltip (Anchor above hovered node)
+  const hoverTooltip = document.createElement('div');
+  hoverTooltip.className = 'palace-hover-tooltip';
+  container.appendChild(hoverTooltip);
 
-  // 6. Holographic HUD Lens (Pinned to Bottom-Right Corner)
+  // 6. Holographic Detail Lens (Bottom-right focus HUD)
   const hudLens = document.createElement('div');
   hudLens.className = 'palace-hud-lens';
   container.appendChild(hudLens);
 
-  const renderHudLens = (node: PalaceNode) => {
+  // 7. Raycasting & Interaction
+  const raycaster = new THREE.Raycaster();
+  const mouse = new THREE.Vector2();
+  let hoveredNode: PalaceNode | null = null;
+
+  const onMouseMove = (e: MouseEvent) => {
+    const rect = canvasWrap.getBoundingClientRect();
+    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const meshes = allNodes.map((n) => n.mesh);
+    const intersects = raycaster.intersectObjects(meshes);
+
+    if (intersects.length > 0) {
+      const hitMesh = intersects[0].object as THREE.Mesh;
+      const node = allNodes.find((n) => n.mesh === hitMesh);
+      if (node && node !== hoveredNode) {
+        hoveredNode = node;
+        document.body.style.cursor = 'pointer';
+
+        // Update Floating Tooltip
+        const tagText = node.noteTag ? `【${node.noteTag}】` : '';
+        hoverTooltip.innerHTML = `
+          <div class="tooltip-header">
+            <span class="tooltip-badge ${node.type}">${node.subtitle || '认知节点'}</span>
+          </div>
+          <div class="tooltip-title">${tagText}${escapeHtml(node.title)}</div>
+        `;
+        hoverTooltip.classList.add('visible');
+
+        // Scale up node mesh slightly
+        gsap.to(node.mesh.scale, { x: 1.35, y: 1.35, z: 1.35, duration: 0.2 });
+      }
+    } else {
+      if (hoveredNode) {
+        gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+        hoveredNode = null;
+        document.body.style.cursor = 'default';
+        hoverTooltip.classList.remove('visible');
+      }
+    }
+
+    if (hoveredNode) {
+      const wp = new THREE.Vector3();
+      hoveredNode.mesh.getWorldPosition(wp);
+      const sp = wp.project(camera);
+      const sx = ((sp.x + 1) * rect.width) / 2;
+      const sy = ((-sp.y + 1) * rect.height) / 2;
+
+      hoverTooltip.style.left = `${sx}px`;
+      hoverTooltip.style.top = `${sy - 32}px`;
+    }
+  };
+
+  const showHudDetail = (node: PalaceNode) => {
     let contentHtml = '';
 
     if (node.type === 'stage') {
-      const stage = stages.find((s) => s.id === node.stageId) || stages[0];
       contentHtml = `
         <div class="hud-lens-header">
           <div>
             <div class="hud-lens-badge">
-              <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}" style="font-size:10px;padding:2px 6px;">
-                ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
-              </span>
-              <span>阶段星核</span>
+              <span>🌌 阶段主星核 · ${node.stageTitle}</span>
             </div>
-            <h3 class="hud-lens-title">${i18n.t(stage.titleKey)}</h3>
+            <h3 class="hud-lens-title">${node.title}</h3>
           </div>
           <button class="btn-ghost" id="btn-close-hud" style="padding:4px;" title="关闭">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
         <div class="hud-lens-body">
-          <div style="font-size:13px;line-height:1.55;color:var(--color-ink);background:var(--color-accent-soft);padding:10px 12px;border-left:3px solid var(--color-accent);border-radius:4px;">
-            ${i18n.t(stage.goalKey)}
-          </div>
-          <div id="hud-table-mount"></div>
           <div id="hud-diagram-mount"></div>
-          <div id="hud-deepdive-mount"></div>
+          <div id="hud-table-mount"></div>
         </div>
         <div class="hud-lens-footer">
-          <span style="font-size:11.5px;color:var(--color-ink-muted);">点击周围子节点查看代码</span>
+          <span style="font-size:11.5px;color:var(--color-ink-muted);">点击周围子节点探索深度代码与原理</span>
+        </div>
+      `;
+    } else if (node.type === 'deepdive') {
+      // Single Platform Deep Dive Node
+      const langLabel = deepDivePlatform === 'android'
+        ? (node.codeSnippet && node.codeSnippet.startsWith('#') ? 'TERMINAL' : 'KOTLIN / GRADLE')
+        : (node.codeSnippet && (node.codeSnippet.startsWith('(') || node.codeSnippet.startsWith('xcrun') || node.codeSnippet.startsWith('codesign')) ? 'TERMINAL / LLDB' : 'SWIFT');
+
+      let snippetHtml = '';
+      if (node.codeSnippet) {
+        snippetHtml = `
+          <div class="deep-dive-code-block" style="margin-top:12px;">
+            <div class="code-block-header">
+              <span class="code-block-lang">${langLabel}</span>
+              <button class="code-copy-btn" id="btn-copy-hud-code" title="复制代码">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>复制</span>
+              </button>
+            </div>
+            <pre class="deep-dive-pre"><code>${escapeHtml(node.codeSnippet)}</code></pre>
+          </div>
+        `;
+      }
+
+      contentHtml = `
+        <div class="hud-lens-header">
+          <div>
+            <div class="hud-lens-badge" style="${deepDivePlatform === 'android' ? 'color:#10b981;' : 'color:#0ea5e9;'}">
+              <span>【${node.noteTag || '底层机制'}】${platformName} 深度进阶 · ${node.stageTitle}</span>
+            </div>
+            <h3 class="hud-lens-title">${node.title}</h3>
+          </div>
+          <button class="btn-ghost" id="btn-close-hud" style="padding:4px;" title="关闭">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="hud-lens-body">
+          <div style="font-size:13.5px;line-height:1.65;color:var(--color-ink);margin-bottom:8px;">
+            ${node.explanation || ''}
+          </div>
+          ${snippetHtml}
+        </div>
+        <div class="hud-lens-footer">
+          <button class="btn btn-secondary btn-sm" id="btn-hud-focus-parent">
+            <span>🔍 聚焦父星核 (${node.stageTitle})</span>
+          </button>
         </div>
       `;
     } else if (node.type === 'concept') {
@@ -412,23 +573,32 @@ export function renderNeuralConstellationView(
     if (node.type === 'stage') {
       const stage = stages.find((s) => s.id === node.stageId);
       if (stage) {
-        const tableMount = hudLens.querySelector('#hud-table-mount');
-        if (tableMount) {
-          tableMount.appendChild(
-            renderComparisonTable(stage.rows.slice(0, 3), i18n.t('detail.col.android'), i18n.t('detail.col.ios'), false)
-          );
+        if (knowledgeMode === 'roadmap') {
+          const tableMount = hudLens.querySelector('#hud-table-mount');
+          if (tableMount) {
+            tableMount.appendChild(
+              renderComparisonTable(stage.rows.slice(0, 3), i18n.t('detail.col.android'), i18n.t('detail.col.ios'), false)
+            );
+          }
         }
         const diagMount = hudLens.querySelector('#hud-diagram-mount');
         if (diagMount) {
           diagMount.appendChild(renderArchitectureDiagram(stage.id, stage.extraHintKey));
         }
-        if (stage.deepDive) {
-          const deepDiveMount = hudLens.querySelector('#hud-deepdive-mount');
-          if (deepDiveMount) {
-            deepDiveMount.appendChild(renderDeepDiveSection(stage.id, stage.deepDive));
-          }
-        }
       }
+    }
+
+    if (node.type === 'deepdive' && node.codeSnippet) {
+      const copyBtn = hudLens.querySelector('#btn-copy-hud-code');
+      copyBtn?.addEventListener('click', () => {
+        navigator.clipboard.writeText(node.codeSnippet || '');
+        const span = copyBtn.querySelector('span');
+        if (span) {
+          const original = span.textContent;
+          span.textContent = '已复制 ✓';
+          setTimeout(() => { span.textContent = original; }, 2000);
+        }
+      });
     }
 
     hudLens.classList.add('active');
@@ -450,82 +620,29 @@ export function renderNeuralConstellationView(
     const spinBtn = topBar.querySelector('#btn-toggle-spin');
     spinBtn?.classList.remove('active');
 
-    const isMobile = window.innerWidth <= 768;
-    const offsetZ = targetNode.type === 'stage' ? 5.5 : 3.8;
-    const offsetX = isMobile ? 0 : targetNode.type === 'stage' ? -1.8 : -1.2;
+    const targetPos = targetNode.pos.clone();
+    const camOffset = targetNode.type === 'stage'
+      ? targetPos.clone().normalize().multiplyScalar(5).add(new THREE.Vector3(0, 2, 4))
+      : targetPos.clone().normalize().multiplyScalar(3).add(new THREE.Vector3(0, 1.2, 2.5));
+
+    const finalCamPos = targetPos.clone().add(camOffset);
 
     gsap.to(camera.position, {
-      x: targetNode.pos.x + offsetX,
-      y: targetNode.pos.y + 0.6,
-      z: targetNode.pos.z + offsetZ,
-      duration: 0.7,
-      ease: 'power2.out',
-    });
-
-    if (sceneManager.controls) {
-      gsap.to(sceneManager.controls.target, {
-        x: targetNode.pos.x,
-        y: targetNode.pos.y,
-        z: targetNode.pos.z,
-        duration: 0.7,
-        ease: 'power2.out',
-      });
-    }
-
-    renderHudLens(targetNode);
-  };
-
-  // 7. Raycaster Hover & Click
-  const raycaster = new THREE.Raycaster();
-  const mouse = new THREE.Vector2(-999, -999);
-  let hoveredNode: PalaceNode | null = null;
-
-  const onMouseMove = (e: MouseEvent) => {
-    const rect = canvasWrap.getBoundingClientRect();
-    mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const visibleMeshes = allNodes.filter((n) => n.mesh.visible).map((n) => n.mesh);
-    const intersects = raycaster.intersectObjects(visibleMeshes);
-
-    if (intersects.length > 0) {
-      const hitMesh = intersects[0].object as THREE.Mesh;
-      const targetNode = allNodes.find((n) => n.mesh === hitMesh);
-
-      if (targetNode && targetNode !== hoveredNode) {
-        hoveredNode = targetNode;
-        canvasWrap.style.cursor = 'pointer';
-
-        gsap.to(targetNode.mesh.scale, { x: 1.6, y: 1.6, z: 1.6, duration: 0.2 });
-        if (targetNode.haloMesh) {
-          gsap.to(targetNode.haloMesh.scale, { x: 1.9, y: 1.9, z: 1.9, duration: 0.2 });
+      x: finalCamPos.x,
+      y: finalCamPos.y,
+      z: finalCamPos.z,
+      duration: 1.2,
+      ease: 'power3.inOut',
+      onUpdate: () => {
+        if (sceneManager.controls) {
+          sceneManager.controls.target.copy(targetPos);
+          sceneManager.controls.update();
         }
-
-        // Project directly on top of the node in 3D space
-        const vector = targetNode.pos.clone().project(camera);
-        const screenX = ((vector.x + 1) * rect.width) / 2;
-        const screenY = ((-vector.y + 1) * rect.height) / 2;
-
-        anchorTooltip.style.left = `${screenX}px`;
-        anchorTooltip.style.top = `${screenY}px`;
-
-        const tagText = targetNode.type === 'stage' ? '阶段星核' : targetNode.type === 'spark' ? '✨ 避坑灵光' : '🎯 概念突触';
-        anchorTooltip.innerHTML = `
-          <span class="anchor-tooltip-tag">${tagText}</span>
-          <span class="anchor-tooltip-title">${targetNode.title}</span>
-        `;
-        anchorTooltip.classList.add('visible');
-      }
-    } else if (hoveredNode) {
-      gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
-      if (hoveredNode.haloMesh) {
-        gsap.to(hoveredNode.haloMesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
-      }
-      hoveredNode = null;
-      canvasWrap.style.cursor = 'grab';
-      anchorTooltip.classList.remove('visible');
-    }
+      },
+      onComplete: () => {
+        showHudDetail(targetNode);
+      },
+    });
   };
 
   const onClick = () => {
@@ -540,6 +657,13 @@ export function renderNeuralConstellationView(
   // 8. Top Bar Event Listeners
   topBar.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
     onSwitchViewMode('doc');
+  });
+
+  topBar.querySelector('#top-btn-android')?.addEventListener('click', () => {
+    if (onSwitchPlatform) onSwitchPlatform('android');
+  });
+  topBar.querySelector('#top-btn-ios')?.addEventListener('click', () => {
+    if (onSwitchPlatform) onSwitchPlatform('ios');
   });
 
   // Top Filter Tabs
@@ -573,7 +697,8 @@ export function renderNeuralConstellationView(
     sceneManager.resetCamera([0, 16, 32], [0, 0, 0]);
   });
 
-  topBar.querySelector('#btn-theme-toggle')?.addEventListener('click', () => {
+  const themeBtn = topBar.querySelector('#btn-theme-toggle') as HTMLButtonElement;
+  themeBtn.addEventListener('click', () => {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const nextTheme = isDark ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', nextTheme);

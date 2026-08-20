@@ -6,6 +6,7 @@ export function renderSidebar(
   currentStageId: string,
   onSelect: (targetId: string) => void,
   docMode: 'roadmap' | 'deepdive' = 'roadmap',
+  deepDivePlatform: 'android' | 'ios' = 'android',
   onSwitchDocMode?: (mode: 'roadmap' | 'deepdive') => void
 ): HTMLElement {
   const sidebar = document.createElement('aside');
@@ -15,12 +16,13 @@ export function renderSidebar(
   const mainStages = stages.filter((s) => !s.isAdvanced);
   const advancedStages = stages.filter((s) => s.isAdvanced);
 
-  // 1. Home Item (in roadmap mode) or Deep Dive Home Item (in deepdive mode)
+  // 1. Home Item (in roadmap mode) or Deep Dive Overview Item (in deepdive mode)
   const topSection = document.createElement('div');
   topSection.className = 'sidebar-section';
 
   const topItem = document.createElement('button');
-  topItem.className = `sidebar-item ${currentStageId === 'home' || (docMode === 'deepdive' && currentStageId === 'all') ? 'active' : ''}`;
+  const isTopActive = currentStageId === 'home' || currentStageId === 'all';
+  topItem.className = `sidebar-item ${isTopActive ? 'active' : ''}`;
   
   if (docMode === 'roadmap') {
     topItem.innerHTML = `
@@ -30,8 +32,8 @@ export function renderSidebar(
     topItem.addEventListener('click', () => onSelect('home'));
   } else {
     topItem.innerHTML = `
-      <span style="font-size:15px;flex-shrink:0;">🌊</span>
-      <span class="sidebar-item-title" style="font-weight:700;">全部深度进阶 (16 阶段)</span>
+      <span style="font-size:15px;flex-shrink:0;">${deepDivePlatform === 'android' ? '🟢' : '🔵'}</span>
+      <span class="sidebar-item-title" style="font-weight:700;">${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 进阶总览 (16 阶段)</span>
     `;
     topItem.addEventListener('click', () => onSelect('all'));
   }

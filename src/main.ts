@@ -8,12 +8,13 @@ import { renderHeader } from './components/Header';
 import { renderSidebar } from './components/Sidebar';
 import { renderHomeView } from './components/HomeView';
 import { renderStageDetail } from './components/StageDetailView';
-import { renderDeepDivePortalView } from './components/DeepDivePortalView';
+import { renderDeepDiveDocView } from './components/DeepDiveDocView';
 import { renderNeuralConstellationView } from './visuals/macro/NeuralConstellationView';
 
 class AppController {
   private is3DMode: boolean = false;
   private docMode: 'roadmap' | 'deepdive' = 'roadmap';
+  private deepDivePlatform: 'android' | 'ios' = 'android';
   private currentStageId: string = 'home';
   private sidebarOpen = false;
   private desktopSidebarCollapsed = false;
@@ -24,6 +25,7 @@ class AppController {
       document.body.classList.add('sidebar-collapsed');
     }
     this.docMode = (localStorage.getItem('learning_cockpit_doc_mode') as 'roadmap' | 'deepdive') || 'roadmap';
+    this.deepDivePlatform = (localStorage.getItem('learning_deepdive_platform') as 'android' | 'ios') || 'android';
     this.is3DMode = localStorage.getItem('learning_cockpit_view_mode') === '3d';
 
     this.initTheme();
@@ -101,6 +103,12 @@ class AppController {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  private switchPlatform(platform: 'android' | 'ios') {
+    this.deepDivePlatform = platform;
+    localStorage.setItem('learning_deepdive_platform', platform);
+    this.render();
+  }
+
   private updateHash() {
     if (this.is3DMode) {
       window.location.hash = '3d';
@@ -176,9 +184,12 @@ class AppController {
 
     // 1. If in 3D Constellation Mode:
     if (this.is3DMode) {
-      const constellationView = renderNeuralConstellationView((mode) => {
-        this.toggle3DDoc(mode);
-      });
+      const constellationView = renderNeuralConstellationView(
+        (mode) => this.toggle3DDoc(mode),
+        this.docMode,
+        this.deepDivePlatform,
+        (platform) => this.switchPlatform(platform)
+      );
       app.appendChild(constellationView);
       return;
     }
@@ -192,7 +203,9 @@ class AppController {
       },
       this.is3DMode,
       this.docMode,
-      (mode) => this.toggle3DDoc(mode)
+      this.deepDivePlatform,
+      (mode) => this.toggle3DDoc(mode),
+      (platform) => this.switchPlatform(platform)
     );
     app.appendChild(header);
 
@@ -205,6 +218,7 @@ class AppController {
       this.currentStageId,
       (id) => this.navigateStage(id),
       this.docMode,
+      this.deepDivePlatform,
       (nextMode) => this.switchDocMode(nextMode)
     );
     body.appendChild(sidebar);
@@ -222,15 +236,13 @@ class AppController {
 
     if (this.docMode === 'deepdive') {
       content.appendChild(
-        renderDeepDivePortalView(
+        renderDeepDiveDocView(
+          this.currentStageId,
+          this.deepDivePlatform,
+          (stageId) => this.navigateStage(stageId),
           (stageId) => {
             this.docMode = 'roadmap';
             this.navigateStage(stageId);
-          },
-          this.currentStageId,
-          (filterStageId) => {
-            this.currentStageId = filterStageId;
-            this.updateHash();
           }
         )
       );

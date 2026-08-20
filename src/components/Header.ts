@@ -3,13 +3,32 @@ export function renderHeader(
   onNavigateHome: () => void,
   is3DMode: boolean = false,
   docMode: 'roadmap' | 'deepdive' = 'roadmap',
-  onToggle3DDoc?: (mode: '3d' | 'doc') => void
+  deepDivePlatform: 'android' | 'ios' = 'android',
+  onToggle3DDoc?: (mode: '3d' | 'doc') => void,
+  onTogglePlatform?: (platform: 'android' | 'ios') => void
 ): HTMLElement {
   const header = document.createElement('header');
   header.className = 'app-header';
 
-  const modeTitle = docMode === 'roadmap' ? '双端路线图' : '单端深度进阶';
-  const badgeTitle = docMode === 'roadmap' ? '双端对照' : '底层内幕';
+  const isRoadmap = docMode === 'roadmap';
+  const mainTitle = isRoadmap ? 'Android ⟷ iOS · 双端路线图' : '单端深度进阶';
+  const badgeTitle = isRoadmap ? '双端对照' : (deepDivePlatform === 'android' ? 'Android 内幕' : 'iOS 内幕');
+
+  let centerPlatformSwitchHtml = '';
+  if (!isRoadmap) {
+    centerPlatformSwitchHtml = `
+      <div class="header-platform-toggle">
+        <button class="platform-toggle-btn btn-android ${deepDivePlatform === 'android' ? 'active' : ''}" id="hdr-btn-android" title="切换为 Android 单端深度进阶">
+          <span class="platform-dot dot-android"></span>
+          <span>Android</span>
+        </button>
+        <button class="platform-toggle-btn btn-ios ${deepDivePlatform === 'ios' ? 'active' : ''}" id="hdr-btn-ios" title="切换为 iOS 单端深度进阶">
+          <span class="platform-dot dot-ios"></span>
+          <span>iOS</span>
+        </button>
+      </div>
+    `;
+  }
 
   header.innerHTML = `
     <div class="header-left">
@@ -17,12 +36,17 @@ export function renderHeader(
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
       </button>
       <div class="header-logo" id="header-logo-btn">
-        <div class="brand-icon">AR</div>
+        <div class="brand-icon" style="${!isRoadmap ? (deepDivePlatform === 'android' ? 'background:linear-gradient(135deg, #10b981, #047857);' : 'background:linear-gradient(135deg, #0ea5e9, #0369a1);') : ''}">AR</div>
         <div class="brand-text">
-          <span class="brand-title">Android ⟷ iOS · ${modeTitle}</span>
-          <span class="brand-badge">${badgeTitle}</span>
+          <span class="brand-title">${mainTitle}</span>
+          <span class="brand-badge" style="${!isRoadmap ? (deepDivePlatform === 'android' ? 'color:#10b981;' : 'color:#0ea5e9;') : ''}">${badgeTitle}</span>
         </div>
       </div>
+    </div>
+
+    <!-- Center: Platform Switcher (only in deepdive mode) -->
+    <div class="header-center">
+      ${centerPlatformSwitchHtml}
     </div>
 
     <div class="header-right">
@@ -52,6 +76,13 @@ export function renderHeader(
     e.preventDefault();
     e.stopPropagation();
     onNavigateHome();
+  });
+
+  header.querySelector('#hdr-btn-android')?.addEventListener('click', () => {
+    if (onTogglePlatform) onTogglePlatform('android');
+  });
+  header.querySelector('#hdr-btn-ios')?.addEventListener('click', () => {
+    if (onTogglePlatform) onTogglePlatform('ios');
   });
 
   header.querySelector('#btn-mode-3d')?.addEventListener('click', () => {
