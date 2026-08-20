@@ -70,15 +70,64 @@ function renderSingleChapterView(
       <h2 class="section-header-title">一、底层运行机制与核心原理</h2>
     </div>
     <div class="chapter-card-box">
-      <p class="chapter-explanation-p">${mod.explanation}</p>
+      ${formatExplanationHtml(mod.explanation)}
     </div>
   `;
   container.appendChild(principleSection);
 
-  // Section 2: Production Code / Implementation
+  let nextSectionNumber = 2;
+
+  // Section: Architecture / Sequence Diagram (if present)
+  if (mod.diagram) {
+    const diagramSection = document.createElement('section');
+    diagramSection.className = 'chapter-content-section';
+    const sectionNumStr = nextSectionNumber === 2 ? '二' : '三';
+    nextSectionNumber++;
+
+    diagramSection.innerHTML = `
+      <div class="section-header" style="margin-top:24px;">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">${sectionNumStr}、架构与执行时序图解</h2>
+      </div>
+      <div class="box-diagram-card">
+        <div class="box-diagram-header">
+          <div class="box-diagram-dots">
+            <span class="box-dot dot-red"></span>
+            <span class="box-dot dot-yellow"></span>
+            <span class="box-dot dot-green"></span>
+          </div>
+          <span class="box-diagram-title">时序与状态转换 · 盒线全景图</span>
+          <button class="box-copy-btn btn-ghost" id="btn-copy-chapter-diag" title="复制图示">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span>复制</span>
+          </button>
+        </div>
+        <div class="box-diagram-body">
+          <pre class="box-diagram-code"><code>${escapeHtml(mod.diagram)}</code></pre>
+        </div>
+      </div>
+    `;
+
+    const copyDiagBtn = diagramSection.querySelector('#btn-copy-chapter-diag') as HTMLButtonElement;
+    copyDiagBtn?.addEventListener('click', () => {
+      navigator.clipboard.writeText(mod.diagram || '');
+      const span = copyDiagBtn.querySelector('span');
+      if (span) {
+        const original = span.textContent;
+        span.textContent = i18n.t('detail.deepdive.copied');
+        setTimeout(() => { span.textContent = original; }, 2000);
+      }
+    });
+
+    container.appendChild(diagramSection);
+  }
+
+  // Section: Production Code / Implementation
   if (mod.codeSnippet) {
     const codeSection = document.createElement('section');
     codeSection.className = 'chapter-content-section';
+    const sectionNumStr = nextSectionNumber === 2 ? '二' : (nextSectionNumber === 3 ? '三' : '四');
+
     const langLabel = mod.codeSnippet.startsWith('#') || mod.codeSnippet.startsWith('adb')
       ? 'SHELL / CLI'
       : (platform === 'android' ? 'KOTLIN / GRADLE' : 'SWIFT / XCODE');
@@ -86,7 +135,7 @@ function renderSingleChapterView(
     codeSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">二、工业级源码实现与实战规范</h2>
+        <h2 class="section-header-title">${sectionNumStr}、工业级源码实现与实战规范</h2>
       </div>
       <div class="deep-dive-code-block">
         <div class="code-block-header">
@@ -267,8 +316,47 @@ function renderPlatformOverview(
 
 function truncateText(text: string, maxLen: number): string {
   if (!text) return '';
-  if (text.length <= maxLen) return text;
-  return text.substring(0, maxLen) + '…';
+  // Clean markdown tags for short summaries
+  const clean = text.replace(/#+\s*/g, '').replace(/[-*]\s*/g, '').replace(/`+/g, '');
+  if (clean.length <= maxLen) return clean;
+  return clean.substring(0, maxLen) + '…';
+}
+
+function formatExplanationHtml(rawText: string): string {
+  if (!rawText) return '';
+  const paragraphs = rawText.split(/\n\n+/);
+  return paragraphs.map((p) => {
+    const trimmed = p.trim();
+    if (!trimmed) return '';
+    if (trimmed.startsWith('### ') || trimmed.startsWith('#### ')) {
+      const title = trimmed.replace(/^#+\s*/, '');
+      return `<h3 class="chapter-subheading">${escapeHtml(title)}</h3>`;
+    }
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      const items = trimmed.split(/\n/).map((line) => {
+        const itemText = line.replace(/^[-*]\s*/, '').trim();
+        return `<li>${formatInlineText(itemText)}</li>`;
+      }).join('');
+      return `<ul class="chapter-bullet-list">${items}</ul>`;
+    }
+    if (/^\d+\.\s/.test(trimmed) && trimmed.includes('\n')) {
+      const items = trimmed.split(/\n/).map((line) => {
+        const itemText = line.replace(/^\d+\.\s*/, '').trim();
+        return `<li>${formatInlineText(itemText)}</li>`;
+      }).join('');
+      return `<ol class="chapter-numbered-list">${items}</ol>`;
+    }
+    return `<p class="chapter-explanation-p">${formatInlineText(trimmed)}</p>`;
+  }).join('');
+}
+
+function formatInlineText(text: string): string {
+  let res = escapeHtml(text);
+  // Support bold: **text**
+  res = res.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  // Support inline code: `code`
+  res = res.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+  return res;
 }
 
 function escapeHtml(text: string): string {

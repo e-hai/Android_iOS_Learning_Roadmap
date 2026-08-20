@@ -15,8 +15,9 @@ export interface ComparisonSection {
 export interface DeepDiveModule {
   tag: string;           // e.g. '底层机制', '性能调优', '架构陷阱', '调试利器'
   title: string;         // Module title
-  explanation: string;   // Deep dive explanation
+  explanation: string;   // Deep dive explanation (supports rich structured paragraphs)
   codeSnippet?: string;  // Code example or CLI command
+  diagram?: string;      // Optional Unicode Box Diagram for architecture/timing/state machine
 }
 
 export interface PlatformDeepDive {

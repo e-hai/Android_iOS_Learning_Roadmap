@@ -5,21 +5,120 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
     android: [
       {
         tag: '并发底层',
-        title: 'Kotlin 协程 K1/K2 挂起状态机与 Continuation 链',
-        explanation: 'Kotlin 协程的 suspend 挂起函数在编译期被转换为带有 Continuation 续体参数的 CPS (Continuation-Passing Style) 方法，并在方法体内部生成基于 Switch-Case 的状态机。当调用另一个挂起函数返回 COROUTINE_SUSPENDED 时，当前函数直接 return 释放调用栈线程；底层异步任务完成后，调用 continuation.resumeWith(result) 重新进入状态机并将 label 推进至下一阶段。',
-        codeSnippet: `// 编译前:
-suspend fun loadUserData(): String {
-    val token = fetchToken() // 挂起 1
-    val info = fetchInfo(token) // 挂起 2
-    return info
+        title: 'Kotlin 协程从浅入深：挂起心智模型、CPS 状态机与 Dispatcher 调度器',
+        explanation: `### 1. 概念与心智模型（浅）：协程与线程的本质区别
+- **协程的本质**：协程（Coroutine = Cooperative Routine 协作式例程）并不是“轻量级线程”，它在 JVM/ART 上本质是**运行在底层线程池之上的用户态计算任务与调度单元**。
+- **非阻塞挂起（Non-blocking Suspend）的心智模型**：
+  - **传统线程阻塞（Thread.sleep / 同步网络 I/O）**：操作系统强制暂停整个内核线程，该线程无法做任何其他工作，且每个线程常驻占用 1MB+ 内存栈空间，伴随昂贵的内核态 CPU 上下文切换。
+  - **协程非阻塞挂起（delay / 挂起网络 I/O）**：当协程遇到挂起点时，**主动交出当前底层的执行线程**（例如主线程），主线程可以立即返回去处理 UI 渲染或触摸事件；底层异步 I/O 完成后，调度器分配一个空闲线程“恢复（Resume）”该协程从挂起点继续向下执行。
+
+### 2. 结构化并发与生命周期（中）：作用域树与异常级联
+- **结构化并发（Structured Concurrency）**：协程必须在明确的 \`CoroutineScope\` 中启动，父子协程构成一棵树状 Job 拓扑结构：
+  - **完成等待**：父协程的作用域会等待其所有子协程执行完毕后才会真正结束。
+  - **取消级联**：父协程调用 \`cancel()\` 时，会自动向下级联取消其所有子协程。
+  - **异常隔离选型**：普通 \`Job\` 中任意子协程发生未捕获异常会导致整个作用域取消；而 \`SupervisorJob\`（如 \`viewModelScope\`）会隔离子协程异常，避免兄弟任务互相波及。
+- **Android 生命周期绑定**：
+  - \`viewModelScope\`：绑定 \`ViewModel.onCleared()\`，页面销毁时自动取消所有异步任务，彻底杜绝内存泄漏与空指针回调。
+  - \`repeatOnLifecycle(Lifecycle.State.STARTED)\`：当 Activity/Fragment 退到后台（STOPPED）时自动挂起或取消流收集，进入前台时自动重启，杜绝在后台不可见时浪费 CPU 与电池。
+
+### 3. 编译期底层核心机理（深）：CPS 变换与状态机续体
+- **CPS (Continuation-Passing Style) 续体传递转换**：
+  - Kotlin 编译器对所有 \`suspend\` 挂起函数进行字节码重写：在参数列表末尾追加一个 \`Continuation<T>\` 续体回调参数（如 \`suspend fun fetch(): String\` 转换为 \`fun fetch(cont: Continuation<String>): Any?\`）。
+  - 函数返回值变更为 \`Any?\`：未挂起时直接返回真实数据；若发生真正挂起则返回内部特殊单例标记 \`COROUTINE_SUSPENDED\`。
+- **状态机（State Machine）生成机制**：
+  - 编译器为挂起函数内部生成一个继承自 \`ContinuationImpl\` 的内部匿名状态机类，维护一个 \`label\` 状态标记（初始为 0）。
+  - 函数体内的挂起点将代码切分为若干个逻辑块，编译为一个 \`when(label)\` 或 \`switch(label)\`。
+  - 遇到挂起点时更新 \`label\` 并将局部变量保存在状态机字段中；子函数若返回挂起标记，当前函数直接 \`return\` 释放线程栈；异步完成后通过 \`continuation.resumeWith()\` 重新进入状态机并跳转至下一 \`label\` 恢复执行。
+
+### 4. 调度器与线程池底层（深）：Dispatchers 与工作窃取
+- **\`Dispatchers.Main\`**：绑定 Android 主线程消息循环，底层通过 \`Handler(Looper.getMainLooper()).post(runnable)\` 将协程恢复包装为 Runnable 投递到主线程 MessageQueue。
+- **\`Dispatchers.Default\`**：计算密集型任务调度器，线程池核心线程数等于 CPU 逻辑核心数，基于高性能 **Work-Stealing（工作窃取）算法**，每个 Worker 线程拥有独立的本地任务队列，空闲 Worker 会从其他繁忙 Worker 队列尾部窃取任务，最大化 CPU 吞吐。
+- **\`Dispatchers.IO\`**：阻塞 I/O 调度器，共享 \`Dispatchers.Default\` 的底层线程池调度器，最大线程数可弹性扩展至 64 或 CPU 核心数较大值，在线程阻塞时动态创建新线程补充算力。`,
+        diagram: `[ Kotlin 协程从浅入深：挂起心智模型、CPS 状态机与调度器全景图解 ]
+
+ 1. 【心智模型对比：线程阻塞 vs 协程非阻塞挂起】
+    传统线程阻塞模型 (Thread.sleep / 同步 I/O):
+    [ Thread-Main ] ──▶ [ I/O 同步阻塞 (500ms) ] ──▶ [ 恢复执行 ]
+                         └── 线程被操作系统挂起卡死，无法处理 UI 绘制 ➔ 造成 ANR！
+
+    协程非阻塞挂起模型 (delay / suspend I/O):
+    [ Thread-Main ] ──▶ [ 遇到挂起点 ] ──▶ [ Thread-Main 立即释放，继续流畅处理 UI 绘制与触摸 ]
+                               │ (底层 epoll / Netty 在后台等待 I/O 事件)
+    [ Thread-Worker] ◀───────── [ I/O 完成，调度器分配空闲 Worker 线程调用 resumeWith 恢复协程 ]
+
+ 2. 【编译期 CPS 变换与 Continuation 状态机执行流】
+    开发者编写的挂起源码:
+    suspend fun loadUserData(): UserProfile {
+        val token = fetchToken()     // 挂起点 ① (label = 0)
+        val info  = fetchInfo(token)  // 挂起点 ② (label = 1)
+        return combine(token, info)  // 结束点   (label = 2)
+    }
+
+    编译器生成的状态机字节码伪代码:
+    fun loadUserData(cont: Continuation<UserProfile>): Any? {
+        val sm = cont as? LoadUserDataSM ?: LoadUserDataSM(cont)
+        when (sm.label) {
+            0 -> {
+                sm.label = 1
+                val res = fetchToken(sm) // 传入状态机续体
+                if (res == COROUTINE_SUSPENDED) return COROUTINE_SUSPENDED // 立即释放线程
+                sm.token = res as String
+            }
+            1 -> {
+                sm.label = 2
+                val res = fetchInfo(sm.token, sm)
+                if (res == COROUTINE_SUSPENDED) return COROUTINE_SUSPENDED // 立即释放线程
+                sm.info = res as UserInfo
+            }
+            2 -> {
+                return combine(sm.token, sm.info) // 最终计算并通知上层 Continuation
+            }
+        }
+    }
+
+ 3. 【结构化并发作用域与 Job 树异常传播机制】
+    viewModelScope (SupervisorJob: 隔离异常)
+         │
+         ├──▶ 子协程 A (launch: 拉取用户列表) ──▶ [网络超时抛出 SocketTimeoutException]
+         │                                              │
+         │                                              ▼ (被 SupervisorJob 拦截，不向上扩散)
+         └──▶ 子协程 B (async: 加载广告推荐)  ──▶ [正常运行不受任何影响，继续完成渲染]`,
+        codeSnippet: `// 1. Android 工业级 ViewModel 结构化并发规范
+class UserProfileViewModel(
+    private val userRepository: UserRepository
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow<UiState<UserProfile>>(UiState.Loading)
+    val uiState: StateFlow<UiState<UserProfile>> = _uiState.asStateFlow()
+
+    fun loadProfile(userId: String) {
+        // viewModelScope 默认采用 SupervisorJob + Dispatchers.Main.immediate
+        viewModelScope.launch(CoroutineExceptionHandler { _, exception ->
+            _uiState.value = UiState.Error(exception.message ?: "未知异常")
+        }) {
+            // 并行异步拉取基础信息与统计数据
+            val userDeferred = async(Dispatchers.IO) { userRepository.fetchUser(userId) }
+            val statsDeferred = async(Dispatchers.IO) { userRepository.fetchStats(userId) }
+
+            // await 同时挂起等待双结果就绪并合并
+            val profile = UserProfile(
+                user = userDeferred.await(),
+                stats = statsDeferred.await()
+            )
+            _uiState.value = UiState.Success(profile)
+        }
+    }
 }
 
-// 编译器反编译伪代码:
-fun loadUserData(cont: Continuation<String>): Any? {
-    val sm = cont as? MyStateMachine ?: MyStateMachine(cont)
-    when (sm.label) {
-        0 -> { sm.label = 1; val res = fetchToken(sm); if (res == COROUTINE_SUSPENDED) return res; sm.token = res }
-        1 -> { sm.label = 2; val res = fetchInfo(sm.token, sm); if (res == COROUTINE_SUSPENDED) return res; return res }
+// 2. Compose UI 生命周期安全收集 (避免后台浪费 CPU)
+@Composable
+fun UserProfileScreen(viewModel: UserProfileViewModel) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // 当页面进入后台 STOPPED 状态时，自动暂停数据流收集
+    when (val s = state) {
+        is UiState.Loading -> LoadingSpinner()
+        is UiState.Success -> ProfileContent(s.data)
+        is UiState.Error -> ErrorBanner(s.message)
     }
 }`,
       },
@@ -89,25 +188,80 @@ abstract class AppDatabase : RoomDatabase() {
     ios: [
       {
         tag: '并发底层',
-        title: 'Swift Concurrency 协程调度器、Task 树与 Actor 数据隔离',
-        explanation: 'Swift Concurrency 基于 Cooperative Thread Pool（协作式线程池）运行，线程数量严格受限于 CPU 核心数，避免了传统 GCD 线程爆炸 (Thread Explosion) 带来的上下文切换损耗。Actor 引用类型通过编译期强制校验保证其内部可变状态在同一时刻只能由一个 Task 访问；跨 Actor 调用必须显式标注 await。@MainActor 属性包装器将类或方法的执行上下文强制绑定至主分发队列 (Main RunLoop)。',
-        codeSnippet: `// 编译期安全的并发计数器 Actor
-actor SafeAccountManager {
+        title: 'Swift Concurrency 从浅入深：async/await、Task 树与 Actor 数据隔离',
+        explanation: `### 1. 概念与心智模型（浅）：async/await 与传统 GCD 的本质差异
+- **消除回调地狱与线程爆炸**：传统 GCD (\`DispatchQueue.global().async\`) 在并发请求激增时会无节制地创建内核线程（线程爆炸 Thread Explosion），导致严重的 1MB+ 栈内存浪费与内核 CPU 上下文切换颠簸；
+- **非阻塞挂起（Suspension Point）**：\`await\` 标注了潜在的挂起点。当遇到挂起时，当前 Task **主动让出底层的 Worker 线程**，该线程立即被调度器用于执行其他任务；当底层 I/O 完成后，系统自动在协作线程池中恢复 Task 继续执行。
+
+### 2. 结构化并发与 Task 树（中）：生命周期与取消传播
+- **Task 树形层次**：使用 \`withTaskGroup\` 或 \`async let\` 启动的子任务与父 Task 构成结构化并发树。
+  - **自动等待**：父作用域必定等待所有子 Task 结束或抛出错误。
+  - **取消级联传递**：当父 Task 被 cancel 时（例如 SwiftUI View 销毁触发 \`.task\` 取消），所有子 Task 的 \`Task.isCancelled\` 标志位自动置为 true。
+- **协同式取消（Cooperative Cancellation）**：Swift Concurrency 不会强制杀掉线程，耗时循环中必须显式调用 \`try Task.checkCancellation()\` 响应取消。
+
+### 3. 数据隔离与 Actor 模型（深）：编译期消除数据竞态
+- **Actor 隔离域**：\`actor\` 是专门用于多线程环境的引用类型，保证其内部的可变状态在任意物理时刻严格只能由**单个 Task** 访问。
+- **跨隔离域通信**：从外部访问 Actor 的成员必须标注 \`await\`，调用请求被放入 Actor 的串行邮箱队列（Mailbox）中排队执行。
+- **\`@MainActor\`**：全局单例 Actor，将类、属性或方法严格绑定到主分发队列（Main RunLoop），专门用于驱动 UI 状态更新。
+
+### 4. 协作式线程池调度器底层（深）：Cooperative Thread Pool
+- Swift 运行时维护一个全局的 **协作式线程池（Cooperative Thread Pool）**，其最大线程数量严格受限于设备的 CPU 物理核心数（如 6 核心即最多 6 个并发 Worker 线程）。
+- 调度器采用优先级队列（UserInteractive > UserInitiated > Utility > Background），杜绝高并发下的线程无限膨胀。`,
+        diagram: `[ Swift Concurrency 从浅入深：async/await、Task 树与 Actor 调度全景图解 ]
+
+ 1. 【心智模型对比：GCD 线程爆炸 vs 协作式线程池】
+    传统 GCD 并发模型 (DispatchQueue.global.async):
+    [ Request 1..100 ] ──▶ 操作系统不断创建新线程 (Thread 1..100) ➔ 导致线程爆炸与严重 CPU 上下文切换！
+
+    Swift Concurrency 协作式模型 (Cooperative Thread Pool):
+    [ Task 1..100 ] ──▶ 严格受限于 CPU 核心数的固定线程池 (如 6 个线程)
+                          └── Task 在 await 挂起时主动让出底层 Worker 线程，零线程爆炸！
+
+ 2. 【结构化并发 Task 树生命周期与取消传播】
+    SwiftUI View (.task) ──▶ 创建根 Task (自动随 View 销毁而 cancel)
+         │
+         ├──▶ withTaskGroup { group in
+         │        ├── group.addTask { fetchAvatar() }  ──▶ 自动继承优先级与 Actor 上下文
+         │        └── group.addTask { fetchFriends() } ──▶ 页面退出时自动级联取消所有子 Task
+         │    }
+
+ 3. 【Actor 数据隔离与编译期竞态消除】
+    @MainActor ViewModel (主线程隔离域)
+         │
+         │ (跨隔离域数据交互必须标注 await)
+         ▼
+    actor DatabaseStore (独立隔离域)
+         └── 内部维护私有可变状态，同一时刻严格保证仅有 1 个 Task 访问，编译期彻底杜绝数据竞态 (Data Race)`,
+        codeSnippet: `// 1. 数据隔离 Actor 模型
+actor SafeAccountStore {
     private var balance: Double = 0.0
 
     func deposit(amount: Double) {
         balance += amount
     }
 
-    func currentBalance() -> Double {
+    func getBalance() -> Double {
         return balance
     }
 }
 
-// 外部调用必须 await
-Task.detached {
-    let manager = SafeAccountManager()
-    await manager.deposit(amount: 100.0)
+// 2. @MainActor ViewModel 结构化并发实战
+@Observable
+@MainActor
+final class AccountViewModel {
+    var balance: Double = 0.0
+    var isLoading: Bool = false
+    private let store = SafeAccountStore()
+
+    func refresh() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        // 并发拉取并自动安全切回主线程
+        async let newBalance = store.getBalance()
+        // await 挂起点，释放主线程给 UI 渲染
+        self.balance = await newBalance
+    }
 }`,
       },
       {
