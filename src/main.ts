@@ -239,11 +239,7 @@ class AppController {
         renderDeepDiveDocView(
           this.currentStageId,
           this.deepDivePlatform,
-          (stageId) => this.navigateStage(stageId),
-          (stageId) => {
-            this.docMode = 'roadmap';
-            this.navigateStage(stageId);
-          }
+          (stageId) => this.navigateStage(stageId)
         )
       );
     } else {

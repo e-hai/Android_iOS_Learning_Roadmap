@@ -5,15 +5,14 @@ import { i18n } from '../services/i18n';
 export function renderDeepDiveDocView(
   currentStageId: string,
   platform: 'android' | 'ios',
-  onSelectStage: (stageId: string) => void,
-  onNavigateRoadmapStage: (stageId: string) => void
+  onSelectStage: (stageId: string) => void
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = 'content-container deep-dive-doc-container';
 
   // 1. Full Platform Overview (All 5 Domains)
   if (currentStageId === 'all' || currentStageId === 'home') {
-    renderPlatformOverview(container, platform, onSelectStage, onNavigateRoadmapStage);
+    renderPlatformOverview(container, platform, onSelectStage);
     return container;
   }
 
@@ -35,18 +34,17 @@ export function renderDeepDiveDocView(
 
   // 3. If a specific chapter index is specified, render the Single Chapter Page
   if (chapterIndex !== null && chapterIndex >= 0 && chapterIndex < modules.length) {
-    renderSingleChapterView(container, domain, chapterIndex, modules, platform, onSelectStage, onNavigateRoadmapStage);
+    renderSingleChapterView(container, domain, chapterIndex, modules, platform, onSelectStage);
     return container;
   }
 
   // 4. Otherwise, render the Domain Table of Contents (大纲概览页)
-  renderDomainTocView(container, domain, modules, platform, onSelectStage, onNavigateRoadmapStage);
+  renderDomainTocView(container, domain, modules, platform, onSelectStage);
   return container;
 }
 
 /**
  * Renders a single, focused Knowledge Point (Chapter) page.
- * Keeps knowledge points on separate pages as requested.
  */
 function renderSingleChapterView(
   container: HTMLElement,
@@ -54,8 +52,7 @@ function renderSingleChapterView(
   chapterIndex: number,
   modules: DeepDiveModule[],
   platform: 'android' | 'ios',
-  onSelectStage: (stageId: string) => void,
-  _onNavigateRoadmapStage: (stageId: string) => void
+  onSelectStage: (stageId: string) => void
 ) {
   const mod = modules[chapterIndex];
   const domainIndex = deepDiveDomains.findIndex((d) => d.id === domain.id);
@@ -98,11 +95,11 @@ function renderSingleChapterView(
       <span class="stage-number-large">${chapterNumberStr} / ${totalChaptersStr}</span>
     </div>
 
-    <h1 class="stage-title" style="font-size:26px;margin-top:4px;">${mod.title}</h1>
+    <h1 class="stage-title" style="font-size:25px;margin-top:4px;">${mod.title}</h1>
     <div class="chapter-quick-meta" style="display:flex;gap:16px;font-size:12.5px;color:var(--color-ink-muted);margin-top:6px;flex-wrap:wrap;">
       <span>📖 章节进度：<strong>第 ${chapterNumberStr} / ${totalChaptersStr} 节</strong></span>
-      <span>🏷️ 核心标签：<strong>${mod.tag}</strong></span>
-      <span>⚡ 深度层级：<strong>${platformName} 底层运行机制与源码实战</strong></span>
+      <span>🏷️ 核心分类：<strong>${mod.tag}</strong></span>
+      <span>⚡ 技术层级：<strong>${platformName} 底层运行机制与源码实战</strong></span>
     </div>
   `;
   container.appendChild(header);
@@ -167,7 +164,6 @@ function renderSingleChapterView(
   const prevChapter = chapterIndex > 0 ? modules[chapterIndex - 1] : null;
   const nextChapter = chapterIndex < totalChapters - 1 ? modules[chapterIndex + 1] : null;
 
-  // Cross-domain transitions if at boundary
   const prevDomain = domainIndex > 0 ? deepDiveDomains[domainIndex - 1] : null;
   const nextDomain = domainIndex < deepDiveDomains.length - 1 ? deepDiveDomains[domainIndex + 1] : null;
 
@@ -219,16 +215,14 @@ function renderSingleChapterView(
 }
 
 /**
- * Renders the Domain Table of Contents (TOC / Outline) Page.
- * Lists all chapter links within this domain so user can select any chapter.
+ * Renders the Domain Table of Contents (TOC) Page.
  */
 function renderDomainTocView(
   container: HTMLElement,
   domain: DeepDiveDomain,
   modules: DeepDiveModule[],
   platform: 'android' | 'ios',
-  onSelectStage: (stageId: string) => void,
-  onNavigateRoadmapStage: (stageId: string) => void
+  onSelectStage: (stageId: string) => void
 ) {
   const domainIndex = deepDiveDomains.findIndex((d) => d.id === domain.id);
   const platformName = platform === 'android' ? 'Android' : 'iOS';
@@ -255,19 +249,19 @@ function renderDomainTocView(
           ${platform === 'android' ? '🟢 Android' : '🔵 iOS'} 单端进阶
         </span>
         <span class="chip chip-main">
-          领域 ${String(domain.number).padStart(2, '0')} · 共 ${modules.length} 个独立章节
+          领域 ${String(domain.number).padStart(2, '0')} · 共 ${modules.length} 节
         </span>
       </div>
       <span class="stage-number-large">${String(domain.number).padStart(2, '0')}</span>
     </div>
 
     <h1 class="stage-title">${String(domain.number).padStart(2, '0')}. ${i18n.t(domain.titleKey)} · ${platformName} 进阶大纲</h1>
-    <p class="stage-goal">
-      本领域共拆分为 <strong>${modules.length} 个独立进阶章节</strong>。每个章节独立成页，深度剖析底层机制并提供工业级生产规范代码。
+    <p class="stage-goal" style="margin-bottom:14px;">
+      共包含 <strong>${modules.length} 个独立进阶章节</strong>。点击任意章节卡片进入独立研读与实操。
     </p>
 
-    <div style="margin-top:12px;">
-      <button class="btn btn-primary" id="btn-start-first-chapter" style="background:${platformColor};border:none;">
+    <div>
+      <button class="btn btn-primary btn-sm" id="btn-start-first-chapter" style="background:${platformColor};border:none;">
         🚀 从第 01 节开始学习 ➔
       </button>
     </div>
@@ -277,13 +271,13 @@ function renderDomainTocView(
   });
   container.appendChild(header);
 
-  // Chapter Cards Grid (Each card goes to its own separate chapter page)
+  // Chapter Cards Grid
   const tocSection = document.createElement('section');
   tocSection.className = 'domain-toc-section';
   tocSection.innerHTML = `
     <div class="section-header">
       <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-      <h2 class="section-header-title">领域章节目录清单 (点击进入独立学习页)</h2>
+      <h2 class="section-header-title">领域章节目录清单</h2>
     </div>
   `;
 
@@ -303,7 +297,7 @@ function renderDomainTocView(
             ${mod.tag}
           </span>
         </div>
-        <span class="domain-toc-enter-link" style="color:var(--color-accent);font-size:12px;font-weight:600;">进入章节 ➔</span>
+        <span class="domain-toc-enter-link" style="color:var(--color-accent);font-size:12px;font-weight:600;">进入 ➔</span>
       </div>
       <h3 class="domain-toc-card-title">${mod.title}</h3>
       <p class="domain-toc-card-desc">${truncateText(mod.explanation, 95)}</p>
@@ -319,7 +313,7 @@ function renderDomainTocView(
   tocSection.appendChild(cardsGrid);
   container.appendChild(tocSection);
 
-  // Bottom Navigator: Prev / Next Domain & Roadmap
+  // Bottom Navigator: Prev / Next Domain only
   const navFooter = document.createElement('div');
   navFooter.className = 'stage-nav-footer';
 
@@ -329,9 +323,6 @@ function renderDomainTocView(
   navFooter.innerHTML = `
     <div class="stage-nav-buttons">
       ${prevDomain ? `<button class="btn btn-secondary btn-sm" id="btn-prev-domain">← ${String(prevDomain.number).padStart(2, '0')}. ${i18n.t(prevDomain.titleKey)}</button>` : '<div></div>'}
-      <button class="btn btn-secondary btn-sm" id="btn-jump-roadmap" style="background:var(--color-surface);color:var(--color-accent);border:1px solid var(--color-accent);">
-        🗺️ 查看双端 16 阶段路线图 ➔
-      </button>
       ${nextDomain ? `<button class="btn btn-secondary btn-sm" id="btn-next-domain">${String(nextDomain.number).padStart(2, '0')}. ${i18n.t(nextDomain.titleKey)} →</button>` : '<div></div>'}
     </div>
   `;
@@ -342,53 +333,49 @@ function renderDomainTocView(
   if (nextDomain) {
     navFooter.querySelector('#btn-next-domain')?.addEventListener('click', () => onSelectStage(nextDomain.id));
   }
-  navFooter.querySelector('#btn-jump-roadmap')?.addEventListener('click', () => onNavigateRoadmapStage('home'));
 
   container.appendChild(navFooter);
 }
 
 /**
- * Renders the platform deep dive overview matrix (5 Domains).
- * Clicking any topic card navigates directly to that topic's independent chapter page!
+ * Renders the streamlined platform deep dive overview.
+ * Clean, compact, easy to scan with only essential info.
  */
 function renderPlatformOverview(
   container: HTMLElement,
   platform: 'android' | 'ios',
-  onSelectStage: (stageId: string) => void,
-  onNavigateRoadmapStage: (stageId: string) => void
+  onSelectStage: (stageId: string) => void
 ) {
   const platformName = platform === 'android' ? 'Android' : 'iOS';
+  const platformColor = platform === 'android' ? '#10b981' : '#0ea5e9';
 
-  // Count total chapters across the 5 domains
+  // Count total chapters
   let totalModules = 0;
   deepDiveDomains.forEach((d) => {
     const mods = platform === 'android' ? d.deepDive.android : d.deepDive.ios;
     totalModules += mods.length;
   });
 
-  // Hero Section
+  // Concise Hero Section
   const hero = document.createElement('div');
-  hero.className = 'deep-dive-portal-hero';
+  hero.className = 'deep-dive-portal-hero compact-portal-hero';
   hero.innerHTML = `
     <div class="portal-badge-wrap">
-      <span class="portal-hero-badge" style="${platform === 'android' ? 'color:#059669;background:#10b98115;border-color:#10b98133;' : 'color:#0284c7;background:#0ea5e915;border-color:#0ea5e933;'}">
-        ${platform === 'android' ? '🟢 Android 平台深度进阶' : '🔵 iOS 平台深度进阶'}
+      <span class="portal-hero-badge" style="color:${platform === 'android' ? '#059669' : '#0284c7'};background:${platform === 'android' ? 'rgba(16,185,129,0.1)' : 'rgba(14,165,233,0.1)'};border-color:${platform === 'android' ? 'rgba(16,185,129,0.25)' : 'rgba(14,165,233,0.25)'};">
+        ${platform === 'android' ? '🟢 Android' : '🔵 iOS'} 单端深度进阶
       </span>
-      <span class="portal-hero-subtag">${totalModules} 个独立进阶章节 · 5 大工业级领域</span>
+      <span class="portal-hero-subtag">5 大领域 · 共 ${totalModules} 个独立进阶章节</span>
     </div>
-    <h1 class="portal-hero-title">${platformName} 单端底层运行内幕与高级调优</h1>
-    <p class="portal-hero-desc">
-      ${platform === 'android'
-        ? '深挖 Android 底层运行原理：从 Kotlin 协程挂起状态机、JVM/ART 垃圾回收、Compose Slot Table 插槽表，到 MVI 单向数据流、Perfetto 链路分析、Baseline Profiles 预编译、OpenGL ES/MediaCodec 管线与 Google Play Billing v6+ 出海订阅。点击任意章节独立深度研读。'
-        : '深挖 iOS 底层运行原理：从 Swift 并发 Actor 隔离、ARC Side Table 与 COW、SwiftUI AttributeGraph 属性图，到 TCA 状态机、MetricKit 性能度量、Metal 图形渲染、VideoToolbox 硬编解码与 Apple StoreKit 2 全球订阅。点击任意章节独立深度研读。'
-      }
+    <h1 class="portal-hero-title" style="font-size:22px;">${platformName} 底层运行机制与实战手册</h1>
+    <p class="portal-hero-desc" style="font-size:13.5px;">
+      直击核心底层原理、编译器优化、工业级架构治理与出海商业化。点击任意章节独立研读。
     </p>
   `;
   container.appendChild(hero);
 
-  // Overview Domains Grid
+  // Compact Overview List
   const gridSection = document.createElement('div');
-  gridSection.className = 'portal-modules-list';
+  gridSection.className = 'portal-modules-list compact-modules-list';
 
   deepDiveDomains.forEach((domain) => {
     const modules = platform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
@@ -398,14 +385,15 @@ function renderPlatformOverview(
     domainGroup.className = 'portal-stage-group';
 
     const groupHeader = document.createElement('div');
-    groupHeader.className = 'portal-stage-header';
+    groupHeader.className = 'portal-stage-header compact-stage-header';
     groupHeader.innerHTML = `
       <div class="portal-stage-title-wrap">
         <span class="portal-stage-num">${String(domain.number).padStart(2, '0')}</span>
-        <h2 class="portal-stage-title">${i18n.t(domain.titleKey)}</h2>
+        <h2 class="portal-stage-title" style="font-size:15.5px;">${i18n.t(domain.titleKey)}</h2>
+        <span style="font-size:12px;color:var(--color-ink-muted);">(${modules.length} 节)</span>
       </div>
-      <button class="btn btn-ghost btn-sm" id="btn-view-domain-toc-${domain.id}" style="color:var(--color-accent);font-weight:600;">
-        查看领域大纲 (${modules.length} 节) ➔
+      <button class="btn btn-ghost btn-sm" id="btn-view-domain-toc-${domain.id}" style="color:var(--color-accent);font-weight:600;font-size:12px;padding:2px 8px;">
+        大纲 ➔
       </button>
     `;
     groupHeader.querySelector(`#btn-view-domain-toc-${domain.id}`)?.addEventListener('click', () => {
@@ -413,30 +401,24 @@ function renderPlatformOverview(
     });
     domainGroup.appendChild(groupHeader);
 
-    // List of module cards within this domain
+    // Streamlined compact chapter cards
     const modulesGrid = document.createElement('div');
-    modulesGrid.className = 'portal-stage-grid';
+    modulesGrid.className = 'portal-compact-grid';
 
     modules.forEach((mod, mIdx) => {
       const card = document.createElement('div');
-      card.className = 'portal-card';
+      card.className = 'portal-compact-card';
       card.style.cursor = 'pointer';
 
       card.innerHTML = `
-        <div class="portal-card-top">
-          <div style="display:flex;align-items:center;gap:6px;">
-            <span class="portal-card-tag">${mod.tag}</span>
-            <span class="portal-card-badge badge-key">
-              第 ${String(mIdx + 1).padStart(2, '0')} 节
-            </span>
-          </div>
-          <span style="font-size:12px;color:var(--color-accent);font-weight:600;">进入章节 ➔</span>
+        <div class="compact-card-meta">
+          <span class="compact-card-idx">${String(mIdx + 1).padStart(2, '0')}</span>
+          <span class="compact-card-tag" style="color:${platformColor};">${mod.tag}</span>
         </div>
-        <h3 class="portal-card-title">${mod.title}</h3>
-        <p class="portal-card-desc">${truncateText(mod.explanation, 90)}</p>
+        <div class="compact-card-title">${mod.title}</div>
+        <div class="compact-card-arrow">➔</div>
       `;
 
-      // Direct jump to this specific chapter's independent page!
       card.addEventListener('click', () => {
         onSelectStage(`${domain.id}:${mIdx}`);
       });
@@ -449,24 +431,6 @@ function renderPlatformOverview(
   });
 
   container.appendChild(gridSection);
-
-  // Bottom Navigator: Return to Roadmap
-  const bottomFooter = document.createElement('div');
-  bottomFooter.className = 'portal-bottom-footer';
-  bottomFooter.style.marginTop = '40px';
-  bottomFooter.style.paddingTop = '24px';
-  bottomFooter.style.borderTop = '1px solid var(--color-border)';
-  bottomFooter.style.textAlign = 'center';
-
-  const returnBtn = document.createElement('button');
-  returnBtn.className = 'btn btn-secondary';
-  returnBtn.innerHTML = `🗺️ 返回 Android ⟷ iOS 双端 16 阶段路线图`;
-  returnBtn.addEventListener('click', () => {
-    onNavigateRoadmapStage('home');
-  });
-
-  bottomFooter.appendChild(returnBtn);
-  container.appendChild(bottomFooter);
 }
 
 function truncateText(text: string, maxLen: number): string {
@@ -485,4 +449,5 @@ function escapeHtml(text: string): string {
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
+
 
