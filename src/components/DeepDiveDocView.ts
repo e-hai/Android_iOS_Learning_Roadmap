@@ -33,11 +33,11 @@ export function renderDeepDiveDocView(
   header.innerHTML = `
     <div class="stage-detail-meta">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <span class="chip ${platform === 'android' ? 'chip-main' : 'chip-advanced'}" style="background:${platform === 'android' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.15)'};color:${platformColor};font-weight:700;border:1px solid ${platformColor};">
+        <span class="chip chip-main" style="background:${platform === 'android' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.15)'};color:${platformColor};font-weight:700;border:1px solid ${platformColor};">
           ${platform === 'android' ? '🟢 Android 单端深度进阶' : '🔵 iOS 单端深度进阶'}
         </span>
-        <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}">
-          ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
+        <span class="chip chip-main">
+          阶段 ${String(stage.number).padStart(2, '0')}
         </span>
       </div>
       <span class="stage-number-large">${String(stage.number).padStart(2, '0')}</span>

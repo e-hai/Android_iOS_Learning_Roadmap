@@ -140,29 +140,15 @@ export function renderHomeView(
       <div class="section-header-bar" style="background:linear-gradient(90deg, var(--color-android), var(--color-ios));"></div>
       <span class="section-header-title">${i18n.t('home.matrix.title')}</span>
     </div>
-    <p style="font-size:13.5px;color:var(--color-ink-muted);margin-bottom:16px;">${i18n.t('home.matrix.desc')}</p>
+    <p style="font-size:13.5px;color:var(--color-ink-muted);margin-bottom:16px;">全 16 阶段双端工程对照矩阵，点击直接开启对应阶段探索：</p>
 
-    <div class="matrix-group-title">
-      <span class="chip chip-main" style="font-size:10px;padding:2px 6px;">${i18n.t('badge.main')}</span>
-      <span>${i18n.t('home.matrix.main')}</span>
-    </div>
-    <div class="matrix-grid" id="matrix-grid-main"></div>
-
-    <div class="matrix-group-title" style="margin-top:28px;">
-      <span class="chip chip-advanced" style="font-size:10px;padding:2px 6px;">${i18n.t('badge.advanced')}</span>
-      <span>${i18n.t('home.matrix.adv')}</span>
-    </div>
-    <div class="matrix-grid" id="matrix-grid-adv"></div>
+    <div class="matrix-grid" id="matrix-grid-all"></div>
   `;
   container.appendChild(matrixSection);
 
-  const mainGrid = matrixSection.querySelector('#matrix-grid-main') as HTMLElement;
-  const advGrid = matrixSection.querySelector('#matrix-grid-adv') as HTMLElement;
+  const allGrid = matrixSection.querySelector('#matrix-grid-all') as HTMLElement;
 
-  const mainStages = stages.filter((s) => !s.isAdvanced);
-  const advStages = stages.filter((s) => s.isAdvanced);
-
-  mainStages.forEach((stage) => {
+  stages.forEach((stage) => {
     const card = document.createElement('div');
     card.className = 'matrix-card main';
     card.innerHTML = `
@@ -170,28 +156,12 @@ export function renderHomeView(
       <div class="matrix-card-info">
         <span class="matrix-card-title">${stage.number}. ${i18n.t(stage.titleKey)}</span>
         <div class="matrix-card-meta">
-          <span>${stage.rows.length} ${i18n.getLanguage() === 'zh-Hans' ? '项对照' : 'items'}</span>
+          <span>${stage.rows.length} 项对照</span>
         </div>
       </div>
     `;
     card.addEventListener('click', () => onNavigate(stage.id));
-    mainGrid.appendChild(card);
-  });
-
-  advStages.forEach((stage) => {
-    const card = document.createElement('div');
-    card.className = 'matrix-card adv';
-    card.innerHTML = `
-      <div class="matrix-card-num">${String(stage.number).padStart(2, '0')}</div>
-      <div class="matrix-card-info">
-        <span class="matrix-card-title">${stage.number}. ${i18n.t(stage.titleKey)}</span>
-        <div class="matrix-card-meta">
-          <span>${stage.rows.length} ${i18n.getLanguage() === 'zh-Hans' ? '项对照' : 'items'}</span>
-        </div>
-      </div>
-    `;
-    card.addEventListener('click', () => onNavigate(stage.id));
-    advGrid.appendChild(card);
+    allGrid.appendChild(card);
   });
 
   // 5. Cheat Sheet Section

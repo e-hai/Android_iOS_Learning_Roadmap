@@ -17,13 +17,13 @@ export function renderStageDetail(
   header.innerHTML = `
     <div class="stage-detail-meta">
       <div style="display:flex;align-items:center;gap:10px;">
-        <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}">
-          ${stage.isAdvanced ? i18n.t('badge.advanced') : i18n.t('badge.main')}
+        <span class="chip chip-main">
+          双端对照 · 阶段 ${String(stage.number).padStart(2, '0')}
         </span>
       </div>
       <span class="stage-number-large">${String(stage.number).padStart(2, '0')}</span>
     </div>
-    <h1 class="stage-detail-title">${i18n.t(stage.titleKey)}</h1>
+    <h1 class="stage-detail-title">${String(stage.number).padStart(2, '0')}. ${i18n.t(stage.titleKey)}</h1>
   `;
   container.appendChild(header);
 

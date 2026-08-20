@@ -88,20 +88,19 @@ export function renderNeuralConstellationView(
 
   stages.forEach((stage, sIdx) => {
     const stageAngle = (sIdx / stages.length) * Math.PI * 2;
-    const isAdv = stage.isAdvanced;
-    const stageRadius = isAdv ? 16 : 10;
+    const stageRadius = 13.0;
     const hubX = Math.cos(stageAngle) * stageRadius;
     const hubZ = Math.sin(stageAngle) * stageRadius;
-    const hubY = Math.sin(sIdx * 0.9) * 2.2;
+    const hubY = Math.sin(sIdx * 0.8) * 1.8;
     const hubPos = new THREE.Vector3(hubX, hubY, hubZ);
 
     const stageTitle = i18n.t(stage.titleKey);
 
     // Level 1: Stage Core Hub
-    const hubGeom = new THREE.SphereGeometry(isAdv ? 0.7 : 0.9, 32, 32);
+    const hubGeom = new THREE.SphereGeometry(0.85, 32, 32);
     const hubMat = new THREE.MeshStandardMaterial({
-      color: knowledgeMode === 'deepdive' ? platformColor : (isAdv ? 0xa855f7 : 0x0d9488),
-      emissive: knowledgeMode === 'deepdive' ? platformEmissive : (isAdv ? 0x6b21a8 : 0x042f2e),
+      color: knowledgeMode === 'deepdive' ? platformColor : 0x0d9488,
+      emissive: knowledgeMode === 'deepdive' ? platformEmissive : 0x042f2e,
       emissiveIntensity: 0.85,
       roughness: 0.2,
       metalness: 0.3,
@@ -111,9 +110,9 @@ export function renderNeuralConstellationView(
     palaceGroup.add(hubMesh);
 
     // Dynamic Halo Ring
-    const haloGeom = new THREE.RingGeometry(isAdv ? 1.0 : 1.3, isAdv ? 1.15 : 1.45, 32);
+    const haloGeom = new THREE.RingGeometry(1.15, 1.35, 32);
     const haloMat = new THREE.MeshBasicMaterial({
-      color: knowledgeMode === 'deepdive' ? platformColor : (isAdv ? 0xc084fc : 0x14b8a6),
+      color: knowledgeMode === 'deepdive' ? platformColor : 0x14b8a6,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.6,
@@ -129,9 +128,9 @@ export function renderNeuralConstellationView(
       type: 'stage',
       stageId: stage.id,
       stageTitle,
-      isAdv,
-      title: `${stageTitle} · ${knowledgeMode === 'deepdive' ? `${platformName} 进阶` : '对照星核'}`,
-      subtitle: isAdv ? '进阶扩展星域' : '核心主线星核',
+      isAdv: false,
+      title: `${String(stage.number).padStart(2, '0')}. ${stageTitle} · ${knowledgeMode === 'deepdive' ? `${platformName} 进阶` : '对照星核'}`,
+      subtitle: `阶段 ${String(stage.number).padStart(2, '0')} 星核`,
       pos: hubPos,
     });
 
@@ -170,7 +169,7 @@ export function renderNeuralConstellationView(
           type: 'deepdive',
           stageId: stage.id,
           stageTitle,
-          isAdv,
+          isAdv: false,
           title: `【${mod.tag}】${mod.title}`,
           subtitle: `${platformName} 底层机制专题`,
           noteTag: mod.tag,
@@ -211,7 +210,7 @@ export function renderNeuralConstellationView(
           type: 'concept',
           stageId: stage.id,
           stageTitle,
-          isAdv,
+          isAdv: false,
           title: `${row.android.split('(')[0].trim()} ⟷ ${row.ios.split('(')[0].trim()}`,
           subtitle: '核心语法对照',
           androidCode: row.android,
@@ -255,7 +254,7 @@ export function renderNeuralConstellationView(
           type: 'spark',
           stageId: stage.id,
           stageTitle,
-          isAdv,
+          isAdv: false,
           title: `【${tag}】`,
           subtitle: '黄金避坑灵光',
           noteTag: tag,
@@ -328,15 +327,6 @@ export function renderNeuralConstellationView(
       </div>
     </div>
 
-    <!-- Center: Filter Tabs -->
-    <div class="top-bar-center">
-      <div class="constellation-filter-tabs">
-        <button class="constellation-tab-btn active" data-filter="all">全部节点</button>
-        <button class="constellation-tab-btn" data-filter="main">核心主线</button>
-        <button class="constellation-tab-btn" data-filter="adv">进阶扩展</button>
-      </div>
-    </div>
-
     <!-- Right: 3D Tools & Theme -->
     <div class="top-bar-right">
       <button class="tool-pill-btn active" id="btn-toggle-spin" title="切换 3D 星系自转">
@@ -361,7 +351,7 @@ export function renderNeuralConstellationView(
   legend.innerHTML = `
     <div class="legend-item">
       <span class="legend-dot" style="background:${isDeepDive ? (deepDivePlatform === 'android' ? '#10b981' : '#0ea5e9') : '#0d9488'};box-shadow:0 0 6px ${isDeepDive ? (deepDivePlatform === 'android' ? '#10b981' : '#0ea5e9') : '#0d9488'};"></span>
-      <span>${isDeepDive ? `${platformName} 阶段星核` : '核心主线星核'}</span>
+      <span>${isDeepDive ? `${platformName} 阶段星核` : '阶段对照星核'}</span>
     </div>
     <div class="legend-item">
       <span class="legend-dot" style="background:${isDeepDive ? (deepDivePlatform === 'android' ? '#34d399' : '#38bdf8') : '#38bdf8'};"></span>
@@ -664,21 +654,6 @@ export function renderNeuralConstellationView(
   });
   topBar.querySelector('#top-btn-ios')?.addEventListener('click', () => {
     if (onSwitchPlatform) onSwitchPlatform('ios');
-  });
-
-  // Top Filter Tabs
-  topBar.querySelectorAll('.constellation-tab-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      topBar.querySelectorAll('.constellation-tab-btn').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-
-      const filter = btn.getAttribute('data-filter') || 'all';
-      allNodes.forEach((n) => {
-        const isVisible = filter === 'all' || (filter === 'main' && !n.isAdv) || (filter === 'adv' && n.isAdv);
-        n.mesh.visible = isVisible;
-        if (n.haloMesh) n.haloMesh.visible = isVisible;
-      });
-    });
   });
 
   // Spin, Reset, and Theme Controls

@@ -1,4 +1,3 @@
-import { LearningStage } from '../models/types';
 import { i18n } from '../services/i18n';
 import { stages } from '../data/roadmap-data';
 
@@ -12,9 +11,6 @@ export function renderSidebar(
   const sidebar = document.createElement('aside');
   sidebar.className = 'app-sidebar';
   sidebar.id = 'app-sidebar';
-
-  const mainStages = stages.filter((s) => !s.isAdvanced);
-  const advancedStages = stages.filter((s) => s.isAdvanced);
 
   // 1. Home Item (in roadmap mode) or Deep Dive Overview Item (in deepdive mode)
   const topSection = document.createElement('div');
@@ -41,8 +37,12 @@ export function renderSidebar(
   topSection.appendChild(topItem);
   sidebar.appendChild(topSection);
 
-  // 2. Stage Rows
-  const createStageRow = (stage: LearningStage) => {
+  // 2. Unified 16 Stages Section
+  const stagesSection = document.createElement('div');
+  stagesSection.className = 'sidebar-section';
+  stagesSection.innerHTML = `<span class="sidebar-section-title main-title">${docMode === 'roadmap' ? '16 个学习阶段' : `${deepDivePlatform === 'android' ? 'Android' : 'iOS'} 16 阶段进阶`}</span>`;
+
+  stages.forEach((stage) => {
     const isActive = currentStageId === stage.id;
 
     let subHtml = '';
@@ -63,7 +63,7 @@ export function renderSidebar(
     const row = document.createElement('button');
     row.className = `sidebar-item ${isActive ? 'active' : ''}`;
     row.innerHTML = `
-      <span class="chip ${stage.isAdvanced ? 'chip-advanced' : 'chip-main'}" style="font-size:10px;padding:1px 5px;flex-shrink:0;">
+      <span class="chip chip-main" style="font-size:10.5px;padding:1px 6px;flex-shrink:0;">
         ${String(stage.number).padStart(2, '0')}
       </span>
       <div class="sidebar-item-info">
@@ -72,28 +72,10 @@ export function renderSidebar(
       </div>
     `;
     row.addEventListener('click', () => onSelect(stage.id));
-    return row;
-  };
-
-  // Main Path Section
-  const mainSection = document.createElement('div');
-  mainSection.className = 'sidebar-section';
-  mainSection.innerHTML = `<span class="sidebar-section-title main-title">${docMode === 'roadmap' ? i18n.t('sidebar.main') : `核心主线 · ${deepDivePlatform.toUpperCase()} 进阶`}</span>`;
-
-  mainStages.forEach((stage) => {
-    mainSection.appendChild(createStageRow(stage));
+    stagesSection.appendChild(row);
   });
-  sidebar.appendChild(mainSection);
 
-  // Advanced Section
-  const advSection = document.createElement('div');
-  advSection.className = 'sidebar-section';
-  advSection.innerHTML = `<span class="sidebar-section-title adv-title">${docMode === 'roadmap' ? i18n.t('sidebar.advanced') : `扩展专题 · ${deepDivePlatform.toUpperCase()} 进阶`}</span>`;
-
-  advancedStages.forEach((stage) => {
-    advSection.appendChild(createStageRow(stage));
-  });
-  sidebar.appendChild(advSection);
+  sidebar.appendChild(stagesSection);
 
   // 3. Bottom Mode Switcher Card
   const footerSwitch = document.createElement('div');
