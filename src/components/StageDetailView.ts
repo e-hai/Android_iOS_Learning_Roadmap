@@ -18,7 +18,7 @@ export function renderStageDetail(
     <div class="stage-detail-meta">
       <div style="display:flex;align-items:center;gap:10px;">
         <span class="chip chip-main">
-          双端对照 · 阶段 ${String(stage.number).padStart(2, '0')}
+          双端对照 · 模块 ${String(stage.number).padStart(2, '0')}
         </span>
       </div>
       <span class="stage-number-large">${String(stage.number).padStart(2, '0')}</span>

@@ -37,7 +37,7 @@ export function renderDeepDiveDocView(
           ${platform === 'android' ? '🟢 Android 单端深度进阶' : '🔵 iOS 单端深度进阶'}
         </span>
         <span class="chip chip-main">
-          阶段 ${String(stage.number).padStart(2, '0')}
+          模块 ${String(stage.number).padStart(2, '0')}
         </span>
       </div>
       <span class="stage-number-large">${String(stage.number).padStart(2, '0')}</span>
@@ -45,7 +45,7 @@ export function renderDeepDiveDocView(
 
     <h1 class="stage-title">${String(stage.number).padStart(2, '0')}. ${i18n.t(stage.titleKey)} · ${platformName} 底层内幕</h1>
     <p class="stage-goal">
-      聚焦 ${platformName} 平台在该阶段最关键的底层运行机制、编译器优化、内存与并发模型、以及实战性能调优利器。
+      聚焦 ${platformName} 平台在该领域最核心的底层运行机制、编译器优化、架构与全球化工程规范。
     </p>
   `;
   container.appendChild(header);
@@ -133,7 +133,7 @@ export function renderDeepDiveDocView(
     <div class="stage-nav-buttons">
       ${prevStage ? `<button class="btn btn-secondary btn-sm" id="btn-prev-stage">← ${String(prevStage.number).padStart(2, '0')}. ${i18n.t(prevStage.titleKey)}</button>` : '<div></div>'}
       <button class="btn btn-primary btn-sm" id="btn-jump-roadmap" style="background:var(--color-surface);color:var(--color-accent);border:1px solid var(--color-accent);">
-        🗺️ 查看该阶段双端横向对照 ➔
+        🗺️ 查看该模块双端横向对照 ➔
       </button>
       ${nextStage ? `<button class="btn btn-secondary btn-sm" id="btn-next-stage">${String(nextStage.number).padStart(2, '0')}. ${i18n.t(nextStage.titleKey)} →</button>` : '<div></div>'}
     </div>

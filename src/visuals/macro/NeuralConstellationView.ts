@@ -130,7 +130,7 @@ export function renderNeuralConstellationView(
       stageTitle,
       isAdv: false,
       title: `${String(stage.number).padStart(2, '0')}. ${stageTitle} · ${knowledgeMode === 'deepdive' ? `${platformName} 进阶` : '对照星核'}`,
-      subtitle: `阶段 ${String(stage.number).padStart(2, '0')} 星核`,
+      subtitle: `模块 ${String(stage.number).padStart(2, '0')} 星核`,
       pos: hubPos,
     });
 
