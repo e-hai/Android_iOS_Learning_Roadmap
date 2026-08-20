@@ -21,7 +21,7 @@ export class ThreeSceneManager {
   private reqId: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
   private clock = new THREE.Clock();
-  private onTickCallback?: (delta: number, time: number) => void;
+  public onTickCallback?: (delta: number, time: number) => void;
   private isDisposed = false;
 
   constructor(container: HTMLElement, options: SceneManagerOptions = {}) {

@@ -411,10 +411,10 @@ export function renderNeuralConstellationView(
   `;
   container.appendChild(legend);
 
-  // 5. Floating Hover Tooltip (Anchor above hovered node)
+  // 5. Floating Hover Tooltip (Anchored above hovered star core in 3D space)
   const hoverTooltip = document.createElement('div');
-  hoverTooltip.className = 'palace-hover-tooltip';
-  container.appendChild(hoverTooltip);
+  hoverTooltip.className = 'constellation-node-anchor-tooltip';
+  canvasWrap.appendChild(hoverTooltip);
 
   // 6. Holographic Detail Lens (Bottom-right focus HUD)
   const hudLens = document.createElement('div');
@@ -439,16 +439,17 @@ export function renderNeuralConstellationView(
       const hitMesh = intersects[0].object as THREE.Mesh;
       const node = allNodes.find((n) => n.mesh === hitMesh);
       if (node && node !== hoveredNode) {
+        if (hoveredNode) {
+          gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+        }
         hoveredNode = node;
         document.body.style.cursor = 'pointer';
 
-        // Update Floating Tooltip
+        // Update Floating Tooltip Content
         const tagText = node.noteTag ? `【${node.noteTag}】` : '';
         hoverTooltip.innerHTML = `
-          <div class="tooltip-header">
-            <span class="tooltip-badge ${node.type}">${node.subtitle || '认知节点'}</span>
-          </div>
-          <div class="tooltip-title">${tagText}${escapeHtml(node.title)}</div>
+          <span class="anchor-tooltip-tag">${node.subtitle || '阶段星核'}</span>
+          <span class="anchor-tooltip-title">${tagText}${escapeHtml(node.title)}</span>
         `;
         hoverTooltip.classList.add('visible');
 
@@ -462,17 +463,6 @@ export function renderNeuralConstellationView(
         document.body.style.cursor = 'default';
         hoverTooltip.classList.remove('visible');
       }
-    }
-
-    if (hoveredNode) {
-      const wp = new THREE.Vector3();
-      hoveredNode.mesh.getWorldPosition(wp);
-      const sp = wp.project(camera);
-      const sx = ((sp.x + 1) * rect.width) / 2;
-      const sy = ((-sp.y + 1) * rect.height) / 2;
-
-      hoverTooltip.style.left = `${sx}px`;
-      hoverTooltip.style.top = `${sy - 32}px`;
     }
   };
 
@@ -731,11 +721,8 @@ export function renderNeuralConstellationView(
     localStorage.setItem('learning_cockpit_theme', nextTheme);
   });
 
-  // 9. Animation Loop
-  let time = 0;
-  setInterval(() => {
-    time += 0.015;
-
+  // 9. Synchronized 3D Animation & Real-Time Star Core Tooltip Tracking
+  sceneManager.onTickCallback = (_delta, time) => {
     // Starfield rotation
     stars.rotation.y += 0.0003;
 
@@ -747,7 +734,27 @@ export function renderNeuralConstellationView(
       }
       n.mesh.position.y = n.pos.y + Math.sin(time * 2 + idx) * 0.04;
     });
-  }, 16);
+
+    // Real-Time Tooltip Anchor Tracking (Directly above the hovered 3D star core)
+    if (hoveredNode) {
+      const wp = new THREE.Vector3();
+      hoveredNode.mesh.getWorldPosition(wp);
+      const sp = wp.project(camera);
+
+      // Check if star core is within camera frustum and facing camera
+      if (sp.z > 1) {
+        hoverTooltip.classList.remove('visible');
+      } else {
+        const rect = canvasWrap.getBoundingClientRect();
+        const sx = ((sp.x + 1) * rect.width) / 2;
+        const sy = ((-sp.y + 1) * rect.height) / 2;
+
+        hoverTooltip.style.left = `${sx}px`;
+        hoverTooltip.style.top = `${sy}px`;
+        hoverTooltip.classList.add('visible');
+      }
+    }
+  };
 
   return container;
 }
