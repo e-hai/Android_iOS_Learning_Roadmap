@@ -60,20 +60,6 @@ function renderSingleChapterView(
   const chapterNumberStr = String(chapterIndex + 1).padStart(2, '0');
   const totalChaptersStr = String(totalChapters).padStart(2, '0');
 
-  // Breadcrumb Navigation
-  const breadcrumb = document.createElement('nav');
-  breadcrumb.className = 'chapter-breadcrumb';
-  breadcrumb.innerHTML = `
-    <button class="breadcrumb-btn" id="btn-crumb-overview">进阶总览</button>
-    <span class="breadcrumb-sep">/</span>
-    <button class="breadcrumb-btn" id="btn-crumb-domain">${i18n.t(domain.titleKey)}</button>
-    <span class="breadcrumb-sep">/</span>
-    <span class="breadcrumb-current">第 ${chapterNumberStr} 节 · ${mod.tag}</span>
-  `;
-  breadcrumb.querySelector('#btn-crumb-overview')?.addEventListener('click', () => onSelectStage('all'));
-  breadcrumb.querySelector('#btn-crumb-domain')?.addEventListener('click', () => onSelectStage(domain.id));
-  container.appendChild(breadcrumb);
-
   // Chapter Header (Clean title only)
   const header = document.createElement('div');
   header.className = 'stage-detail-header chapter-page-header';
@@ -205,17 +191,6 @@ function renderDomainTocView(
   const domainIndex = deepDiveDomains.findIndex((d) => d.id === domain.id);
   const platformName = platform === 'android' ? 'Android' : 'iOS';
   const platformColor = platform === 'android' ? 'var(--color-android)' : 'var(--color-ios)';
-
-  // Breadcrumb
-  const breadcrumb = document.createElement('nav');
-  breadcrumb.className = 'chapter-breadcrumb';
-  breadcrumb.innerHTML = `
-    <button class="breadcrumb-btn" id="btn-crumb-overview">进阶总览</button>
-    <span class="breadcrumb-sep">/</span>
-    <span class="breadcrumb-current">${i18n.t(domain.titleKey)}</span>
-  `;
-  breadcrumb.querySelector('#btn-crumb-overview')?.addEventListener('click', () => onSelectStage('all'));
-  container.appendChild(breadcrumb);
 
   // Domain Header (Clean title only)
   const header = document.createElement('div');
