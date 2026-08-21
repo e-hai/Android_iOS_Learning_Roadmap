@@ -57,7 +57,7 @@ function renderSingleChapterView(
   const header = document.createElement('div');
   header.className = 'stage-detail-header chapter-page-header';
   header.innerHTML = `
-    <h1 class="stage-title" style="font-size:26px;margin-top:4px;">${mod.title}</h1>
+    <h1 class="stage-detail-title">${mod.title}</h1>
   `;
   container.appendChild(header);
 
