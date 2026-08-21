@@ -6,28 +6,42 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
       {
         tag: '并发底层',
         title: 'Kotlin 协程从浅入深：挂起心智模型、CPS 状态机与 Dispatcher 调度器',
+        pipeline: [
+          { title: '协程概念', subtitle: 'Conway 1963 · 对称地互相让出控制权', category: 'theory' },
+          { title: '续延理论 CPS', subtitle: 'Reynolds · Scheme call/cc', category: 'theory' },
+          { title: '无栈实现策略', subtitle: '挂起状态存于堆对象，而非独立调用栈', category: 'theory' },
+          { title: 'Continuation 接口 + 状态机', subtitle: 'ContinuationImpl / SuspendLambda', category: 'engineering' },
+          { title: 'Completion 链', subtitle: '多个状态机互相引用，替代调用栈', category: 'engineering' },
+          { title: 'Job + Dispatcher', subtitle: '协程身份与调度，两条独立的轴', category: 'engineering' },
+        ],
         metaphor: {
           title: '餐厅点单与叫号取餐牌',
           formula: '协程 = 状态机 (Switch-Case) + 续体 (Continuation) + 调度器 (Dispatcher)',
           metaphorDesc: '去快餐店点餐时，你（主线程）点完餐不会站在点餐台死等（线程阻塞），服务员发给你一个**取餐号牌（Continuation 续体）**；你立刻退回点餐台去处理其他事（UI 渲染）；后厨（异步 I/O / 线程池）做好餐后叫号，服务员在空闲窗口（Dispatcher 调度）把餐交给你，你拿着餐继续享用（恢复执行）。',
         },
-        explanation: `### 1. 概念（浅）：非阻塞挂起
-- **本质**：协程是运行在线程之上的**用户态协作任务**。
-- **挂起 vs 阻塞**：\`Thread.sleep\` 阻塞并卡死当前线程；\`delay\` **主动让出线程**给 UI 绘制，I/O 完成后调度空闲线程恢复执行。
+        explanation: `### 1. 协程概念（Conway 1963）：对称让出控制权
+- **通俗心智**：普通函数是“主从关系”（调用后死等返回，单向压栈）；协程是“对等伙伴”（双方平起平坐，可以随时暂停让出执行权，稍后从暂停处恢复）。
+- **工程价值**：避免传统线程阻塞（\`Thread.sleep\` / 同步 I/O）带来的 1MB+ 内存常驻与内核态 CPU 切换损耗。
 
-### 2. 结构化并发（中）：作用域与生命周期
-- **Job 树**：父协程 \`cancel()\` 级联取消所有子协程。
-- **异常隔离**：\`SupervisorJob\`（如 \`viewModelScope\`）隔离子协程异常，防止单一崩溃波及全局。
-- **生命周期**：配合 \`repeatOnLifecycle\` 在后台自动暂停流收集，杜绝 CPU 与电量浪费。
+### 2. 续延理论 CPS（Reynolds / Scheme）：形式化续体
+- **通俗心智**：函数不再通过隐式硬件寄存器 \`return\`，而是把“接下来要做的所有剩余计算”打包成一个显式参数——**续体（Continuation）**。
+- **编译器改写**：\`suspend fun fetch(): User\` 编译期被重写为 \`fun fetch(cont: Continuation<User>): Any?\`。
 
-### 3. 编译底层（深）：CPS 状态机
-- **CPS 转换**：\`suspend fun f(): T\` 编译为 \`fun f(cont: Continuation<T>): Any?\`。
-- **状态机生成**：编译器生成 \`when(label)\` 状态机，挂起时返回 \`COROUTINE_SUSPENDED\` 并释放调用栈，完成后通过 \`resumeWith()\` 推进至下一状态。
+### 3. 无栈实现策略（Stackless）：栈帧堆化
+- **为什么选无栈？** JVM 虚拟机不允许直接操控底层 CPU 栈指针（无法像 Go 语言那样为每个协程分配独立运行栈）。
+- **核心策略**：当协程挂起时，将函数在栈上的局部变量“搬移（Spill）”到堆内存对象中保存，函数立即弹栈退出释放线程；恢复时再从堆对象读回变量。
 
-### 4. 调度器（深）：Dispatchers
-- **Main**：绑定 Android 主线程 Looper。
-- **Default**：计算密集型，基于 CPU 核心数 Work-Stealing 线程池。
-- **IO**：阻塞 I/O，最大可弹性扩展至 64 线程。`,
+### 4. Continuation 接口 + 状态机：代码切片分发
+- **状态机合成**：编译器为挂起函数生成一个内部类（继承 \`ContinuationImpl\`），内含 \`label\` 状态标记。
+- **Switch-Case 切片**：以挂起点切分代码。挂起时返回 \`COROUTINE_SUSPENDED\` 释放线程栈；异步完成后通过 \`resumeWith()\` 推进 \`label\` 恢复执行。
+
+### 5. Completion 链：堆上单向链表替代调用栈
+- **通俗心智**：当函数 A 调用挂起函数 B，B 调用挂起函数 C 时，在堆上自动形成 \`C ➔ B ➔ A\` 的 \`completion\` 单向引用链表。
+- **堆上调用栈**：最底层的 C 完成后，通过 \`completion.resumeWith()\` 逐层向上回溯唤醒 B 和 A，用堆内存完美复刻了函数调用栈。
+
+### 6. Job + Dispatcher：身份与调度的两条正交轴
+- **Job（身份与拓扑树）**：负责管理生命周期、父子协程树取消级联与异常隔离（\`SupervisorJob\` 保护兄弟任务）。
+- **Dispatcher（物理调度载体）**：负责把恢复任务分发到具体的线程队列（\`Main\` 绑定主线程 Looper，\`Default\` 运行 CPU 密集型工作窃取线程池，\`IO\` 弹性扩张阻塞线程池）。两者完全正交解耦。`,
         stepper: [
           {
             title: '1. 发起挂起调用与状态机初始化',
@@ -241,24 +255,37 @@ abstract class AppDatabase : RoomDatabase() {
       {
         tag: '并发底层',
         title: 'Swift Concurrency 从浅入深：async/await、Task 树与 Actor 数据隔离',
+        pipeline: [
+          { title: '协程概念', subtitle: 'Conway 1963 · 协作式让出控制权', category: 'theory' },
+          { title: '续延语义 async/await', subtitle: 'Lattner 2021 · 编译期挂起点改写', category: 'theory' },
+          { title: '无栈异步栈帧', subtitle: 'Async Frame 分配于堆，释放 Worker 线程', category: 'theory' },
+          { title: 'UnsafeContinuation 接口', subtitle: '桥接异步回调与 Swift 协程状态机', category: 'engineering' },
+          { title: '结构化 Task 树', subtitle: 'withTaskGroup 级联取消与优先级继承', category: 'engineering' },
+          { title: 'Actor + 协作线程池', subtitle: '数据隔离与 CPU 核心数绑定调度', category: 'engineering' },
+        ],
         metaphor: {
           title: '接力赛道跑者与专属交接棒',
           formula: 'Swift Concurrency = async/await(挂起让权) + Task 树(结构化生命周期) + Actor(串行邮箱隔离)',
           metaphorDesc: '协作式线程池就像一条固定有 6 条跑道的跑道（CPU 核心数）。当一个跑者（Task）遇到水坑（`await` 异步 I/O）时，他不会在跑道上原地扎营堵路（线程阻塞），而是把跑道**交出来给其他跑者通行**；水坑跨过（I/O 完成）后，裁判（调度器）在任意一条空闲跑道上安排他继续往前冲。',
         },
-        explanation: `### 1. 概念（浅）：async/await
-- **协作式挂起**：\`await\` 标记挂起点，挂起时主动让出底层 Worker 线程，杜绝传统 GCD 的线程爆炸与上下文切换损耗。
+        explanation: `### 1. 协程概念（Conway 1963）：协作式让权
+- **通俗心智**：消除传统 GCD (\`DispatchQueue.global().async\`) 无节制创建线程导致的“线程爆炸”；协程在遇到 I/O 时主动让出执行线程。
 
-### 2. 结构化并发（中）：Task 树
-- **自动级联**：父 Task 取消时自动向下传播 \`isCancelled\` 信号；SwiftUI \`.task\` 随 View 销毁自动取消。
-- **TaskGroup**：动态并行发包，统一等待全部子任务收敛。
+### 2. 续延语义 async/await（Lattner 2021）：挂起点改写
+- **通俗心智**：\`await\` 标注了潜在的挂起点。当遇到挂起时，当前 Task 的后续逻辑被封装为续体，底层 Worker 线程立即去执行其他就绪任务。
 
-### 3. 数据隔离（深）：Actor 模型
-- **数据竞态消除**：\`actor\` 保证同一时刻仅有单个 Task 访问内部可变状态，外部访问必须 \`await\`。
-- **@MainActor**：强制将 ViewModel 状态更新绑定至主 RunLoop。
+### 3. 无栈异步栈帧（Async Frame）：堆上生命周期
+- **核心策略**：Swift 编译器将跨挂起点的局部变量打包存入堆上的 **Async Frame**，当前线程立即返回；异步 I/O 完成后，调度器分配空闲 Worker 从 Async Frame 恢复执行。
 
-### 4. 协作线程池（深）：Cooperative Pool
-- 线程数量严格受限于 CPU 物理核心数，通过任务挂起让权实现高吞吐并发调度。`,
+### 4. UnsafeContinuation 接口：桥接异步回调
+- **工程实现**：通过 \`withCheckedContinuation\` / \`withUnsafeContinuation\` 将传统 Callback 回调包装为挂起函数，手动调用 \`continuation.resume(returning:)\` 推进状态。
+
+### 5. 结构化 Task 树：生命周期与级联取消
+- **Task 树拓扑**：父 Task 自动等待子 Task 结束；父 Task 被取消时（如 SwiftUI \`.task\` 随视图销毁），自动向下广播 \`isCancelled\` 信号。
+
+### 6. Actor + 协作线程池：数据隔离与定额调度
+- **Actor 隔离域**：同一时刻严格保证仅 1 个 Task 访问内部可变状态，编译期彻底消除数据竞态；
+- **Cooperative Pool**：全局线程池数量严格等于 CPU 物理核心数，杜绝高并发下的线程无限膨胀。`,
         stepper: [
           {
             title: '1. Task 创建与入队协作线程池',

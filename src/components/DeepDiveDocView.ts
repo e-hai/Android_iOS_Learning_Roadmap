@@ -1,5 +1,5 @@
 import { deepDiveDomains } from '../data/deep-dive-data';
-import { DeepDiveDomain, DeepDiveModule, StepperStep } from '../models/types';
+import { DeepDiveDomain, DeepDiveModule, PipelineStep, StepperStep } from '../models/types';
 import { i18n } from '../services/i18n';
 
 export function renderDeepDiveDocView(
@@ -29,12 +29,21 @@ export function renderDeepDiveDocView(
     }
   }
 
-  const domain = deepDiveDomains.find((d) => d.id === domainId) || deepDiveDomains[0];
-  const modules: DeepDiveModule[] = platform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
-  const validChapterIndex = chapterIndex >= 0 && chapterIndex < modules.length ? chapterIndex : 0;
+  const domain = deepDiveDomains.find((d) => d.id === domainId);
+  if (!domain) {
+    container.innerHTML = `<div class="error-msg">${i18n.t('error.domainNotFound')}</div>`;
+    return container;
+  }
 
-  // 3. Render the Single Chapter Page directly
-  renderSingleChapterView(container, domain, validChapterIndex, modules, platform, onSelectStage);
+  const modules = platform === 'android' ? domain.deepDive.android : domain.deepDive.ios;
+  if (!modules || modules.length === 0 || chapterIndex >= modules.length) {
+    container.innerHTML = `<div class="error-msg">${i18n.t('error.chapterNotFound')}</div>`;
+    return container;
+  }
+
+  // Render Single Chapter
+  renderSingleChapterView(container, domain, modules, chapterIndex, platform, onSelectStage);
+
   return container;
 }
 
@@ -44,8 +53,8 @@ export function renderDeepDiveDocView(
 function renderSingleChapterView(
   container: HTMLElement,
   domain: DeepDiveDomain,
-  chapterIndex: number,
   modules: DeepDiveModule[],
+  chapterIndex: number,
   platform: 'android' | 'ios',
   onSelectStage: (stageId: string) => void
 ) {
@@ -60,6 +69,11 @@ function renderSingleChapterView(
     <h1 class="stage-detail-title">${mod.title}</h1>
   `;
   container.appendChild(header);
+
+  // Theory-to-Engineering Pipeline Flow Card (if present)
+  if (mod.pipeline && mod.pipeline.length > 0) {
+    container.appendChild(renderPipelineFlowCard(mod.pipeline, platform));
+  }
 
   // Cognitive Metaphor & Formula Card (if present)
   if (mod.metaphor) {
@@ -489,6 +503,57 @@ function renderStepperComponent(stepper: StepperStep[], platform: 'android' | 'i
   updateView();
   return wrapper;
 }
+
+function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 'ios'): HTMLElement {
+  const card = document.createElement('div');
+  card.className = `pipeline-flow-card ${platform === 'ios' ? 'pipeline-ios' : ''}`;
+
+  const nodesHtml = pipeline.map((step, idx) => {
+    const isTheory = step.category === 'theory' || idx < 3;
+    const nodeClass = isTheory ? 'node-theory' : 'node-engineering';
+    const connector = idx < pipeline.length - 1 ? `
+      <div class="pipeline-connector">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+      </div>
+    ` : '';
+
+    return `
+      <div class="pipeline-node ${nodeClass}">
+        <h4 class="pipeline-node-title">${escapeHtml(step.title)}</h4>
+        <p class="pipeline-node-subtitle">${escapeHtml(step.subtitle)}</p>
+      </div>
+      ${connector}
+    `;
+  }).join('');
+
+  card.innerHTML = `
+    <div class="pipeline-flow-header">
+      <div class="pipeline-flow-title-wrap">
+        <span class="pipeline-flow-badge">Roadmap</span>
+        <h3 class="pipeline-flow-title">理论 ➔ 工程演进全景链路</h3>
+      </div>
+      <div class="pipeline-flow-legend">
+        <div class="legend-item">
+          <span class="legend-dot theory-dot"></span>
+          <span>理论与策略层</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot eng-dot"></span>
+          <span>工程与运行时层</span>
+        </div>
+      </div>
+    </div>
+    <div class="pipeline-flow-container">
+      ${nodesHtml}
+    </div>
+  `;
+
+  return card;
+}
+
 
 
 

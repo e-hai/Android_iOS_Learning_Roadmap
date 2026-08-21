@@ -2188,6 +2188,194 @@
   cursor: not-allowed;
 }
 
+/* ==========================================================================
+   Theory-to-Engineering Pipeline Flow Diagram Card
+   ========================================================================== */
+.pipeline-flow-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pipeline-flow-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pipeline-flow-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pipeline-flow-badge {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-ring);
+  text-transform: uppercase;
+}
+
+.pipeline-flow-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.pipeline-flow-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--color-ink-muted);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.legend-dot.theory-dot {
+  background: #d4d4d8;
+  border: 1px solid #a1a1aa;
+}
+
+[data-theme="dark"] .legend-dot.theory-dot {
+  background: #3f3f46;
+  border-color: #71717a;
+}
+
+.legend-dot.eng-dot {
+  background: var(--color-accent);
+}
+
+.pipeline-flow-card.pipeline-ios .legend-dot.eng-dot {
+  background: var(--color-ios);
+}
+
+.pipeline-flow-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 460px;
+  gap: 0;
+}
+
+.pipeline-node {
+  width: 100%;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 3px;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
+  user-select: none;
+}
+
+.pipeline-node:hover {
+  transform: translateY(-1.5px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Theory & Strategy Level (Nodes 1~3) */
+.pipeline-node.node-theory {
+  background: #f4f4f5;
+  border-color: #e4e4e7;
+}
+
+[data-theme="dark"] .pipeline-node.node-theory {
+  background: #18181b;
+  border-color: #27272a;
+}
+
+.pipeline-node.node-theory:hover {
+  border-color: #a1a1aa;
+}
+
+/* Engineering & Runtime Level (Nodes 4~6) */
+.pipeline-node.node-engineering {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent-ring);
+}
+
+.pipeline-flow-card.pipeline-ios .pipeline-node.node-engineering {
+  background: var(--color-ios-soft);
+  border-color: var(--color-ios-border);
+}
+
+.pipeline-node.node-engineering:hover {
+  border-color: var(--color-accent);
+}
+
+.pipeline-flow-card.pipeline-ios .pipeline-node.node-engineering:hover {
+  border-color: var(--color-ios);
+}
+
+.pipeline-node-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.pipeline-node-subtitle {
+  font-size: 11.5px;
+  color: var(--color-ink-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.pipeline-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 20px;
+  justify-content: center;
+  color: var(--color-ink-faint);
+}
+
+.pipeline-connector svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--color-ink-faint);
+  transition: stroke var(--transition-fast);
+}
+
+.pipeline-node:hover + .pipeline-connector svg {
+  stroke: var(--color-accent);
+}
+
+
 
 
 

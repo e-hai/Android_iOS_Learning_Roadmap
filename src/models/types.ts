@@ -26,9 +26,16 @@ export interface StepperStep {
   stateSnapshot?: Record<string, string>; // e.g. { 'label': '1', '主线程状态': '立即释放', '返回值': 'COROUTINE_SUSPENDED' }
 }
 
+export interface PipelineStep {
+  title: string;          // e.g. '协程概念'
+  subtitle: string;       // e.g. 'Conway 1963 · 对称地互相让出控制权'
+  category?: 'theory' | 'engineering'; // 'theory' (理论与策略层) | 'engineering' (工程与运行时层)
+}
+
 export interface DeepDiveModule {
   tag: string;           // e.g. '底层机制', '性能调优', '架构陷阱', '调试利器'
   title: string;         // Module title
+  pipeline?: PipelineStep[];   // Optional Theory-to-Engineering pipeline chain diagram
   metaphor?: DeepDiveMetaphor; // Optional cognitive metaphor & golden memory formula
   explanation: string;   // Deep dive explanation (supports rich structured paragraphs)
   stepper?: StepperStep[]; // Optional interactive step-by-step state machine runner
