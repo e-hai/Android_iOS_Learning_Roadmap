@@ -176,6 +176,22 @@ function renderSingleChapterView(
     container.appendChild(diagramSection);
   }
 
+  // Extended Top-Down Deep Dive Section (if present)
+  if (mod.extendedDeepDive) {
+    const extSection = document.createElement('section');
+    extSection.className = 'chapter-content-section extended-deep-dive-section';
+    extSection.innerHTML = `
+      <div class="section-header">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">进阶延伸思考：从顶层到底层的 4 级全景透视</h2>
+      </div>
+      <div class="extended-deep-dive-box ${platform === 'ios' ? 'deepdive-ios' : ''}">
+        ${formatExtendedDeepDiveHtml(mod.extendedDeepDive)}
+      </div>
+    `;
+    container.appendChild(extSection);
+  }
+
   // Section: Production Code / Implementation
   if (mod.codeSnippet) {
     const codeSection = document.createElement('section');
@@ -604,6 +620,73 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios')
 
   return container;
 }
+
+function formatExtendedDeepDiveHtml(rawText: string): string {
+  if (!rawText) return '';
+  // Split by "### "
+  const blocks = rawText.split(/(?=###\s+)/g).map((b) => b.trim()).filter(Boolean);
+
+  return blocks.map((block, idx) => {
+    const lines = block.split('\n');
+    const headerLine = lines[0].replace(/^###\s+/, '').trim();
+    
+    // Parse tag if present: e.g. "第 1 级：顶层语法与调用边界（Application & API）"
+    let title = headerLine;
+    let tag = '';
+    const match = headerLine.match(/^(第\s*\d+\s*级[：:])\s*(.*?)(（(.*?)）|\((.*?)\))?$/);
+    let levelBadge = `L${idx + 1}`;
+    if (match) {
+      levelBadge = match[1].replace(/[：:]/, '').trim();
+      title = match[2].trim();
+      tag = (match[4] || match[5] || '').trim();
+    }
+
+    const restText = lines.slice(1).join('\n').trim();
+
+    // Parse sections within restText: diagrams (```diagram ... ```), code (```kotlin ... ```), text
+    let contentHtml = '';
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let codeMatch: RegExpExecArray | null;
+
+    while ((codeMatch = codeBlockRegex.exec(restText)) !== null) {
+      const textBefore = restText.substring(lastIndex, codeMatch.index).trim();
+      if (textBefore) {
+        contentHtml += `<div class="layer-explanation-text">${formatExplanationHtml(textBefore)}</div>`;
+      }
+
+      const lang = (codeMatch[1] || '').toLowerCase();
+      const code = codeMatch[2].trim();
+
+      if (lang === 'diagram' || lang === 'ascii' || lang === 'text') {
+        contentHtml += `<pre class="layer-diagram-box"><code>${escapeHtml(code)}</code></pre>`;
+      } else {
+        contentHtml += `<pre class="layer-code-box"><code>${escapeHtml(code)}</code></pre>`;
+      }
+
+      lastIndex = codeMatch.index + codeMatch[0].length;
+    }
+
+    const textAfter = restText.substring(lastIndex).trim();
+    if (textAfter) {
+      contentHtml += `<div class="layer-explanation-text">${formatExplanationHtml(textAfter)}</div>`;
+    }
+
+    return `
+      <div class="extended-layer-card">
+        <div class="extended-layer-header">
+          <div class="layer-title-wrap">
+            <span class="layer-number-badge">${escapeHtml(levelBadge)}</span>
+            <h3 class="layer-title">${escapeHtml(title)}</h3>
+          </div>
+          ${tag ? `<span class="layer-tag">${escapeHtml(tag)}</span>` : ''}
+        </div>
+        ${contentHtml}
+      </div>
+    `;
+  }).join('');
+}
+
 
 
 

@@ -2542,6 +2542,132 @@
   margin-bottom: 0;
 }
 
+/* ==========================================================================
+   Extended Top-Down Deep Dive Section (进阶延伸思考：从顶层到底层的 4 级透视)
+   ========================================================================== */
+.extended-deep-dive-section {
+  margin-top: 36px;
+  margin-bottom: 28px;
+}
+
+.extended-deep-dive-box {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.extended-layer-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 18px 22px;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all var(--transition-fast);
+}
+
+.extended-layer-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-sm);
+}
+
+.extended-layer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
+}
+
+.layer-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.layer-number-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-ring);
+  letter-spacing: 0.5px;
+}
+
+.extended-deep-dive-box.deepdive-ios .layer-number-badge {
+  background: var(--color-ios-soft);
+  color: var(--color-ios);
+  border-color: var(--color-ios-border);
+}
+
+.layer-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.layer-tag {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-sunken);
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.layer-diagram-box {
+  background: #18181b;
+  color: #e4e4e7;
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.layer-explanation-text {
+  font-size: 13.5px;
+  color: var(--color-ink-muted);
+  line-height: 1.7;
+}
+
+.layer-explanation-text ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.layer-explanation-text li {
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.layer-explanation-text li:last-child {
+  margin-bottom: 0;
+}
+
+.layer-code-box {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  overflow-x: auto;
+  color: var(--color-ink);
+}
+
+
 
 
 

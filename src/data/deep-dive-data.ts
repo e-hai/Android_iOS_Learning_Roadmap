@@ -37,6 +37,120 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
 ### 6. Job + Dispatcher：身份与调度的两条正交轴
 - **Job（身份与拓扑树）**：负责管理生命周期、父子协程树取消级联与异常隔离（\`SupervisorJob\` 保护兄弟任务）。
 - **Dispatcher（物理调度载体）**：负责把恢复任务分发到具体的线程队列（\`Main\` 绑定主线程 Looper，\`Default\` 运行 CPU 密集型工作窃取线程池，\`IO\` 弹性扩张阻塞线程池）。两者完全正交解耦。`,
+        extendedDeepDive: `### 第 1 级：顶层语法与调用边界（Application & API Layer）
+- **心智图解：构建器 vs 挂起函数**
+\`\`\`diagram
+ [ 主线程 (UI / 外部世界) ]
+    │
+    ├─ 1. launch { ... }  ──▶ 派出【外卖小哥】(创建全新协程与独立 Job，主线程不等待立即返回)
+    │
+    ▼
+ [ 协程内部时间线 ]
+    │
+    ├─ 2. val data = api.fetch() ──▶ 自己在厨房【烧开水】(suspend 函数，当前协程挂起顺序等待结果)
+    │                                 
+    └─ 3. updateUI(data) ──────────▶ 水烧开后，自己接着泡茶 (拿到结果继续走下一行)
+\`\`\`
+- **极简代码流程印证**
+\`\`\`kotlin
+// 顶层入口：launch 创建新协程实例，返回 Job
+viewModelScope.launch {
+    // 协程内部：suspend 函数按顺序挂起等待，直接返回数据对象
+    val user = api.fetchUser() // 等待 500ms 拿到 User
+    val stats = api.fetchStats() // 再等待 300ms 拿到 Stats (共 800ms)
+    _uiState.value = UserProfile(user, stats)
+}
+\`\`\`
+
+### 第 2 级：编译期状态机生成（Compiler & Bytecode Layer）
+- **心智图解：父状态机步骤 与 子状态机调用**
+\`\`\`diagram
+ [ launch 编译成的根状态机 (SuspendLambda) ]
+   ├── case 0 (步骤 0): 调用 fetchUser(this) ────────┐ 把父状态机 (this) 作为 completion 传下去
+   │                                                 ▼
+   │                              [ fetchUser 编译成的独立子状态机 (ContinuationImpl) ]
+   │                               ├── 内部有自己的 label 步骤 (网络握手/接收数据)
+   │                               └── 算完后调用: this.completion.resumeWith(user)
+   │                                                 │
+   ├── case 1 (步骤 1): 接收 user，调用 fetchStats(this) ◀┘ (唤醒父状态机进入 case 1)
+   │
+   └── case 2 (步骤 2): 组装最终结果，协程彻底完成！
+\`\`\`
+- **极简代码流程印证（编译器生成的伪代码）**
+\`\`\`kotlin
+// 为何必须是「接口 + 状态机」？
+// 状态机对内：全函数只 new 1 个对象，when(label) 轻松支持 for 循环与 try-catch！
+// 接口对外：实现 Continuation 接口，提供唯一的 resumeWith() 供外部统一唤醒！
+fun invokeSuspend(result: Result<Any?>): Any? {
+    when (this.label) {
+        0 -> { this.label = 1; return fetchUser(this) }       // 步骤 0
+        1 -> { this.user = result; this.label = 2; return fetchStats(this) } // 步骤 1
+        2 -> { return UserProfile(this.user, result) }         // 步骤 2
+    }
+}
+\`\`\`
+
+### 第 3 级：堆内存调用栈重构（Heap Memory Layer）
+- **心智图解：用堆内存链表替代 CPU 栈的“返回地址（Return Address）”**
+\`\`\`diagram
+ 传统操作系统线程栈 (LIFO 原生栈):
+ [ 函数 A 栈帧 (Return Addr) ] ◀── [ 函数 B 栈帧 (Return Addr) ] ◀── [ 函数 C 栈帧 ]
+
+ 协程无栈模型 (堆内存链表):
+ ┌───────────────────────┐
+ │ 函数 A 状态机 (根节点) │
+ └──────────▲────────────┘
+            │ completion 指针 (记录“我完成后交还给谁”)
+ ┌──────────┴────────────┐
+ │ 函数 B 状态机 (中间层) │
+ └──────────▲────────────┘
+            │ completion 指针 (命名为 completion 突出其“完成回调归宿”的角色)
+ ┌──────────┴────────────┐
+ │ 函数 C 状态机 (最底层) │ ──▶ C 执行完毕，沿着 completion 链回溯向上唤醒 B 和 A！
+ └───────────────────────┘
+\`\`\`
+- **极简代码流程印证（Kotlin 官方 BaseContinuationImpl 源码）**
+\`\`\`kotlin
+// 为什么不发生 StackOverflow 栈溢出？因为用 while(true) 平铺解包！
+override fun resumeWith(result: Result<Any?>) {
+    var current = this
+    while (true) {
+        val completion = current.completion!! // 顺着 completion 链向上
+        val outcome = current.invokeSuspend(param) // 执行当前状态机
+        if (outcome === COROUTINE_SUSPENDED) return // 挂起则安全退出方法栈
+        current = completion as BaseContinuationImpl // 平铺迭代，消除递归压栈！
+    }
+}
+\`\`\`
+
+### 第 4 级：运行时拦截与多核调度（Runtime & Threading Layer）
+- **心智图解：跨调度器（Default ➔ IO ➔ Default）的接力交接**
+\`\`\`diagram
+ [ 1. 在 Dispatchers.Default 上运行 ]
+   │ 执行计算: val param = hash()
+   │ 遇到 withContext(Dispatchers.IO) ──▶ 将外层状态机 (带 Default 车票) 存入 completion
+   │ 
+   ▼ (外层挂起让权，切到 IO 线程)
+ [ 2. 在 Dispatchers.IO 线程池中下载 ]
+   │ 执行网络阻塞: val data = download(param)
+   │ 下载完成，交出接力棒: completion.resumeWith(data)
+   │                            │
+   ▼                            ▼ (通过 completion.context 自动识别上层是 Default)
+ [ 3. Dispatchers.Default 拦截器接管 ]
+   │ 将任务打包为 Runnable 丢入 DefaultScheduler.WorkQueue
+   │ Worker-Default 线程出队执行 ➔ 拿到 data 继续在 Default 上计算！
+\`\`\`
+- **极简代码流程印证**
+\`\`\`kotlin
+// 拦截器眼中的视角：纯粹把一切当成黑盒 Continuation
+public interface ContinuationInterceptor : CoroutineContext.Element {
+    // 拦截原始续体，包装为能在线程池排队的 Runnable (DispatchedContinuation)
+    fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T>
+}
+
+// 调度协同：Dispatchers.Main / IO / Default 都是全局单例拦截器
+// 无论跨越多少个拦截器，每个 completion 随身携带的 context，保证数据永远精准自动回传！
+\`\`\``,
       },
       {
         tag: '内存模型',
@@ -131,6 +245,90 @@ abstract class AppDatabase : RoomDatabase() {
 ### 6. Actor + 协作线程池：数据隔离与定额调度
 - **Actor 隔离域**：同一时刻严格保证仅 1 个 Task 访问内部可变状态，编译期彻底消除数据竞态；
 - **Cooperative Pool**：全局线程池数量严格等于 CPU 物理核心数，杜绝高并发下的线程无限膨胀。`,
+        extendedDeepDive: `### 第 1 级：顶层语法与调用边界（Application & API Layer）
+- **心智图解：Task 树构建 vs async 挂起步骤**
+\`\`\`diagram
+ [ SwiftUI 视图 / 主 RunLoop ]
+    │
+    ├─ 1. Task { ... } ────────▶ 创建根 Task (绑定 @MainActor，主线程不等待立即返回)
+    │
+    ▼
+ [ Task 内部时间线 ]
+    │
+    ├─ 2. val balance = await store.getBalance() ──▶ 遇到 await 挂起让权 (释放当前 Worker 线程)
+    │                                                 
+    └─ 3. self.balance = balance ──────────────────▶ 拿到结果切回 @MainActor 驱动 UI 刷新
+\`\`\`
+- **极简代码流程印证**
+\`\`\`swift
+// 顶层入口：Task 创建新并发任务实例
+Task { @MainActor in
+    // 协程内部：await 显式标注挂起点，顺序等待数据返回
+    let user = try await api.fetchUser()
+    let stats = try await api.fetchStats()
+    self.uiState = .success(UserProfile(user: user, stats: stats))
+}
+\`\`\`
+
+### 第 2 级：编译期 Async Frame 堆化（Compiler & Bytecode Layer）
+- **心智图解：异步调用栈帧与挂起点切分**
+\`\`\`diagram
+ [ 编译器为 async 函数分配堆上的 Async Frame ]
+   ├── 局部变量 (user, token) 提升为 Async Frame 堆字段
+   ├── 遇到 await 挂起点 ──▶ 将当前续体记录到当前 Task，Worker 线程立即弹栈退出！
+   └── 底层 I/O 完成 ──▶ 调度器从 Async Frame 读取局部变量恢复执行
+\`\`\`
+- **极简代码流程印证（UnsafeContinuation 桥接）**
+\`\`\`swift
+// 桥接传统 Callback 到 Swift Concurrency
+func fetchToken() async -> String {
+    await withCheckedContinuation { continuation in
+        legacySdk.fetchToken { token in
+            continuation.resume(returning: token) // 恢复挂起的 Task
+        }
+    }
+}
+\`\`\`
+
+### 第 3 级：结构化 Task 树与生命周期（Structured Concurrency Layer）
+- **心智图解：父子 Task 树状拓扑与取消传播**
+\`\`\`diagram
+ SwiftUI View (.task 根节点)
+      │
+      ├──▶ withTaskGroup (动态派离子任务)
+      │        ├── Task 1: fetchAvatar() ──▶ 继承父级优先级 (UserInitiated)
+      │        └── Task 2: fetchFriends() ──▶ 父级销毁时自动广播 isCancelled 取消
+      └── 统一在 group 退出前收敛等待全部子任务完成
+\`\`\`
+- **极简代码流程印证**
+\`\`\`swift
+// TaskGroup 结构化并发：父 Task 自动等待全部子 Task 结束
+await withTaskGroup(of: String.self) { group in
+    group.addTask { await fetchPartA() }
+    group.addTask { await fetchPartB() }
+    for await result in group { process(result) }
+}
+\`\`\`
+
+### 第 4 级：Actor 数据隔离与协作线程池（Runtime & Threading Layer）
+- **心智图解：Mailbox 邮箱串行队列与定额协作线程池**
+\`\`\`diagram
+ [ Task 1 (Worker-1) ] ──(跨隔离域调用 await)──┐
+                                                ▼
+ [ Task 2 (Worker-2) ] ──(跨隔离域调用 await)──▶ [ Actor 独立隔离域 (Mailbox 队列) ]
+                                                   │
+                                                   ▼ (同一物理时刻严格仅 1 个 Task 执行)
+                                                [ 访问 private var balance (0 竞态!) ]
+ [ 协作线程池 (Cooperative Thread Pool) ] ──▶ 全局 Worker 线程数严格 = CPU 物理核心数 (杜绝线程爆炸)
+\`\`\`
+- **极简代码流程印证**
+\`\`\`swift
+actor SafeStore {
+    private var balance: Double = 0.0
+    // Actor 内部独占访问，编译期彻底消除多线程数据竞态
+    func deposit(_ amount: Double) { balance += amount }
+}
+\`\`\``,
       },
       {
         tag: '内存模型',
