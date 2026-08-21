@@ -2375,6 +2375,174 @@
   stroke: var(--color-accent);
 }
 
+/* ==========================================================================
+   Scheme 1: Integrated Vertical Timeline Stream (原理解析纵向时序流)
+   ========================================================================== */
+.timeline-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 20px;
+  margin-bottom: 28px;
+  position: relative;
+  width: 100%;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  position: relative;
+}
+
+.timeline-axis {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 32px;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.timeline-step-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  z-index: 2;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-xs);
+}
+
+.timeline-step-badge.badge-theory {
+  background: #e4e4e7;
+  color: #3f3f46;
+  border: 1.5px solid #a1a1aa;
+}
+
+[data-theme="dark"] .timeline-step-badge.badge-theory {
+  background: #27272a;
+  color: #d4d4d8;
+  border-color: #52525b;
+}
+
+.timeline-step-badge.badge-engineering {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1.5px solid var(--color-accent);
+}
+
+.timeline-ios .timeline-step-badge.badge-engineering {
+  background: var(--color-ios-soft);
+  color: var(--color-ios);
+  border-color: var(--color-ios);
+}
+
+.timeline-track-line {
+  position: absolute;
+  top: 28px;
+  bottom: -16px;
+  width: 2px;
+  background: var(--color-border);
+  z-index: 1;
+}
+
+.timeline-item:last-child .timeline-track-line {
+  display: none;
+}
+
+.timeline-card {
+  flex: 1;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px 18px;
+  box-shadow: var(--shadow-xs);
+  transition: all var(--transition-fast);
+}
+
+.timeline-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-sm);
+  transform: translateX(2px);
+}
+
+.timeline-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-wrap: wrap;
+}
+
+.timeline-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin: 0;
+}
+
+.timeline-card-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.3px;
+}
+
+.timeline-card-tag.tag-theory {
+  background: #f4f4f5;
+  color: #71717a;
+  border: 1px solid #e4e4e7;
+}
+
+[data-theme="dark"] .timeline-card-tag.tag-theory {
+  background: #18181b;
+  color: #a1a1aa;
+  border-color: #27272a;
+}
+
+.timeline-card-tag.tag-engineering {
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-ring);
+}
+
+.timeline-ios .timeline-card-tag.tag-engineering {
+  background: var(--color-ios-soft);
+  color: var(--color-ios);
+  border-color: var(--color-ios-border);
+}
+
+.timeline-card-content {
+  font-size: 13.5px;
+  color: var(--color-ink-muted);
+  line-height: 1.65;
+}
+
+.timeline-card-content .chapter-bullet-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.timeline-card-content .chapter-bullet-list li {
+  margin-bottom: 6px;
+  font-size: 13.5px;
+  line-height: 1.65;
+}
+
+.timeline-card-content .chapter-bullet-list li:last-child {
+  margin-bottom: 0;
+}
+
+
 
 
 

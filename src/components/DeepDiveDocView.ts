@@ -70,46 +70,46 @@ function renderSingleChapterView(
   `;
   container.appendChild(header);
 
-  // Theory-to-Engineering Pipeline Flow Card (if present)
+  // Pipeline & Explanation (Unified Principle Flow)
   if (mod.pipeline && mod.pipeline.length > 0) {
     container.appendChild(renderPipelineFlowCard(mod.pipeline, platform));
-  }
-
-  // Cognitive Metaphor & Formula Card (if present)
-  if (mod.metaphor) {
-    const metaphorCard = document.createElement('div');
-    metaphorCard.className = `chapter-metaphor-card ${platform === 'ios' ? 'metaphor-ios' : ''}`;
-    metaphorCard.innerHTML = `
-      <div class="metaphor-header">
-        <div class="metaphor-badge">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-          <span>心智模型隐喻</span>
+    container.appendChild(renderTimelineExplanation(mod.explanation, platform));
+  } else {
+    // Cognitive Metaphor & Formula Card (if present on traditional modules)
+    if (mod.metaphor) {
+      const metaphorCard = document.createElement('div');
+      metaphorCard.className = `chapter-metaphor-card ${platform === 'ios' ? 'metaphor-ios' : ''}`;
+      metaphorCard.innerHTML = `
+        <div class="metaphor-header">
+          <div class="metaphor-badge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <span>心智模型隐喻</span>
+          </div>
+          <span class="metaphor-title">${escapeHtml(mod.metaphor.title)}</span>
         </div>
-        <span class="metaphor-title">${escapeHtml(mod.metaphor.title)}</span>
-      </div>
-      <div class="metaphor-formula-wrap">
-        <span class="metaphor-formula-label">⚡ 黄金记忆公式:</span>
-        <code class="metaphor-formula-code">${escapeHtml(mod.metaphor.formula)}</code>
-      </div>
-      <p class="metaphor-desc">${formatInlineText(mod.metaphor.metaphorDesc)}</p>
-    `;
-    container.appendChild(metaphorCard);
-  }
+        <div class="metaphor-formula-wrap">
+          <span class="metaphor-formula-label">⚡ 黄金记忆公式:</span>
+          <code class="metaphor-formula-code">${escapeHtml(mod.metaphor.formula)}</code>
+        </div>
+        <p class="metaphor-desc">${formatInlineText(mod.metaphor.metaphorDesc)}</p>
+      `;
+      container.appendChild(metaphorCard);
+    }
 
-  // Section 1: Core Mechanism & Principle Analysis
-  const hasMultipleSections = !!(mod.stepper?.length || mod.diagram || mod.codeSnippet);
-  const principleSection = document.createElement('section');
-  principleSection.className = 'chapter-content-section';
-  principleSection.innerHTML = `
-    <div class="section-header">
-      <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-      <h2 class="section-header-title">${hasMultipleSections ? '一、底层运行机制与核心原理' : '核心原理解析与技术推演'}</h2>
-    </div>
-    <div class="chapter-card-box">
-      ${formatExplanationHtml(mod.explanation)}
-    </div>
-  `;
-  container.appendChild(principleSection);
+    // Traditional Module Principle Section
+    const principleSection = document.createElement('section');
+    principleSection.className = 'chapter-content-section';
+    principleSection.innerHTML = `
+      <div class="section-header">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">核心原理解析与底层机制</h2>
+      </div>
+      <div class="chapter-card-box">
+        ${formatExplanationHtml(mod.explanation)}
+      </div>
+    `;
+    container.appendChild(principleSection);
+  }
 
   let nextSectionNumber = 2;
   const numToChinese = ['一', '二', '三', '四', '五', '六'];
@@ -554,6 +554,57 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
 
   return card;
 }
+
+function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios'): HTMLElement {
+  const container = document.createElement('div');
+  container.className = `timeline-stream ${platform === 'ios' ? 'timeline-ios' : ''}`;
+
+  // Split by markdown H3 heading
+  const sections = rawText.split(/(?=###\s+)/g).map((s) => s.trim()).filter(Boolean);
+
+  sections.forEach((sec, idx) => {
+    const lines = sec.split('\n').map((l) => l.trim()).filter(Boolean);
+    const titleLine = lines[0] || '';
+    const title = titleLine.replace(/^###\s+/, '');
+    const bodyLines = lines.slice(1);
+
+    const isTheory = idx < 3;
+    const badgeNumber = String(idx + 1).padStart(2, '0');
+    const tagText = isTheory ? '理论与策略' : '工程与运行时';
+
+    const item = document.createElement('div');
+    item.className = 'timeline-item';
+
+    // Format list items
+    const listHtml = bodyLines.map((line) => {
+      const cleanLine = line.replace(/^[-*]\s*/, '').trim();
+      return `<li>${formatInlineText(cleanLine)}</li>`;
+    }).join('');
+
+    item.innerHTML = `
+      <div class="timeline-axis">
+        <span class="timeline-step-badge ${isTheory ? 'badge-theory' : 'badge-engineering'}">${badgeNumber}</span>
+        <div class="timeline-track-line"></div>
+      </div>
+      <div class="timeline-card">
+        <div class="timeline-card-header">
+          <h3 class="timeline-card-title">${escapeHtml(title)}</h3>
+          <span class="timeline-card-tag ${isTheory ? 'tag-theory' : 'tag-engineering'}">${tagText}</span>
+        </div>
+        <div class="timeline-card-content">
+          <ul class="chapter-bullet-list">
+            ${listHtml}
+          </ul>
+        </div>
+      </div>
+    `;
+
+    container.appendChild(item);
+  });
+
+  return container;
+}
+
 
 
 
