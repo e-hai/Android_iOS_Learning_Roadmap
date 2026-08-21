@@ -97,12 +97,13 @@ function renderSingleChapterView(
   }
 
   // Section 1: Core Mechanism & Principle Analysis
+  const hasMultipleSections = !!(mod.stepper?.length || mod.diagram || mod.codeSnippet);
   const principleSection = document.createElement('section');
   principleSection.className = 'chapter-content-section';
   principleSection.innerHTML = `
     <div class="section-header">
       <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-      <h2 class="section-header-title">一、底层运行机制与核心原理</h2>
+      <h2 class="section-header-title">${hasMultipleSections ? '一、底层运行机制与核心原理' : '核心原理解析与技术推演'}</h2>
     </div>
     <div class="chapter-card-box">
       ${formatExplanationHtml(mod.explanation)}
