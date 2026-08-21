@@ -2623,15 +2623,15 @@
 }
 
 .layer-diagram-box {
-  background: #18181b;
-  color: #e4e4e7;
+  background: var(--color-surface-sunken);
+  color: var(--color-ink);
   border-radius: var(--radius-md);
   padding: 12px 16px;
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
   overflow-x: auto;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--color-border);
 }
 
 .layer-explanation-text {
