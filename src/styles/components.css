@@ -1850,5 +1850,344 @@
   margin: 0;
 }
 
+/* ==========================================================================
+   Chapter Cognitive Metaphor Card
+   ========================================================================== */
+.chapter-metaphor-card {
+  padding: 16px 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  margin-bottom: 20px;
+  border-left: 3.5px solid var(--color-accent);
+  background: linear-gradient(135deg, var(--color-accent-soft) 0%, var(--color-surface) 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chapter-metaphor-card.metaphor-ios {
+  border-left-color: var(--color-ios);
+  background: linear-gradient(135deg, var(--color-ios-soft) 0%, var(--color-surface) 100%);
+}
+
+.metaphor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.metaphor-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-accent);
+  background: var(--color-surface);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.metaphor-ios .metaphor-badge {
+  color: var(--color-ios);
+}
+
+.metaphor-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.metaphor-formula-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface);
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.metaphor-formula-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  flex-shrink: 0;
+}
+
+.metaphor-formula-code {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.metaphor-desc {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--color-ink-secondary);
+  margin: 0;
+}
+
+/* ==========================================================================
+   Chapter Interactive Step-by-Step State Stepper
+   ========================================================================== */
+.chapter-stepper-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+  margin: 14px 0 20px 0;
+}
+
+.stepper-nav-bar {
+  display: flex;
+  align-items: center;
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.stepper-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.stepper-tab-btn:hover {
+  color: var(--color-ink);
+  background: var(--color-surface);
+}
+
+.stepper-tab-btn.active {
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border-bottom-color: var(--color-accent);
+  font-weight: 700;
+}
+
+.stepper-card-ios .stepper-tab-btn.active {
+  color: var(--color-ios);
+  border-bottom-color: var(--color-ios);
+}
+
+.stepper-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.stepper-tab-btn.active .stepper-num {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.stepper-card-ios .stepper-tab-btn.active .stepper-num {
+  background: var(--color-ios);
+  border-color: var(--color-ios);
+}
+
+.stepper-content-body {
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stepper-step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.stepper-step-tag {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-ring);
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.stepper-card-ios .stepper-step-tag {
+  background: var(--color-ios-soft);
+  color: var(--color-ios);
+  border-color: var(--color-ios-border);
+}
+
+.stepper-step-desc {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--color-ink);
+  margin: 0;
+  font-weight: 500;
+}
+
+.stepper-diagram-box {
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  overflow-x: auto;
+}
+
+.stepper-code {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  white-space: pre;
+  tab-size: 2;
+}
+
+.stepper-snapshot-box {
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.snapshot-header {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--color-ink-muted);
+  margin-bottom: 8px;
+}
+
+.snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.snapshot-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  background: var(--color-surface-sunken);
+  padding: 4px 8px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.snapshot-key {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--color-ink-muted);
+}
+
+.snapshot-val {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.stepper-card-ios .snapshot-val {
+  color: var(--color-ios);
+}
+
+.stepper-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.stepper-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.stepper-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-border);
+  transition: all var(--transition-fast);
+}
+
+.stepper-dot.active {
+  width: 18px;
+  border-radius: var(--radius-full);
+  background: var(--color-accent);
+}
+
+.stepper-card-ios .stepper-dot.active {
+  background: var(--color-ios);
+}
+
+.stepper-btn-prev,
+.stepper-btn-next {
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink);
+}
+
+.stepper-btn-next {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.stepper-card-ios .stepper-btn-next {
+  background: var(--color-ios);
+  border-color: var(--color-ios);
+}
+
+.stepper-btn-prev:hover:not(:disabled) {
+  background: var(--color-surface-sunken);
+}
+
+.stepper-btn-next:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.stepper-btn-prev:disabled,
+.stepper-btn-next:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+
 
 

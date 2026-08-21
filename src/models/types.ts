@@ -12,12 +12,28 @@ export interface ComparisonSection {
   rows: ComparisonRow[];
 }
 
+export interface DeepDiveMetaphor {
+  title: string;          // e.g. '餐厅点单与叫号取餐'
+  formula: string;        // e.g. '协程 = 状态机 (Switch-Case) + 续体 (Continuation) + 调度器 (Dispatcher)'
+  metaphorDesc: string;   // Vivid physical world metaphor explanation
+}
+
+export interface StepperStep {
+  title: string;          // e.g. '① 发起调用与创建状态机'
+  desc: string;           // Concise description of what happens at this step
+  tag?: string;           // Optional badge e.g. '主线程占用' | '主线程释放'
+  diagram: string;        // Visual box/ASCII diagram for this step
+  stateSnapshot?: Record<string, string>; // e.g. { 'label': '1', '主线程状态': '立即释放', '返回值': 'COROUTINE_SUSPENDED' }
+}
+
 export interface DeepDiveModule {
   tag: string;           // e.g. '底层机制', '性能调优', '架构陷阱', '调试利器'
   title: string;         // Module title
+  metaphor?: DeepDiveMetaphor; // Optional cognitive metaphor & golden memory formula
   explanation: string;   // Deep dive explanation (supports rich structured paragraphs)
-  codeSnippet?: string;  // Code example or CLI command
+  stepper?: StepperStep[]; // Optional interactive step-by-step state machine runner
   diagram?: string;      // Optional Unicode Box Diagram for architecture/timing/state machine
+  codeSnippet?: string;  // Code example or CLI command
 }
 
 export interface PlatformDeepDive {

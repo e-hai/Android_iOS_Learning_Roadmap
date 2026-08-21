@@ -6,6 +6,11 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
       {
         tag: '并发底层',
         title: 'Kotlin 协程从浅入深：挂起心智模型、CPS 状态机与 Dispatcher 调度器',
+        metaphor: {
+          title: '餐厅点单与叫号取餐牌',
+          formula: '协程 = 状态机 (Switch-Case) + 续体 (Continuation) + 调度器 (Dispatcher)',
+          metaphorDesc: '去快餐店点餐时，你（主线程）点完餐不会站在点餐台死等（线程阻塞），服务员发给你一个**取餐号牌（Continuation 续体）**；你立刻退回点餐台去处理其他事（UI 渲染）；后厨（异步 I/O / 线程池）做好餐后叫号，服务员在空闲窗口（Dispatcher 调度）把餐交给你，你拿着餐继续享用（恢复执行）。',
+        },
         explanation: `### 1. 概念（浅）：非阻塞挂起
 - **本质**：协程是运行在线程之上的**用户态协作任务**。
 - **挂起 vs 阻塞**：\`Thread.sleep\` 阻塞并卡死当前线程；\`delay\` **主动让出线程**给 UI 绘制，I/O 完成后调度空闲线程恢复执行。
@@ -23,6 +28,87 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
 - **Main**：绑定 Android 主线程 Looper。
 - **Default**：计算密集型，基于 CPU 核心数 Work-Stealing 线程池。
 - **IO**：阻塞 I/O，最大可弹性扩展至 64 线程。`,
+        stepper: [
+          {
+            title: '1. 发起挂起调用与状态机初始化',
+            tag: '主线程调用',
+            desc: '外部在主线程调用 `loadUserData()`，编译器注入的 `ContinuationImpl` 状态机实例被创建，初始 `label = 0`。',
+            diagram: `[ 主线程 (Main Thread) ] ──▶ 调用 loadUserData(cont)
+                              │
+                              ▼
+           ┌─────────────────────────────────────────┐
+           │ 状态机实例 (LoadUserDataSM)             │
+           │ • label: 0                              │
+           │ • token: null                           │
+           │ • continuation: 外部调用栈续体          │
+           └─────────────────────────────────────────┘`,
+            stateSnapshot: {
+              '当前执行线程': 'main (主线程)',
+              'SM.label': '0 (初始阶段)',
+              '局部变量 token': 'null',
+              'CPU 状态': '正常执行同步指令',
+            },
+          },
+          {
+            title: '2. 遇到挂起点，主线程立即释放让权',
+            tag: '非阻塞挂起',
+            desc: '状态机执行到 `fetchToken(sm)`，底层网络库发起非阻塞 I/O，函数向主线程返回特殊标记 `COROUTINE_SUSPENDED`；主线程**立即弹出调用栈**，返回去流畅处理 UI 绘制与触摸！',
+            diagram: `[ 状态机 ] ──▶ 执行 fetchToken(sm) ──▶ 底层向 epoll/Netty 注册异步回调
+                  │
+                  ▼ 返回 COROUTINE_SUSPENDED
+[ 主线程 (Main Thread) ] ──▶ 立即释放调用栈！
+                              │
+                              ▼ (返回 Android Looper 消息循环)
+                    [ 继续流畅渲染 UI & 触摸响应 (60fps) ]`,
+            stateSnapshot: {
+              '当前执行线程': 'main 立即释放并返回',
+              'SM.label': '1 (推进至阶段 1)',
+              '函数返回值': 'COROUTINE_SUSPENDED',
+              '主线程 UI 渲染': '持续 60 FPS 流畅绘制 (0 ANR)',
+            },
+          },
+          {
+            title: '3. 后台 I/O 完成，调度器分发 Worker 线程',
+            tag: '异步 I/O 完成',
+            desc: '底层网络驱动完成数据接收，触发回调调用 `continuation.resumeWith("token_abc")`，调度器将恢复任务包装为 Runnable 投递到目标线程。',
+            diagram: `[ 操作系统网络驱动 ] ──▶ 数据包到达 (TCP/TLS 握手完成)
+                              │
+                              ▼ 触发异步回调
+[ Dispatcher 调度器 ] ──▶ 调用 sm.resumeWith("token_abc")
+                              │
+                              ▼ 从线程池分配空闲 Worker 或投递 Main Looper
+                    [ Thread-Worker / Handler.post(sm) ]`,
+            stateSnapshot: {
+              '网络 I/O 状态': '已完成，数据到达',
+              '触发回调': 'continuation.resumeWith(result)',
+              '目标 Dispatcher': 'Dispatchers.Default / Main',
+              'SM.label': '1',
+            },
+          },
+          {
+            title: '4. 重新进入状态机，根据 label 恢复执行',
+            tag: '恢复执行',
+            desc: '状态机再次被调用，通过 `when(label)` 跳转到 `case 1`，将 `res` 赋值给局部变量 `token`，随后继续向下执行或返回最终结果！',
+            diagram: `                 fun loadUserData(cont: Continuation): Any?
+                                      │
+                         ┌────────────┴────────────┐
+                         ▼                         ▼
+                  when (sm.label) {         when (sm.label) {
+                      0: fetchToken()           1: (恢复此分支!)
+                  }                                 sm.token = res
+                                                    return sm.token
+                                            }
+                                                   │
+                                                   ▼
+                                         [ 向上层返回最终 UserProfile ]`,
+            stateSnapshot: {
+              '恢复执行线程': 'Worker-1 或 Main',
+              'SM.label': '2 (最终阶段)',
+              '恢复局部变量': 'sm.token = "token_abc"',
+              '执行结果': '成功计算出最终数据',
+            },
+          },
+        ],
         diagram: `[ Kotlin 协程从浅入深：挂起心智模型、CPS 状态机与调度器全景图解 ]
 
  1. 【心智模型对比：线程阻塞 vs 协程非阻塞挂起】
@@ -155,6 +241,11 @@ abstract class AppDatabase : RoomDatabase() {
       {
         tag: '并发底层',
         title: 'Swift Concurrency 从浅入深：async/await、Task 树与 Actor 数据隔离',
+        metaphor: {
+          title: '接力赛道跑者与专属交接棒',
+          formula: 'Swift Concurrency = async/await(挂起让权) + Task 树(结构化生命周期) + Actor(串行邮箱隔离)',
+          metaphorDesc: '协作式线程池就像一条固定有 6 条跑道的跑道（CPU 核心数）。当一个跑者（Task）遇到水坑（`await` 异步 I/O）时，他不会在跑道上原地扎营堵路（线程阻塞），而是把跑道**交出来给其他跑者通行**；水坑跨过（I/O 完成）后，裁判（调度器）在任意一条空闲跑道上安排他继续往前冲。',
+        },
         explanation: `### 1. 概念（浅）：async/await
 - **协作式挂起**：\`await\` 标记挂起点，挂起时主动让出底层 Worker 线程，杜绝传统 GCD 的线程爆炸与上下文切换损耗。
 
@@ -168,6 +259,78 @@ abstract class AppDatabase : RoomDatabase() {
 
 ### 4. 协作线程池（深）：Cooperative Pool
 - 线程数量严格受限于 CPU 物理核心数，通过任务挂起让权实现高吞吐并发调度。`,
+        stepper: [
+          {
+            title: '1. Task 创建与入队协作线程池',
+            tag: 'Task 创建',
+            desc: 'SwiftUI 或 ViewModel 发起 `Task { await store.getBalance() }`，系统创建 Task 对象并提交给全局 Cooperative Thread Pool。',
+            diagram: `[ SwiftUI View / Button ] ──▶ Task { await store.getBalance() }
+                                  │
+                                  ▼
+           ┌───────────────────────────────────────────┐
+           │ 全局协作线程池 (Cooperative Thread Pool)  │
+           │ • 线程数量严格 = CPU 物理核心数 (如 6 个)  │
+           │ • Task 队列按优先级排队 (UserInteractive) │
+           └───────────────────────────────────────────┘`,
+            stateSnapshot: {
+              'Task 状态': 'Ready (就绪)',
+              '当前隔离域': '@MainActor (主线程)',
+              '线程池活跃数': '固定核心数 Worker 运行中',
+            },
+          },
+          {
+            title: '2. await 挂起点让权，释放 Worker 线程',
+            tag: '协作式挂起',
+            desc: '执行到 `await store.getBalance()` 跨 Actor 调用，当前 Task 挂起并将请求发送至 Actor 邮箱，底层 Worker 线程立即去执行其他待处理任务，零线程阻塞！',
+            diagram: `[ Task (Worker-1) ] ──▶ 遇到 await store.getBalance()
+                             │
+                             ▼ 跨隔离域调用
+                  [ 请求进入 Actor Mailbox 邮箱 ]
+                             │
+                             ▼ 挂起让权 (Suspension Point)
+[ Worker-1 线程 ] ──▶ 立即切换去执行其他就绪 Task (零线程爆炸!)`,
+            stateSnapshot: {
+              'Task 状态': 'Suspended (挂起等待)',
+              'Worker-1 状态': '释放，调度执行其他任务',
+              'Actor Mailbox': '排队等待串行执行',
+            },
+          },
+          {
+            title: '3. Actor 串行隔离执行，杜绝数据竞态',
+            tag: '数据隔离',
+            desc: 'Actor 从私有邮箱中取出请求，在 Actor 隔离域内独占访问 `private var balance`，编译期彻底杜绝多线程同时读写产生的数据竞态（Data Race）。',
+            diagram: `       ┌────────────────────────────────────────────────┐
+       │ actor SafeAccountStore (独立隔离域)             │
+       │                                                │
+       │   Mailbox 队列: [ 请求 1 ] ➔ [ 请求 2 ]        │
+       │                      │                         │
+       │                      ▼ (同一时刻严格仅 1 个执行)│
+       │   读取私有状态: return balance (线程安全!)      │
+       └────────────────────────────────────────────────┘`,
+            stateSnapshot: {
+              'Actor 访问状态': '互斥独占执行中',
+              '可变状态 balance': '安全读取 (无竞态)',
+              '数据竞态风险': '0 (编译期完全消除)',
+            },
+          },
+          {
+            title: '4. 挂起完成，切回 @MainActor 安全更新 UI',
+            tag: '主线程切回',
+            desc: 'Actor 计算完成返回结果，调度器将挂起 Task 恢复并安全调度回 `@MainActor` 主 RunLoop，直接更新 UI 属性，零显式 GCD `DispatchQueue.main.async` 样板代码！',
+            diagram: `[ Actor 执行完毕 ] ──▶ 返回 balance 结果 (100.0)
+                           │
+                           ▼ 恢复 Task 续体
+[ @MainActor ViewModel ] ──▶ 切回主线程 RunLoop
+                                 │
+                                 ▼
+                    self.balance = newBalance ➔ 驱动 SwiftUI 视图重绘`,
+            stateSnapshot: {
+              '执行线程': 'Main RunLoop (主线程)',
+              'ViewModel 状态': 'balance = 100.0',
+              'SwiftUI 刷新': '自动触发 AttributeGraph 局部精准更新',
+            },
+          },
+        ],
         diagram: `[ Swift Concurrency 从浅入深：async/await、Task 树与 Actor 调度全景图解 ]
 
  1. 【心智模型对比：GCD 线程爆炸 vs 协作式线程池】

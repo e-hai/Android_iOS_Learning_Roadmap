@@ -1,5 +1,5 @@
 import { deepDiveDomains } from '../data/deep-dive-data';
-import { DeepDiveDomain, DeepDiveModule } from '../models/types';
+import { DeepDiveDomain, DeepDiveModule, StepperStep } from '../models/types';
 import { i18n } from '../services/i18n';
 
 export function renderDeepDiveDocView(
@@ -61,6 +61,27 @@ function renderSingleChapterView(
   `;
   container.appendChild(header);
 
+  // Cognitive Metaphor & Formula Card (if present)
+  if (mod.metaphor) {
+    const metaphorCard = document.createElement('div');
+    metaphorCard.className = `chapter-metaphor-card ${platform === 'ios' ? 'metaphor-ios' : ''}`;
+    metaphorCard.innerHTML = `
+      <div class="metaphor-header">
+        <div class="metaphor-badge">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <span>心智模型隐喻</span>
+        </div>
+        <span class="metaphor-title">${escapeHtml(mod.metaphor.title)}</span>
+      </div>
+      <div class="metaphor-formula-wrap">
+        <span class="metaphor-formula-label">⚡ 黄金记忆公式:</span>
+        <code class="metaphor-formula-code">${escapeHtml(mod.metaphor.formula)}</code>
+      </div>
+      <p class="metaphor-desc">${formatInlineText(mod.metaphor.metaphorDesc)}</p>
+    `;
+    container.appendChild(metaphorCard);
+  }
+
   // Section 1: Core Mechanism & Principle Analysis
   const principleSection = document.createElement('section');
   principleSection.className = 'chapter-content-section';
@@ -76,12 +97,30 @@ function renderSingleChapterView(
   container.appendChild(principleSection);
 
   let nextSectionNumber = 2;
+  const numToChinese = ['一', '二', '三', '四', '五', '六'];
+
+  // Section: Interactive Step-by-Step State Stepper (if present)
+  if (mod.stepper && mod.stepper.length > 0) {
+    const stepperSection = document.createElement('section');
+    stepperSection.className = 'chapter-content-section';
+    const sectionNumStr = numToChinese[nextSectionNumber - 1] || `${nextSectionNumber}`;
+    nextSectionNumber++;
+
+    stepperSection.innerHTML = `
+      <div class="section-header" style="margin-top:24px;">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">${sectionNumStr}、执行时序与状态机动态演进 (交互式步进)</h2>
+      </div>
+    `;
+    stepperSection.appendChild(renderStepperComponent(mod.stepper, platform));
+    container.appendChild(stepperSection);
+  }
 
   // Section: Architecture / Sequence Diagram (if present)
   if (mod.diagram) {
     const diagramSection = document.createElement('section');
     diagramSection.className = 'chapter-content-section';
-    const sectionNumStr = nextSectionNumber === 2 ? '二' : '三';
+    const sectionNumStr = numToChinese[nextSectionNumber - 1] || `${nextSectionNumber}`;
     nextSectionNumber++;
 
     diagramSection.innerHTML = `
@@ -126,7 +165,7 @@ function renderSingleChapterView(
   if (mod.codeSnippet) {
     const codeSection = document.createElement('section');
     codeSection.className = 'chapter-content-section';
-    const sectionNumStr = nextSectionNumber === 2 ? '二' : (nextSectionNumber === 3 ? '三' : '四');
+    const sectionNumStr = numToChinese[nextSectionNumber - 1] || `${nextSectionNumber}`;
 
     const langLabel = mod.codeSnippet.startsWith('#') || mod.codeSnippet.startsWith('adb')
       ? 'SHELL / CLI'
@@ -369,5 +408,87 @@ function escapeHtml(text: string): string {
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
 }
+
+function renderStepperComponent(stepper: StepperStep[], platform: 'android' | 'ios'): HTMLElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = `chapter-stepper-card ${platform === 'ios' ? 'stepper-card-ios' : ''}`;
+
+  let currentStep = 0;
+
+  function updateView() {
+    const step = stepper[currentStep];
+    wrapper.innerHTML = `
+      <div class="stepper-nav-bar">
+        ${stepper.map((s, idx) => `
+          <button class="stepper-tab-btn ${idx === currentStep ? 'active' : ''}" data-step="${idx}">
+            <span class="stepper-num">${idx + 1}</span>
+            <span class="stepper-label">${escapeHtml(s.title)}</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="stepper-content-body">
+        <div class="stepper-step-header">
+          ${step.tag ? `<span class="stepper-step-tag">${escapeHtml(step.tag)}</span>` : ''}
+          <p class="stepper-step-desc">${formatInlineText(step.desc)}</p>
+        </div>
+        <div class="stepper-diagram-box">
+          <pre class="stepper-code"><code>${escapeHtml(step.diagram)}</code></pre>
+        </div>
+        ${step.stateSnapshot ? `
+          <div class="stepper-snapshot-box">
+            <div class="snapshot-header">⚡ 此时底层运行时快照 (Runtime State Snapshot):</div>
+            <div class="snapshot-grid">
+              ${Object.entries(step.stateSnapshot).map(([k, v]) => `
+                <div class="snapshot-item">
+                  <span class="snapshot-key">${escapeHtml(k)}:</span>
+                  <span class="snapshot-val">${escapeHtml(v)}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        ` : ''}
+        <div class="stepper-controls">
+          <button class="stepper-btn-prev" ${currentStep === 0 ? 'disabled' : ''}>← 上一步</button>
+          <div class="stepper-dots">
+            ${stepper.map((_, i) => `<span class="stepper-dot ${i === currentStep ? 'active' : ''}"></span>`).join('')}
+          </div>
+          <button class="stepper-btn-next" ${currentStep === stepper.length - 1 ? 'disabled' : ''}>下一步 →</button>
+        </div>
+      </div>
+    `;
+
+    // Bind Tab clicks
+    wrapper.querySelectorAll('.stepper-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const stepIdx = parseInt((btn as HTMLElement).dataset.step || '0', 10);
+        if (stepIdx !== currentStep) {
+          currentStep = stepIdx;
+          updateView();
+        }
+      });
+    });
+
+    // Bind Prev/Next
+    const prevBtn = wrapper.querySelector('.stepper-btn-prev') as HTMLButtonElement;
+    prevBtn?.addEventListener('click', () => {
+      if (currentStep > 0) {
+        currentStep--;
+        updateView();
+      }
+    });
+
+    const nextBtn = wrapper.querySelector('.stepper-btn-next') as HTMLButtonElement;
+    nextBtn?.addEventListener('click', () => {
+      if (currentStep < stepper.length - 1) {
+        currentStep++;
+        updateView();
+      }
+    });
+  }
+
+  updateView();
+  return wrapper;
+}
+
 
 
