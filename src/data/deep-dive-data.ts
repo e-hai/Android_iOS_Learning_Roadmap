@@ -37,120 +37,94 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
 ### 6. Job + Dispatcher：身份与调度的两条正交轴
 - **Job（身份与拓扑树）**：负责管理生命周期、父子协程树取消级联与异常隔离（\`SupervisorJob\` 保护兄弟任务）。
 - **Dispatcher（物理调度载体）**：负责把恢复任务分发到具体的线程队列（\`Main\` 绑定主线程 Looper，\`Default\` 运行 CPU 密集型工作窃取线程池，\`IO\` 弹性扩张阻塞线程池）。两者完全正交解耦。`,
-        extendedDeepDive: `### 第 1 级：顶层语法与调用边界（Application & API Layer）
-- **心智图解：构建器 vs 挂起函数**
+        extendedDeepDive: `### 第一层：编译器层（不可见，自动生成）
+- **核心职责**：编译器在编译期进行 CPS（续延传递风格）变换与状态机代码切片，无需开发者手动写状态机。
 \`\`\`diagram
- [ 主线程 (UI / 外部世界) ]
-    │
-    ├─ 1. launch { ... }  ──▶ 派出【外卖小哥】(创建全新协程与独立 Job，主线程不等待立即返回)
-    │
+suspend 函数
+    │ 编译时 CPS 转换
     ▼
- [ 协程内部时间线 ]
+Continuation + 状态机（每个挂起点对应一个状态）
+\`\`\`
+- **关键机制**：\`suspend fun fetch(): User\` 在字节码层面被重写为 \`fun fetch(cont: Continuation<User>): Any?\`；内部以挂起点为界切分为 \`when(this.label)\` 步骤。
+
+### 第二层：基础接口层（协程的地基）
+- **核心职责**：定义跨线程、跨异步库通信的标准续体契约与上下文容器。
+\`\`\`diagram
+Continuation<T>（续体，挂起/恢复的核心）
+    ├── val context: CoroutineContext
+    └── fun resumeWith(result: Result<T>)
+
+CoroutineContext（上下文容器，存储配置元素）
+    └── Element（内部接口，上下文的元素）
+            ├── Job（接口）                          ← 协程生命周期
+            ├── AbstractCoroutineContextElement（抽象类）
+            │       └── CoroutineDispatcher（抽象类） ← 线程调度
+            └── CoroutineExceptionHandler（接口）     ← 异常兜底
+\`\`\`
+- **关键机制**：\`Continuation\` 负责唤醒与回传；\`CoroutineContext\` 作为持久字典，挂载 \`Job\` 树、\`Dispatcher\` 拦截器与 \`ExceptionHandler\`。
+
+### 第三层：Job 实现层（两个独立分支）
+- **核心职责**：分离“纯控制句柄（CompletableJob）”与“三位一体真正协程（AbstractCoroutine）”，奠定结构化并发的基石。
+\`\`\`diagram
+Job（接口）
     │
-    ├─ 2. val data = api.fetch() ──▶ 自己在厨房【烧开水】(suspend 函数，当前协程挂起顺序等待结果)
-    │                                 
-    └─ 3. updateUI(data) ──────────▶ 水烧开后，自己接着泡茶 (拿到结果继续走下一行)
+    ├── CompletableJob（接口）              ← 分支 1：纯句柄，无协程体
+    │       └── JobImpl（类）               ← Job() 工厂函数创建
+    │               └── SupervisorJobImpl   ← SupervisorJob() 工厂函数创建
+    │
+    └── AbstractCoroutine<T>（抽象类）      ← 分支 2：真正的协程
+            ├── 实现 Job                    ← 生命周期管理
+            ├── 实现 Continuation           ← 挂起/恢复
+            ├── 实现 CoroutineScope         ← 启动子协程
+            │
+            ├── StandaloneCoroutine         ← launch 创建
+            ├── DeferredCoroutine           ← async 创建
+            ├── BlockingCoroutine           ← runBlocking 创建
+            └── ScopeCoroutine              ← coroutineScope 创建
+                    └── SupervisorCoroutine ← supervisorScope 创建
 \`\`\`
-- **极简代码流程印证**
-\`\`\`kotlin
-// 顶层入口：launch 创建新协程实例，返回 Job
-viewModelScope.launch {
-    // 协程内部：suspend 函数按顺序挂起等待，直接返回数据对象
-    val user = api.fetchUser() // 等待 500ms 拿到 User
-    val stats = api.fetchStats() // 再等待 300ms 拿到 Stats (共 800ms)
-    _uiState.value = UserProfile(user, stats)
-}
-\`\`\`
+- **关键机制**：\`JobImpl / SupervisorJobImpl\` 是纯控制句柄；\`AbstractCoroutine\` 集 \`Job + Continuation + Scope\` 于一身，构成所有实际运行协程的母体。
 
-### 第 2 级：编译期状态机生成（Compiler & Bytecode Layer）
-- **心智图解：父状态机步骤 与 子状态机调用**
+### 第四层：构建器层（日常开发使用的 API）
+- **核心职责**：提供面向开发者的协程启动入口、作用域函数、Job 工厂与多核线程分发调度器。
 \`\`\`diagram
- [ launch 编译成的根状态机 (SuspendLambda) ]
-   ├── case 0 (步骤 0): 调用 fetchUser(this) ────────┐ 把父状态机 (this) 作为 completion 传下去
-   │                                                 ▼
-   │                              [ fetchUser 编译成的独立子状态机 (ContinuationImpl) ]
-   │                               ├── 内部有自己的 label 步骤 (网络握手/接收数据)
-   │                               └── 算完后调用: this.completion.resumeWith(user)
-   │                                                 │
-   ├── case 1 (步骤 1): 接收 user，调用 fetchStats(this) ◀┘ (唤醒父状态机进入 case 1)
-   │
-   └── case 2 (步骤 2): 组装最终结果，协程彻底完成！
-\`\`\`
-- **极简代码流程印证（编译器生成的伪代码）**
-\`\`\`kotlin
-// 为何必须是「接口 + 状态机」？
-// 状态机对内：全函数只 new 1 个对象，when(label) 轻松支持 for 循环与 try-catch！
-// 接口对外：实现 Continuation 接口，提供唯一的 resumeWith() 供外部统一唤醒！
-fun invokeSuspend(result: Result<Any?>): Any? {
-    when (this.label) {
-        0 -> { this.label = 1; return fetchUser(this) }       // 步骤 0
-        1 -> { this.user = result; this.label = 2; return fetchStats(this) } // 步骤 1
-        2 -> { return UserProfile(this.user, result) }         // 步骤 2
-    }
-}
-\`\`\`
+CoroutineScope（接口，提供运行环境）
+    ├── fun launch(...): Job                ← 创建协程（无返回值）
+    ├── fun <T> async(...): Deferred<T>     ← 创建协程并返回结果（Deferred）
+    └── 扩展函数
 
-### 第 3 级：堆内存调用栈重构（Heap Memory Layer）
-- **心智图解：用堆内存链表替代 CPU 栈的“返回地址（Return Address）”**
+挂起函数构建器
+    ├── runBlocking { }                     ← 阻塞式，创建 BlockingCoroutine
+    ├── coroutineScope { }                  ← 临时作用域，等待所有子协程，创建 ScopeCoroutine
+    └── supervisorScope { }                 ← 临时作用域，隔离异常，创建 SupervisorCoroutine
+
+Job 工厂函数
+    ├── Job(parent: Job? = null): CompletableJob
+    └── SupervisorJob(parent: Job? = null): CompletableJob
+
+调度器
+    ├── Dispatchers.Main                    ← Android 主线程 Looper
+    ├── Dispatchers.IO                      ← 弹性 I/O 阻塞线程池
+    ├── Dispatchers.Default                 ← CPU 计算密集型 Work-Stealing 线程池
+    └── Dispatchers.Unconfined              ← 不切换线程
+\`\`\`
+- **关键机制**：\`launch / async\` 负责创建并启动新协程；\`coroutineScope / supervisorScope\` 负责方法内局部并发与故障隔离；\`Dispatchers\` 作为 \`ContinuationInterceptor\` 全局单例负责线程排队。
+
+### 第五层：应用层（Android 开发直接使用）
+- **核心职责**：将协程深度融入 Android 组件生命周期（MVVM/Compose）与响应式数据流管道。
 \`\`\`diagram
- 传统操作系统线程栈 (LIFO 原生栈):
- [ 函数 A 栈帧 (Return Addr) ] ◀── [ 函数 B 栈帧 (Return Addr) ] ◀── [ 函数 C 栈帧 ]
+生命周期感知作用域
+    ├── viewModelScope                     ← ViewModel 存活期间（绑定 onCleared 自动销毁）
+    ├── lifecycleScope                     ← Activity/Fragment 存活期间（绑定 DESTROYED 销毁）
+    └── rememberCoroutineScope             ← Composable 存活期间（组件离开组合树销毁）
 
- 协程无栈模型 (堆内存链表):
- ┌───────────────────────┐
- │ 函数 A 状态机 (根节点) │
- └──────────▲────────────┘
-            │ completion 指针 (记录“我完成后交还给谁”)
- ┌──────────┴────────────┐
- │ 函数 B 状态机 (中间层) │
- └──────────▲────────────┘
-            │ completion 指针 (命名为 completion 突出其“完成回调归宿”的角色)
- ┌──────────┴────────────┐
- │ 函数 C 状态机 (最底层) │ ──▶ C 执行完毕，沿着 completion 链回溯向上唤醒 B 和 A！
- └───────────────────────┘
+响应式 API
+    ├── Flow<T>                            ← 冷流（被 collect 时按需触发）
+    ├── StateFlow<T>                       ← 状态流（持有最新状态，驱动 Compose UIState）
+    ├── SharedFlow<T>                      ← 共享流（热流，广播事件通知）
+    └── Channel<E>                         ← 通道（CSP 并发管道通信）
 \`\`\`
-- **极简代码流程印证（Kotlin 官方 BaseContinuationImpl 源码）**
-\`\`\`kotlin
-// 为什么不发生 StackOverflow 栈溢出？因为用 while(true) 平铺解包！
-override fun resumeWith(result: Result<Any?>) {
-    var current = this
-    while (true) {
-        val completion = current.completion!! // 顺着 completion 链向上
-        val outcome = current.invokeSuspend(param) // 执行当前状态机
-        if (outcome === COROUTINE_SUSPENDED) return // 挂起则安全退出方法栈
-        current = completion as BaseContinuationImpl // 平铺迭代，消除递归压栈！
-    }
-}
-\`\`\`
-
-### 第 4 级：运行时拦截与多核调度（Runtime & Threading Layer）
-- **心智图解：跨调度器（Default ➔ IO ➔ Default）的接力交接**
-\`\`\`diagram
- [ 1. 在 Dispatchers.Default 上运行 ]
-   │ 执行计算: val param = hash()
-   │ 遇到 withContext(Dispatchers.IO) ──▶ 将外层状态机 (带 Default 车票) 存入 completion
-   │ 
-   ▼ (外层挂起让权，切到 IO 线程)
- [ 2. 在 Dispatchers.IO 线程池中下载 ]
-   │ 执行网络阻塞: val data = download(param)
-   │ 下载完成，交出接力棒: completion.resumeWith(data)
-   │                            │
-   ▼                            ▼ (通过 completion.context 自动识别上层是 Default)
- [ 3. Dispatchers.Default 拦截器接管 ]
-   │ 将任务打包为 Runnable 丢入 DefaultScheduler.WorkQueue
-   │ Worker-Default 线程出队执行 ➔ 拿到 data 继续在 Default 上计算！
-\`\`\`
-- **极简代码流程印证**
-\`\`\`kotlin
-// 拦截器眼中的视角：纯粹把一切当成黑盒 Continuation
-public interface ContinuationInterceptor : CoroutineContext.Element {
-    // 拦截原始续体，包装为能在线程池排队的 Runnable (DispatchedContinuation)
-    fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T>
-}
-
-// 调度协同：Dispatchers.Main / IO / Default 都是全局单例拦截器
-// 无论跨越多少个拦截器，每个 completion 随身携带的 context，保证数据永远精准自动回传！
-\`\`\``,
+- **关键机制**：在 UI 表现层通过 \`viewModelScope\` 和 \`StateFlow\` 实现 UDF 单向数据流，生命周期结束时自动向下级联取消，100% 杜绝内存泄漏。`,
       },
       {
         tag: '内存模型',

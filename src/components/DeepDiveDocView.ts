@@ -180,10 +180,13 @@ function renderSingleChapterView(
   if (mod.extendedDeepDive) {
     const extSection = document.createElement('section');
     extSection.className = 'chapter-content-section extended-deep-dive-section';
+    const sectionTitle = platform === 'android'
+      ? 'Kotlin 协程 5 层垂直架构透视'
+      : 'Swift 并发 4 级全景透视';
     extSection.innerHTML = `
       <div class="section-header">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">进阶延伸思考：从顶层到底层的 4 级全景透视</h2>
+        <h2 class="section-header-title">${sectionTitle}</h2>
       </div>
       <div class="extended-deep-dive-box ${platform === 'ios' ? 'deepdive-ios' : ''}">
         ${formatExtendedDeepDiveHtml(mod.extendedDeepDive)}
@@ -630,10 +633,10 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
     const lines = block.split('\n');
     const headerLine = lines[0].replace(/^###\s+/, '').trim();
     
-    // Parse tag if present: e.g. "第 1 级：顶层语法与调用边界（Application & API）"
+    // Parse tag if present: e.g. "第一层：编译器层（不可见，自动生成）" or "第 1 级：顶层语法与调用边界（Application & API）"
     let title = headerLine;
     let tag = '';
-    const match = headerLine.match(/^(第\s*\d+\s*级[：:])\s*(.*?)(（(.*?)）|\((.*?)\))?$/);
+    const match = headerLine.match(/^(第\s*[\d一二三四五六七八九十]+\s*[层级][：:])\s*(.*?)(（(.*?)）|\((.*?)\))?$/);
     let levelBadge = `L${idx + 1}`;
     if (match) {
       levelBadge = match[1].replace(/[：:]/, '').trim();
