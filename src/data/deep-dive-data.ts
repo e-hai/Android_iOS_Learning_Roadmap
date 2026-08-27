@@ -38,17 +38,14 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
 - **Job（身份与拓扑树）**：负责管理生命周期、父子协程树取消级联与异常隔离（\`SupervisorJob\` 保护兄弟任务）。
 - **Dispatcher（物理调度载体）**：负责把恢复任务分发到具体的线程队列（\`Main\` 绑定主线程 Looper，\`Default\` 运行 CPU 密集型工作窃取线程池，\`IO\` 弹性扩张阻塞线程池）。两者完全正交解耦。`,
         extendedDeepDive: `### 第一层：编译器层（不可见，自动生成）
-- **核心职责**：编译器在编译期进行 CPS（续延传递风格）变换与状态机代码切片，无需开发者手动写状态机。
 \`\`\`diagram
 suspend 函数
     │ 编译时 CPS 转换
     ▼
 Continuation + 状态机（每个挂起点对应一个状态）
 \`\`\`
-- **关键机制**：\`suspend fun fetch(): User\` 在字节码层面被重写为 \`fun fetch(cont: Continuation<User>): Any?\`；内部以挂起点为界切分为 \`when(this.label)\` 步骤。
 
 ### 第二层：基础接口层（协程的地基）
-- **核心职责**：定义跨线程、跨异步库通信的标准续体契约与上下文容器。
 \`\`\`diagram
 Continuation<T>（续体，挂起/恢复的核心）
     ├── val context: CoroutineContext
@@ -61,10 +58,8 @@ CoroutineContext（上下文容器，存储配置元素）
             │       └── CoroutineDispatcher（抽象类） ← 线程调度
             └── CoroutineExceptionHandler（接口）     ← 异常兜底
 \`\`\`
-- **关键机制**：\`Continuation\` 负责唤醒与回传；\`CoroutineContext\` 作为持久字典，挂载 \`Job\` 树、\`Dispatcher\` 拦截器与 \`ExceptionHandler\`。
 
 ### 第三层：Job 实现层（两个独立分支）
-- **核心职责**：分离“纯控制句柄（CompletableJob）”与“三位一体真正协程（AbstractCoroutine）”，奠定结构化并发的基石。
 \`\`\`diagram
 Job（接口）
     │
@@ -83,14 +78,12 @@ Job（接口）
             └── ScopeCoroutine              ← coroutineScope 创建
                     └── SupervisorCoroutine ← supervisorScope 创建
 \`\`\`
-- **关键机制**：\`JobImpl / SupervisorJobImpl\` 是纯控制句柄；\`AbstractCoroutine\` 集 \`Job + Continuation + Scope\` 于一身，构成所有实际运行协程的母体。
 
 ### 第四层：构建器层（日常开发使用的 API）
-- **核心职责**：提供面向开发者的协程启动入口、作用域函数、Job 工厂与多核线程分发调度器。
 \`\`\`diagram
 CoroutineScope（接口，提供运行环境）
-    ├── fun launch(...): Job                ← 创建协程（无返回值）
-    ├── fun <T> async(...): Deferred<T>     ← 创建协程并返回结果（Deferred）
+    ├── fun launch(...): Job                ← 创建协程
+    ├── fun <T> async(...): Deferred<T>     ← 创建协程并返回结果
     └── 扩展函数
 
 挂起函数构建器
@@ -103,28 +96,25 @@ Job 工厂函数
     └── SupervisorJob(parent: Job? = null): CompletableJob
 
 调度器
-    ├── Dispatchers.Main                    ← Android 主线程 Looper
-    ├── Dispatchers.IO                      ← 弹性 I/O 阻塞线程池
-    ├── Dispatchers.Default                 ← CPU 计算密集型 Work-Stealing 线程池
+    ├── Dispatchers.Main                    ← Android 主线程
+    ├── Dispatchers.IO                      ← IO 线程池
+    ├── Dispatchers.Default                 ← CPU 线程池
     └── Dispatchers.Unconfined              ← 不切换线程
 \`\`\`
-- **关键机制**：\`launch / async\` 负责创建并启动新协程；\`coroutineScope / supervisorScope\` 负责方法内局部并发与故障隔离；\`Dispatchers\` 作为 \`ContinuationInterceptor\` 全局单例负责线程排队。
 
 ### 第五层：应用层（Android 开发直接使用）
-- **核心职责**：将协程深度融入 Android 组件生命周期（MVVM/Compose）与响应式数据流管道。
 \`\`\`diagram
 生命周期感知作用域
-    ├── viewModelScope                     ← ViewModel 存活期间（绑定 onCleared 自动销毁）
-    ├── lifecycleScope                     ← Activity/Fragment 存活期间（绑定 DESTROYED 销毁）
-    └── rememberCoroutineScope             ← Composable 存活期间（组件离开组合树销毁）
+    ├── viewModelScope                     ← ViewModel 存活期间
+    ├── lifecycleScope                     ← Activity/Fragment 存活期间
+    └── rememberCoroutineScope             ← Composable 存活期间
 
 响应式 API
-    ├── Flow<T>                            ← 冷流（被 collect 时按需触发）
-    ├── StateFlow<T>                       ← 状态流（持有最新状态，驱动 Compose UIState）
-    ├── SharedFlow<T>                      ← 共享流（热流，广播事件通知）
-    └── Channel<E>                         ← 通道（CSP 并发管道通信）
-\`\`\`
-- **关键机制**：在 UI 表现层通过 \`viewModelScope\` 和 \`StateFlow\` 实现 UDF 单向数据流，生命周期结束时自动向下级联取消，100% 杜绝内存泄漏。`,
+    ├── Flow<T>                            ← 冷流
+    ├── StateFlow<T>                       ← 状态流
+    ├── SharedFlow<T>                      ← 共享流
+    └── Channel<E>                         ← 通道
+\`\`\``,
       },
       {
         tag: '内存模型',

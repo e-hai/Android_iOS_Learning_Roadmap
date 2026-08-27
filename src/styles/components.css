@@ -2553,18 +2553,20 @@
 .extended-deep-dive-box {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  position: relative;
 }
 
 .extended-layer-card {
+  position: relative;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 18px 22px;
+  padding: 16px 20px;
   box-shadow: var(--shadow-xs);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   transition: all var(--transition-fast);
 }
 
@@ -2573,12 +2575,32 @@
   box-shadow: var(--shadow-sm);
 }
 
+.extended-layer-card:not(:last-child)::after {
+  content: '▼';
+  position: absolute;
+  bottom: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--color-ink-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  box-shadow: var(--shadow-xs);
+}
+
 .extended-layer-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding-bottom: 10px;
+  padding-bottom: 8px;
   border-bottom: 1px solid var(--color-border-subtle);
   flex-wrap: wrap;
 }
@@ -2592,7 +2614,7 @@
 .layer-number-badge {
   font-size: 11px;
   font-weight: 800;
-  padding: 3px 9px;
+  padding: 2px 8px;
   border-radius: var(--radius-xs);
   background: var(--color-accent-soft);
   color: var(--color-accent);
@@ -2607,7 +2629,7 @@
 }
 
 .layer-title {
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--color-ink);
   margin: 0;
@@ -2626,12 +2648,13 @@
   background: var(--color-surface-sunken);
   color: var(--color-ink);
   border-radius: var(--radius-md);
-  padding: 12px 16px;
+  padding: 14px 18px;
   font-family: var(--font-mono);
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.55;
   overflow-x: auto;
   border: 1px solid var(--color-border);
+  margin: 0;
 }
 
 .layer-explanation-text {
