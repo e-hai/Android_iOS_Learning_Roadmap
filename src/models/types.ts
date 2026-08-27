@@ -39,6 +39,7 @@ export interface DeepDiveModule {
   metaphor?: DeepDiveMetaphor; // Optional cognitive metaphor & golden memory formula
   explanation: string;   // Deep dive explanation (supports rich structured paragraphs)
   extendedDeepDive?: string; // Optional extended top-down deep dive analysis
+  caseStudy?: string;    // Optional in-depth case study & reflection
   stepper?: StepperStep[]; // Optional interactive step-by-step state machine runner
   diagram?: string;      // Optional Unicode Box Diagram for architecture/timing/state machine
   codeSnippet?: string;  // Code example or CLI command

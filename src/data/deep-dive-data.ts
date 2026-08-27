@@ -114,6 +114,95 @@ Job 工厂函数
     ├── SharedFlow<T>                      ← 共享流
     └── Channel<E>                         ← 通道
 \`\`\``,
+        caseStudy: `### 思考：viewModelScope 场景下 Job 与 SupervisorJob 的行为差异
+
+\`viewModelScope\` 内部实际的 Context 是 \`SupervisorJob() + Dispatchers.Main.immediate\`。为了搞清楚这个选择背后的原因，用 \`Job()\` 和 \`SupervisorJob()\` 各写一组对照代码，分两轮实验：先看不装异常处理器时的差异，再看装了 \`CoroutineExceptionHandler\` 之后差异是否还成立。
+
+#### 实验一：不安装 CoroutineExceptionHandler
+
+\`\`\`kotlin
+fun testJob() {
+    val scope = CoroutineScope(Job() + Dispatchers.Default)
+
+    scope.launch {
+        throw RuntimeException("任务 A 致命错误")
+    }
+
+    scope.launch {
+        delay(500.milliseconds)
+        println("[任务 B] 完成")
+    }
+}
+
+fun testSupervisorJob() {
+    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    supervisorScope.launch {
+        throw RuntimeException("任务 A 致命错误")
+    }
+    supervisorScope.launch {
+        delay(500.milliseconds)
+        println("[任务 B] 完成")
+    }
+}
+\`\`\`
+
+- **Job() 结果**：控制台只看到 A 的异常堆栈，\`[任务 B] 完成\` **不会被打印**；应用**崩溃**。
+- **testSupervisorJob() 结果**：控制台只看到 A 的异常堆栈，\`[任务 B] 完成\` **大概率不会被打印**（协程未杀 B，但因 A 未捕获导致进程崩溃陪葬）；应用**崩溃**。
+
+#### 实验二：安装 CoroutineExceptionHandler
+
+\`\`\`kotlin
+fun testJob() {
+    val scope = CoroutineScope(Job() + Dispatchers.Default)
+
+    scope.launch(CoroutineExceptionHandler { _, e ->
+        println("[任务 A] handler 捕获: \${e.message}")
+    }) {
+        throw RuntimeException("任务 A 致命错误")
+    }
+
+    scope.launch {
+        delay(500.milliseconds)
+        println("[任务 B] 完成")
+    }
+}
+
+fun testSupervisorJob() {
+    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    supervisorScope.launch(CoroutineExceptionHandler { _, e ->
+        println("[任务 A] handler 捕获: \${e.message}")
+    }) {
+        throw RuntimeException("任务 A 致命错误")
+    }
+    supervisorScope.launch {
+        delay(500.milliseconds)
+        println("[任务 B] 完成")
+    }
+}
+\`\`\`
+
+- **Job() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **不会被打印**；应用**正常**。
+- **testSupervisorJob() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **被打印**；应用**正常**。
+
+#### 回到 viewModelScope
+
+\`SupervisorJob\` 和“每个 launch 自己兜底”解决的是两个不同的问题：
+
+| 机制 | 解决的问题 | 不负责的事 |
+| :--- | :--- | :--- |
+| **\`SupervisorJob()\`** | 一个任务失败不连累其他并行任务（对应实验一里 B 被级联取消的问题） | 不会帮你处理/吞掉异常 |
+| **每个 \`launch\` 自己 try/catch 或挂 CEH** | 让异常真正被消费，而不是交给平台默认处理器（对应实验二里“崩溃”的问题） | 不会阻止取消传播（那是 Job 的职责） |
+
+> **架构结论**：\`viewModelScope\` = \`SupervisorJob() + Dispatchers.Main.immediate\` 只解决第一个问题；第二个问题——每个具体任务的异常兜底——仍然要在业务代码里自己做。
+
+#### 总结
+
+| 作用域类型 | 兄弟协程是否受连累 | CEH 何时生效 |
+| :--- | :--- | :--- |
+| **\`Job()\`** | 💀 一挂全挂 | 基本无效——装在非根协程上等于没装 |
+| **\`SupervisorJob()\`** | 🛡️ 互不连累 | 必须装在失败的那个协程自己身上 |`,
       },
       {
         tag: '内存模型',

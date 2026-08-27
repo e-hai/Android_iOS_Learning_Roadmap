@@ -236,6 +236,22 @@ function renderSingleChapterView(
     container.appendChild(codeSection);
   }
 
+  // Section: In-Depth Case Study & Architectural Reflection (if present)
+  if (mod.caseStudy) {
+    const caseSection = document.createElement('section');
+    caseSection.className = 'chapter-content-section case-study-section';
+    caseSection.innerHTML = `
+      <div class="section-header" style="margin-top:24px;">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">深度实战思考：viewModelScope 场景下 Job 与 SupervisorJob 的行为差异</h2>
+      </div>
+      <div class="case-study-card ${platform === 'ios' ? 'deepdive-ios' : ''}">
+        ${formatCaseStudyHtml(mod.caseStudy)}
+      </div>
+    `;
+    container.appendChild(caseSection);
+  }
+
   // Chapter Navigation Footer (Prev / Next Chapter)
   const navFooter = document.createElement('div');
   navFooter.className = 'stage-nav-footer chapter-nav-footer';
@@ -688,6 +704,95 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
       </div>
     `;
   }).join('');
+}
+
+function formatCaseStudyHtml(rawText: string): string {
+  if (!rawText) return '';
+
+  const lines = rawText.split('\n');
+  let html = '';
+  let inCodeBlock = false;
+  let codeContent = '';
+  let inTable = false;
+  let tableHeader: string[] = [];
+  let tableRows: string[][] = [];
+
+  const flushTable = () => {
+    if (!inTable) return;
+    html += '<div class="case-study-table-wrap"><table class="case-study-table">';
+    if (tableHeader.length > 0) {
+      html += '<thead><tr>' + tableHeader.map((h) => `<th>${formatInlineText(h.trim())}</th>`).join('') + '</tr></thead>';
+    }
+    html += '<tbody>';
+    tableRows.forEach((row) => {
+      html += '<tr>' + row.map((cell) => `<td>${formatInlineText(cell.trim())}</td>`).join('') + '</tr>';
+    });
+    html += '</tbody></table></div>';
+    inTable = false;
+    tableHeader = [];
+    tableRows = [];
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Check code blocks
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        html += `<pre class="layer-code-box case-code-box"><code>${escapeHtml(codeContent.trim())}</code></pre>`;
+        inCodeBlock = false;
+        codeContent = '';
+      } else {
+        flushTable();
+        inCodeBlock = true;
+        codeContent = '';
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeContent += line + '\n';
+      continue;
+    }
+
+    // Check table
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      const cells = trimmed.split('|').slice(1, -1);
+      // Check if it's separator line |---|---|
+      if (cells.every((c) => /^[\s\-:]+$/.test(c))) {
+        continue;
+      }
+      if (!inTable) {
+        inTable = true;
+        tableHeader = cells;
+      } else {
+        tableRows.push(cells);
+      }
+      continue;
+    } else {
+      flushTable();
+    }
+
+    if (!trimmed) continue;
+
+    // Headings & formatting
+    if (trimmed.startsWith('### ')) {
+      // Top heading
+      html += `<div class="case-study-intro-banner"><h3 class="case-study-banner-title">${formatInlineText(trimmed.replace(/^###\s+/, ''))}</h3></div>`;
+    } else if (trimmed.startsWith('#### ')) {
+      html += `<h4 class="case-study-h4">${formatInlineText(trimmed.replace(/^####\s+/, ''))}</h4>`;
+    } else if (trimmed.startsWith('> ')) {
+      html += `<div class="case-study-callout">${formatInlineText(trimmed.replace(/^>\s+/, ''))}</div>`;
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      html += `<div class="case-study-bullet"><span class="case-bullet-dot"></span><span>${formatInlineText(trimmed.replace(/^[-*]\s+/, ''))}</span></div>`;
+    } else {
+      html += `<p class="case-study-p">${formatInlineText(trimmed)}</p>`;
+    }
+  }
+
+  flushTable();
+  return html;
 }
 
 
