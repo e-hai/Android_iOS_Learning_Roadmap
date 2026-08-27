@@ -54,8 +54,7 @@ Continuation<T>（续体，挂起/恢复的核心）
 CoroutineContext（上下文容器，存储配置元素）
     └── Element（内部接口，上下文的元素）
             ├── Job（接口）                          ← 协程生命周期
-            ├── AbstractCoroutineContextElement（抽象类）
-            │       └── CoroutineDispatcher（抽象类） ← 线程调度
+            ├── CoroutineDispatcher（抽象类）        ← 线程调度
             └── CoroutineExceptionHandler（接口）     ← 异常兜底
 \`\`\`
 
