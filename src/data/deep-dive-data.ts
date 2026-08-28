@@ -232,7 +232,7 @@ internal fun handleCoroutineException(context: CoroutineContext, exception: Thro
 
 也就是说，协程框架在最顶层会对 \`CancellationException\` 进行特殊拦截与静默放行，它是受框架官方保护的！
 
-### 三、顺序执行
+### 三、链式流转
 
 \`\`\`kotlin
 class ProfileViewModel : ViewModel() {
@@ -265,7 +265,7 @@ class ProfileViewModel : ViewModel() {
 }
 \`\`\`
 
-### 四、嵌套 launch
+### 四、旁路并发
 
 \`\`\`kotlin
 class OrderViewModel : ViewModel() {
@@ -304,7 +304,7 @@ class OrderViewModel : ViewModel() {
 
 - **场景解释**：主任务专心扣款，顺手丢个子任务去后台打点（不用等它）；打点即使报错自己吞掉，绝不能耽误主任务付钱。
 
-### 五、async 并行聚合
+### 五、并行聚合
 
 \`\`\`kotlin
 class ProductViewModel : ViewModel() {
