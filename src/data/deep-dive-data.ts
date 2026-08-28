@@ -204,7 +204,33 @@ inline fun <T> runSuspendCatching(block: () -> T): Result<T> {
 \`\`\`
 
 - **为什么要单独封装？**：Kotlin 标准库的 \`runCatching\` 内部无脑捕获了 \`Throwable\`，会把用户退出页面时的正常取消信号（\`CancellationException\`）当成普通业务错误吞掉，导致协程无法及时终止、继续违规刷新已销毁的 UI。
-- **重新抛出 CancellationException 为什么不会导致崩溃？**：在协程底层设计中，\`CancellationException\` 属于“正常刹车指令”而非“程序错误”。协程框架在顶层感知到取消信号后，会**直接静默收工（将状态标记为 Cancelled 正常退出）**，绝不上报给操作系统的未捕获异常处理器，因此 100% 绝对不会引发闪退。`,
+
+- **重新抛出 CancellationException 为什么不会导致崩溃？**：当你在 \`runSuspendCatching\` 内部 \`throw e\`（重新抛出取消异常）时，这个异常会一路冒泡到 \`launch\` 的最顶层。
+
+让我们看一下 Kotlin 协程底层在顶层收拢异常时的真实源码处理逻辑（精简示意）：
+
+\`\`\`kotlin
+// kotlinx.coroutines 官方底层异常分发逻辑
+internal fun handleCoroutineException(context: CoroutineContext, exception: Throwable) {
+    // ⚡ 协程框架的特权判断：
+    if (exception is CancellationException) {
+        // 1. 如果是取消异常，直接标记协程为 CANCELLED 正常退出
+        // 2. 绝不调用 CoroutineExceptionHandler！
+        // 3. 绝不上报给操作系统的 UncaughtExceptionHandler！
+        return // 👈 静默安全退出，0 崩溃！
+    }
+    // 只有非 CancellationException 的真正严重错误，才会去激活 CEH 或触发崩溃
+    val handler = context[CoroutineExceptionHandler]
+    if (handler != null) {
+        handler.handleException(context, exception)
+    } else {
+        // 没装 CEH，交给 Java 线程默认处理器，App 闪退
+        Thread.currentThread().uncaughtExceptionHandler.uncaughtException(...)
+    }
+}
+\`\`\`
+
+也就是说，协程框架在最顶层会对 \`CancellationException\` 进行特殊拦截与静默放行，它是受框架官方保护的！`,
       },
       {
         tag: '内存模型',
