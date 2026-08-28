@@ -302,7 +302,47 @@ class OrderViewModel : ViewModel() {
 }
 \`\`\`
 
-- **场景解释**：主任务专心扣款，顺手丢个子任务去后台打点（不用等它）；打点即使报错自己吞掉，绝不能耽误主任务付钱。`,
+- **场景解释**：主任务专心扣款，顺手丢个子任务去后台打点（不用等它）；打点即使报错自己吞掉，绝不能耽误主任务付钱。
+
+### 五、async 并行聚合
+
+\`\`\`kotlin
+class ProductViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow("初始状态")
+    val uiState: StateFlow<String> = _uiState.asStateFlow()
+
+    fun loadProductDetail(productId: String) {
+        viewModelScope.launch {
+            _uiState.value = "加载中..."
+            runSuspendCatching {
+                val goodsDeferred = async { fetchGoods(productId) }
+                val couponDeferred = async { fetchCoupons(productId) }
+
+                val goods = goodsDeferred.await()
+                val coupons = couponDeferred.await()
+
+                "商品: $goods, 优惠券: $coupons"
+            }.onSuccess { detail ->
+                _uiState.value = "加载成功: $detail"
+            }.onFailure { error ->
+                _uiState.value = "加载失败: \${error.message}"
+            }
+        }
+    }
+
+    private suspend fun fetchGoods(id: String) = withContext(Dispatchers.IO) {
+        delay(300.milliseconds)
+        "iPhone 16"
+    }
+
+    private suspend fun fetchCoupons(id: String) = withContext(Dispatchers.IO) {
+        delay(200.milliseconds)
+        "满 5000 减 400"
+    }
+}
+\`\`\`
+
+- **场景解释**：商品信息与优惠券互不依赖，通过 \`async\` 同时发起两个网络请求，最后统一 \`await\` 合并结果；总耗时取决于最慢的一个请求（从 500ms 降至 300ms）。`,
       },
       {
         tag: '内存模型',
