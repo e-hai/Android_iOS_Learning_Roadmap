@@ -277,9 +277,7 @@ class OrderViewModel : ViewModel() {
             _uiState.value = "提交中..."
 
             launch {
-                runSuspendCatching {
-                    trackBuyEvent(productId)
-                }
+                trackBuyEvent(productId)
             }
 
             runSuspendCatching {
@@ -297,12 +295,14 @@ class OrderViewModel : ViewModel() {
     }
 
     private suspend fun trackBuyEvent(productId: String) = withContext(Dispatchers.IO) {
-        delay(200.milliseconds)
+        runSuspendCatching {
+            delay(200.milliseconds)
+        }
     }
 }
 \`\`\`
 
-- **场景解释**：主流程扣款，嵌套 \`launch\` 异步上报埋点（无需等待）；子协程内部用 \`runSuspendCatching\` 消化异常，防止连坐中断主流程。`,
+- **场景解释**：主流程扣款，嵌套 \`launch\` 异步上报埋点（无需等待）；旁路函数内部自闭环消化异常，防止连坐中断主流程。`,
       },
       {
         tag: '内存模型',
