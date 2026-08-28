@@ -263,7 +263,46 @@ class ProfileViewModel : ViewModel() {
         "用户 [张三]，使用凭据: $token"
     }
 }
-\`\`\``,
+\`\`\`
+
+### 四、嵌套 launch
+
+\`\`\`kotlin
+class OrderViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow("初始状态")
+    val uiState: StateFlow<String> = _uiState.asStateFlow()
+
+    fun buyProduct(productId: String) {
+        viewModelScope.launch {
+            _uiState.value = "提交中..."
+
+            launch {
+                runSuspendCatching {
+                    trackBuyEvent(productId)
+                }
+            }
+
+            runSuspendCatching {
+                payOrder(productId)
+            }.onSuccess {
+                _uiState.value = "支付成功"
+            }.onFailure { error ->
+                _uiState.value = "支付失败: \${error.message}"
+            }
+        }
+    }
+
+    private suspend fun payOrder(productId: String) = withContext(Dispatchers.IO) {
+        delay(500.milliseconds)
+    }
+
+    private suspend fun trackBuyEvent(productId: String) = withContext(Dispatchers.IO) {
+        delay(200.milliseconds)
+    }
+}
+\`\`\`
+
+- **嵌套 launch 核心准则**：底层业务函数只声明为 \`suspend fun\`，由 ViewModel 调用方决定是否通过 \`launch\` 开启旁路并发；旁路子协程内部必须通过 \`runSuspendCatching\` 就地消化异常，防止普通 Job 连坐机制误杀父协程的主流程。`,
       },
       {
         tag: '内存模型',
