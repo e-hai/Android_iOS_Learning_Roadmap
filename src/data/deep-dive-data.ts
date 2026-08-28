@@ -122,7 +122,7 @@ Job 工厂函数
 
 \`\`\`kotlin
 fun testJob() {
-    val scope = CoroutineScope(Job() + Dispatchers.Default)
+    val scope = CoroutineScope(Job() + Dispatchers.Main.immediate)
 
     scope.launch {
         throw RuntimeException("任务 A 致命错误")
@@ -135,7 +135,7 @@ fun testJob() {
 }
 
 fun testSupervisorJob() {
-    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     supervisorScope.launch {
         throw RuntimeException("任务 A 致命错误")
@@ -154,7 +154,7 @@ fun testSupervisorJob() {
 
 \`\`\`kotlin
 fun testJob() {
-    val scope = CoroutineScope(Job() + Dispatchers.Default)
+    val scope = CoroutineScope(Job() + Dispatchers.Main.immediate)
 
     scope.launch(CoroutineExceptionHandler { _, e ->
         println("[任务 A] handler 捕获: \${e.message}")
@@ -169,7 +169,7 @@ fun testJob() {
 }
 
 fun testSupervisorJob() {
-    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     supervisorScope.launch(CoroutineExceptionHandler { _, e ->
         println("[任务 A] handler 捕获: \${e.message}")
