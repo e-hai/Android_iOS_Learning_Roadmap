@@ -242,9 +242,14 @@ class ProfileViewModel : ViewModel() {
     fun loadUserData() {
         viewModelScope.launch {
             _uiState.value = "加载中..."
-            val token = fetchToken()
-            val user = fetchUserInfo(token)
-            _uiState.value = "获取成功：$user"
+            runSuspendCatching {
+                val token = fetchToken()
+                fetchUserInfo(token)
+            }.onSuccess { user ->
+                _uiState.value = "获取成功：$user"
+            }.onFailure { error ->
+                _uiState.value = "加载失败: \${error.message}"
+            }
         }
     }
 
