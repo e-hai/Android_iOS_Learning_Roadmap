@@ -234,6 +234,8 @@ internal fun handleCoroutineException(context: CoroutineContext, exception: Thro
 
 ### 三、链式流转
 
+- **场景解释**：第二步查用户依赖第一步的 Token，顺序链式调用；若第一步失败，第二步自动跳过并由 \`runSuspendCatching\` 捕获错误。
+
 \`\`\`kotlin
 class ProfileViewModel : ViewModel() {
     private val _uiState = MutableStateFlow("初始状态")
@@ -266,6 +268,8 @@ class ProfileViewModel : ViewModel() {
 \`\`\`
 
 ### 四、旁路并发
+
+- **场景解释**：主任务专心扣款，顺手丢个子任务去后台打点（不用等它）；打点即使报错自己吞掉，绝不能耽误主任务付钱。
 
 \`\`\`kotlin
 class OrderViewModel : ViewModel() {
@@ -302,9 +306,9 @@ class OrderViewModel : ViewModel() {
 }
 \`\`\`
 
-- **场景解释**：主任务专心扣款，顺手丢个子任务去后台打点（不用等它）；打点即使报错自己吞掉，绝不能耽误主任务付钱。
-
 ### 五、并行聚合
+
+- **场景解释**：商品信息与优惠券互不依赖，通过 \`async\` 同时发起两个网络请求，最后统一 \`await\` 合并结果；总耗时取决于最慢的一个请求（从 500ms 降至 300ms）。
 
 \`\`\`kotlin
 class ProductViewModel : ViewModel() {
@@ -340,9 +344,7 @@ class ProductViewModel : ViewModel() {
         "满 5000 减 400"
     }
 }
-\`\`\`
-
-- **场景解释**：商品信息与优惠券互不依赖，通过 \`async\` 同时发起两个网络请求，最后统一 \`await\` 合并结果；总耗时取决于最慢的一个请求（从 500ms 降至 300ms）。`,
+\`\`\``,
       },
       {
         tag: '内存模型',
