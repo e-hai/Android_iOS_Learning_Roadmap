@@ -243,7 +243,7 @@ function renderSingleChapterView(
     caseSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">深度实战思考：viewModelScope 场景下 Job 与 SupervisorJob 的行为差异</h2>
+        <h2 class="section-header-title">深度实战思考</h2>
       </div>
       <div class="case-study-card ${platform === 'ios' ? 'deepdive-ios' : ''}">
         ${formatCaseStudyHtml(mod.caseStudy)}

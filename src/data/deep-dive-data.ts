@@ -114,7 +114,7 @@ Job 工厂函数
     ├── SharedFlow<T>                      ← 共享流
     └── Channel<E>                         ← 通道
 \`\`\``,
-        caseStudy: `### 思考：viewModelScope 场景下 Job 与 SupervisorJob 的行为差异
+        caseStudy: `### 一、viewModelScope 场景下 Job 与 SupervisorJob 的行为差异
 
 \`viewModelScope\` 内部实际的 Context 是 \`SupervisorJob() + Dispatchers.Main.immediate\`。为了搞清楚这个选择背后的原因，用 \`Job()\` 和 \`SupervisorJob()\` 各写一组对照代码，分两轮实验：先看不装异常处理器时的差异，再看装了 \`CoroutineExceptionHandler\` 之后差异是否还成立。
 
@@ -186,7 +186,7 @@ fun testSupervisorJob() {
 - **Job() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **不会被打印**；应用**正常**。
 - **testSupervisorJob() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **被打印**；应用**正常**。
 
-#### 工业级最佳用例：协程安全版 runSuspendCatching
+### 二、协程安全版 runSuspendCatching
 
 \`\`\`kotlin
 /**

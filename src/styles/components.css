@@ -2698,6 +2698,10 @@
   margin-bottom: 4px;
 }
 
+.case-study-intro-banner:not(:first-child) {
+  margin-top: 18px;
+}
+
 .case-study-card.deepdive-ios .case-study-intro-banner {
   border-left-color: var(--color-ios);
 }
