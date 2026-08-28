@@ -232,47 +232,33 @@ internal fun handleCoroutineException(context: CoroutineContext, exception: Thro
 
 也就是说，协程框架在最顶层会对 \`CancellationException\` 进行特殊拦截与静默放行，它是受框架官方保护的！
 
-### 三、真实业务场景：主线程安全（Main-Safety）与顺序执行
+### 三、顺序执行
 
 \`\`\`kotlin
 class ProfileViewModel : ViewModel() {
-
     private val _uiState = MutableStateFlow("初始状态")
     val uiState: StateFlow<String> = _uiState.asStateFlow()
 
     fun loadUserData() {
         viewModelScope.launch {
-            // ⚡ 1.【主线程】0ms 立即更新 Loading
             _uiState.value = "加载中..."
-
-            // ⚡ 2.【直接顺序调用】ViewModel 不需要显式写 withContext(Dispatchers.IO)
-            // 底层挂起函数自身保证了 Main-Safety（绝不卡死主线程）
             val token = fetchToken()
             val user = fetchUserInfo(token)
-
-            // ⚡ 3.【主线程】直接更新成功数据
             _uiState.value = "获取成功：$user"
         }
     }
 
-    // ============================================================
-    // 👇 底层实现：挂起函数内部自己保证「主线程安全」
-    // ============================================================
-
-    // 方式 A：自定义耗时代码，内部通过 withContext(Dispatchers.IO) 封装
     private suspend fun fetchToken(): String = withContext(Dispatchers.IO) {
-        delay(300.milliseconds) // 模拟网络/文件耗时操作
+        delay(300.milliseconds)
         "token_888888"
     }
 
     private suspend fun fetchUserInfo(token: String): String = withContext(Dispatchers.IO) {
-        delay(300.milliseconds) // 模拟网络/文件耗时操作
+        delay(300.milliseconds)
         "用户 [张三]，使用凭据: $token"
     }
 }
-\`\`\`
-
-- **主线程安全（Main-Safety）原则**：耗时/阻塞操作应在挂起函数内部通过 \`withContext(Dispatchers.IO)\` 自主完成线程切换。调用方（ViewModel）无需关心底层调度细节，可以直接在主线程像写单线程同步代码一样顺序调用。`,
+\`\`\``,
       },
       {
         tag: '内存模型',
