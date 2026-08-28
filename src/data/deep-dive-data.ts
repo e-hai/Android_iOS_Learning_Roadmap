@@ -184,7 +184,27 @@ fun testSupervisorJob() {
 \`\`\`
 
 - **Job() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **不会被打印**；应用**正常**。
-- **testSupervisorJob() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **被打印**；应用**正常**。`,
+- **testSupervisorJob() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **被打印**；应用**正常**。
+
+#### 工业级最佳用例：协程安全版 runSuspendCatching
+
+\`\`\`kotlin
+/**
+ * 协程安全版 runCatching：自动放行 CancellationException，保证生命周期正常取消！
+ */
+inline fun <T> runSuspendCatching(block: () -> T): Result<T> {
+    return try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e // ⚡ 核心：遇到取消异常必须重新抛出，绝不当成业务异常吞掉！
+    } catch (e: Throwable) {
+        Result.failure(e)
+    }
+}
+\`\`\`
+
+- **为什么要单独封装？**：Kotlin 标准库的 \`runCatching\` 内部无脑捕获了 \`Throwable\`，会把用户退出页面时的正常取消信号（\`CancellationException\`）当成普通业务错误吞掉，导致协程无法及时终止、继续违规刷新已销毁的 UI。
+- **重新抛出 CancellationException 为什么不会导致崩溃？**：在协程底层设计中，\`CancellationException\` 属于“正常刹车指令”而非“程序错误”。协程框架在顶层感知到取消信号后，会**直接静默收工（将状态标记为 Cancelled 正常退出）**，绝不上报给操作系统的未捕获异常处理器，因此 100% 绝对不会引发闪退。`,
       },
       {
         tag: '内存模型',
