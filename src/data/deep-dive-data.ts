@@ -346,7 +346,20 @@ class ProductViewModel : ViewModel() {
 }
 \`\`\`
 
-- **使用误区**：避免写出“假并发”（刚 \`async\` 就立马 \`await\`，如 \`async { ... }.await()\`）。这样会导致代码退化为串行阻塞，必须先全部发起 \`async\`，最后再统一 \`await()\`。`,
+- **使用误区（假并发）**：避免刚 \`async\` 就立马 \`await\`，导致代码退化为串行阻塞。必须**先全部发起 \`async\`，最后再统一 \`await()\`**。
+
+\`\`\`kotlin
+// ❌ 错误写法（假并发：刚 async 就立马 await，退化为串行阻塞 500ms）
+val goods = async { fetchGoods(productId) }.await()     // ⏳ 等待 300ms 完成后才发下一个
+val coupons = async { fetchCoupons(productId) }.await() // ⏳ 再等待 200ms
+
+// ✅ 正确写法（真并发：先同时发起，最后统一 await 合并，总耗时仅需 max(300ms, 200ms) = 300ms）
+val goodsDeferred = async { fetchGoods(productId) }
+val couponDeferred = async { fetchCoupons(productId) }
+
+val goods = goodsDeferred.await()
+val coupons = couponDeferred.await()
+\`\`\``,
       },
       {
         tag: '内存模型',
