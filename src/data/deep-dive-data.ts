@@ -359,6 +359,52 @@ val couponDeferred = async { fetchCoupons(productId) }
 
 val goods = goodsDeferred.await()
 val coupons = couponDeferred.await()
+\`\`\`
+
+### 六、黑盒并发
+
+- **场景解释**：在数据层（Repository）等普通挂起函数内部开辟并发作用域。对外表现为单一同步挂起函数，对内并行加速；任何一个子任务失败时（如批量上传），立即自动熔断并取消其余所有兄弟任务，避免浪费流量。
+
+\`\`\`kotlin
+class UserRepository {
+    suspend fun getFullProfile(userId: String): FullProfile = coroutineScope {
+        val basicDeferred = async { fetchBasic(userId) }
+        val avatarDeferred = async { fetchAvatar(userId) }
+
+        FullProfile(
+            basic = basicDeferred.await(),
+            avatar = avatarDeferred.await()
+        )
+    }
+
+    private suspend fun fetchBasic(id: String) = withContext(Dispatchers.IO) {
+        delay(300.milliseconds)
+        "张三"
+    }
+
+    private suspend fun fetchAvatar(id: String) = withContext(Dispatchers.IO) {
+        delay(200.milliseconds)
+        "https://avatar.png"
+    }
+}
+
+class ProfileViewModel(private val repository: UserRepository) : ViewModel() {
+    private val _uiState = MutableStateFlow("初始状态")
+    val uiState: StateFlow<String> = _uiState.asStateFlow()
+
+    fun load(userId: String) {
+        viewModelScope.launch {
+            _uiState.value = "加载中..."
+            runSuspendCatching {
+                repository.getFullProfile(userId)
+            }.onSuccess { profile ->
+                _uiState.value = "加载成功: $profile"
+            }.onFailure { error ->
+                _uiState.value = "加载失败: \${error.message}"
+            }
+        }
+    }
+}
 \`\`\``,
       },
       {
