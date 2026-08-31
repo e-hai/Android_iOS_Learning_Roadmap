@@ -367,14 +367,16 @@ val coupons = couponDeferred.await()
 
 \`\`\`kotlin
 class UserRepository {
-    suspend fun getFullProfile(userId: String): FullProfile = coroutineScope {
-        val basicDeferred = async { fetchBasic(userId) }
-        val avatarDeferred = async { fetchAvatar(userId) }
+    suspend fun getFullProfile(userId: String): Result<FullProfile> = coroutineScope {
+        runSuspendCatching {
+            val basicDeferred = async { fetchBasic(userId) }
+            val avatarDeferred = async { fetchAvatar(userId) }
 
-        FullProfile(
-            basic = basicDeferred.await(),
-            avatar = avatarDeferred.await()
-        )
+            FullProfile(
+                basic = basicDeferred.await(),
+                avatar = avatarDeferred.await()
+            )
+        }
     }
 
     private suspend fun fetchBasic(id: String) = withContext(Dispatchers.IO) {
@@ -395,13 +397,12 @@ class ProfileViewModel(private val repository: UserRepository) : ViewModel() {
     fun load(userId: String) {
         viewModelScope.launch {
             _uiState.value = "加载中..."
-            runSuspendCatching {
-                repository.getFullProfile(userId)
-            }.onSuccess { profile ->
-                _uiState.value = "加载成功: $profile"
-            }.onFailure { error ->
-                _uiState.value = "加载失败: \${error.message}"
-            }
+            repository.getFullProfile(userId)
+                .onSuccess { profile ->
+                    _uiState.value = "加载成功: $profile"
+                }.onFailure { error ->
+                    _uiState.value = "加载失败: \${error.message}"
+                }
         }
     }
 }
