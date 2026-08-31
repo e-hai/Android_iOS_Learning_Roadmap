@@ -388,53 +388,53 @@ val coupons = couponDeferred.await()
 
 ### 六、黑盒并发
 
-- **场景解释**：在数据层（Repository）等普通挂起函数内部开辟并发作用域。对外表现为单一同步挂起函数，对内并行加速；任何一个子任务失败时（如批量上传），立即自动熔断并取消其余所有兄弟任务，避免浪费流量。
+- **场景解释**：将第五点的并发聚合下沉到数据层（Repository）。通过 \`coroutineScope\` 在底层开辟并发作用域；对 ViewModel 表现为单一同步挂起函数，对内多任务并行，且具备自动熔断特性。
 
 \`\`\`kotlin
-data class FullProfile(val basic: String, val avatar: String)
+data class ProductDetail(val goods: String, val coupons: String)
 
-data class UserUiState(
+data class ProductDetailUiState(
     val isLoading: Boolean = false,
-    val profile: FullProfile? = null,
+    val detail: ProductDetail? = null,
     val error: String? = null
 )
 
-class UserRepository {
-    suspend fun getFullProfile(userId: String): Result<FullProfile> = coroutineScope {
+class ProductRepository {
+    suspend fun getProductDetail(productId: String): Result<ProductDetail> = coroutineScope {
         runSuspendCatching {
-            val basicDeferred = async { fetchBasic(userId) }
-            val avatarDeferred = async { fetchAvatar(userId) }
+            val goodsDeferred = async { fetchGoods(productId) }
+            val couponDeferred = async { fetchCoupons(productId) }
 
-            FullProfile(
-                basic = basicDeferred.await(),
-                avatar = avatarDeferred.await()
+            ProductDetail(
+                goods = goodsDeferred.await(),
+                coupons = couponDeferred.await()
             )
         }
     }
 
-    private suspend fun fetchBasic(id: String) = withContext(Dispatchers.IO) {
+    private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
         delay(300.milliseconds)
-        "张三"
+        "iPhone 16"
     }
 
-    private suspend fun fetchAvatar(id: String) = withContext(Dispatchers.IO) {
+    private suspend fun fetchCoupons(id: String): String = withContext(Dispatchers.IO) {
         delay(200.milliseconds)
-        "https://avatar.png"
+        "满 5000 减 400"
     }
 }
 
-class ProfileViewModel(private val repository: UserRepository) : ViewModel() {
-    private val _uiState = MutableStateFlow(UserUiState())
-    val uiState: StateFlow<UserUiState> = _uiState.asStateFlow()
+class ProductViewModel(private val repository: ProductRepository) : ViewModel() {
+    private val _uiState = MutableStateFlow(ProductDetailUiState())
+    val uiState: StateFlow<ProductDetailUiState> = _uiState.asStateFlow()
 
-    fun load(userId: String) {
+    fun load(productId: String) {
         viewModelScope.launch {
-            _uiState.value = UserUiState(isLoading = true)
-            repository.getFullProfile(userId)
-                .onSuccess { profile ->
-                    _uiState.value = UserUiState(profile = profile)
+            _uiState.value = ProductDetailUiState(isLoading = true)
+            repository.getProductDetail(productId)
+                .onSuccess { detail ->
+                    _uiState.value = ProductDetailUiState(detail = detail)
                 }.onFailure { error ->
-                    _uiState.value = UserUiState(error = error.message)
+                    _uiState.value = ProductDetailUiState(error = error.message)
                 }
         }
     }
