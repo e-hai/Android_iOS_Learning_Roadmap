@@ -322,15 +322,16 @@ class ProductViewModel : ViewModel() {
             val goodsDeferred = async { fetchGoods(productId) }
             val couponDeferred = async { fetchCoupons(productId) }
 
-            val goodsRes = goodsDeferred.await()
-            val couponRes = couponDeferred.await()
-
-            if (goodsRes.isSuccess && couponRes.isSuccess) {
-                _uiState.value = "商品: \${goodsRes.getOrThrow()}, 优惠券: \${couponRes.getOrThrow()}"
-            } else {
-                val error = goodsRes.exceptionOrNull() ?: couponRes.exceptionOrNull()
-                _uiState.value = "加载失败: \${error?.message}"
+            val goods = goodsDeferred.await().getOrElse {
+                _uiState.value = "商品加载失败: \${it.message}"
+                return@launch
             }
+            val coupons = couponDeferred.await().getOrElse {
+                _uiState.value = "优惠券加载失败: \${it.message}"
+                return@launch
+            }
+
+            _uiState.value = "商品: $goods, 优惠券: $coupons"
         }
     }
 
