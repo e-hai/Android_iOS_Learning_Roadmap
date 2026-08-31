@@ -439,6 +439,63 @@ class ProductViewModel(private val repository: ProductRepository) : ViewModel() 
         }
     }
 }
+\`\`\`
+
+### 七、局部容灾
+
+- **场景解释**：基于第五点的多接口并发，将次要接口做局部容灾降级。通过 \`supervisorScope\` 建立水密隔舱；优惠券接口崩溃时自动降级为 \`null\`，核心商品数据照常成功拉取并展示，避免页面全盘白屏。
+
+\`\`\`kotlin
+data class ProductDetail(val goods: String, val coupons: String?)
+
+data class ProductDetailUiState(
+    val isLoading: Boolean = false,
+    val detail: ProductDetail? = null,
+    val error: String? = null
+)
+
+class ProductRepository {
+    suspend fun getProductDetail(productId: String): Result<ProductDetail> = supervisorScope {
+        runSuspendCatching {
+            val goodsDeferred = async { fetchGoods(productId) }
+            val couponDeferred = async {
+                runSuspendCatching { fetchCoupons(productId) }.getOrNull()
+            }
+
+            ProductDetail(
+                goods = goodsDeferred.await(),
+                coupons = couponDeferred.await()
+            )
+        }
+    }
+
+    private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
+        delay(300.milliseconds)
+        "iPhone 16"
+    }
+
+    private suspend fun fetchCoupons(id: String): String = withContext(Dispatchers.IO) {
+        delay(200.milliseconds)
+        throw RuntimeException("优惠券接口 500 异常")
+    }
+}
+
+class ProductViewModel(private val repository: ProductRepository) : ViewModel() {
+    private val _uiState = MutableStateFlow(ProductDetailUiState())
+    val uiState: StateFlow<ProductDetailUiState> = _uiState.asStateFlow()
+
+    fun load(productId: String) {
+        viewModelScope.launch {
+            _uiState.value = ProductDetailUiState(isLoading = true)
+            repository.getProductDetail(productId)
+                .onSuccess { detail ->
+                    _uiState.value = ProductDetailUiState(detail = detail)
+                }.onFailure { error ->
+                    _uiState.value = ProductDetailUiState(error = error.message)
+                }
+        }
+    }
+}
 \`\`\``,
       },
       {
