@@ -293,28 +293,25 @@ class OrderViewModel : ViewModel() {
             _uiState.value = OrderUiState(isLoading = true)
 
             launch {
-                trackBuyEvent(productId)
+                runSuspendCatching { trackBuyEvent(productId) }
             }
 
-            payOrder(productId)
-                .onSuccess {
-                    _uiState.value = OrderUiState(isSuccess = true)
-                }.onFailure { error ->
-                    _uiState.value = OrderUiState(error = error.message)
-                }
+            runSuspendCatching {
+                payOrder(productId)
+            }.onSuccess {
+                _uiState.value = OrderUiState(isSuccess = true)
+            }.onFailure { error ->
+                _uiState.value = OrderUiState(error = error.message)
+            }
         }
     }
 
-    private suspend fun payOrder(productId: String): Result<Unit> = withContext(Dispatchers.IO) {
-        runSuspendCatching {
-            delay(500.milliseconds)
-        }
+    private suspend fun payOrder(productId: String) = withContext(Dispatchers.IO) {
+        delay(500.milliseconds)
     }
 
     private suspend fun trackBuyEvent(productId: String) = withContext(Dispatchers.IO) {
-        runSuspendCatching {
-            delay(200.milliseconds)
-        }
+        delay(200.milliseconds)
     }
 }
 \`\`\`
@@ -339,34 +336,29 @@ class ProductViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = ProductUiState(isLoading = true)
 
-            val goodsDeferred = async { fetchGoods(productId) }
-            val couponDeferred = async { fetchCoupons(productId) }
+            runSuspendCatching {
+                coroutineScope {
+                    val goodsDeferred = async { fetchGoods(productId) }
+                    val couponDeferred = async { fetchCoupons(productId) }
 
-            val goods = goodsDeferred.await().getOrElse {
-                _uiState.value = ProductUiState(error = "商品加载失败: \${it.message}")
-                return@launch
+                    goodsDeferred.await() to couponDeferred.await()
+                }
+            }.onSuccess { (goods, coupons) ->
+                _uiState.value = ProductUiState(goods = goods, coupons = coupons)
+            }.onFailure { error ->
+                _uiState.value = ProductUiState(error = error.message)
             }
-            val coupons = couponDeferred.await().getOrElse {
-                _uiState.value = ProductUiState(error = "优惠券加载失败: \${it.message}")
-                return@launch
-            }
-
-            _uiState.value = ProductUiState(goods = goods, coupons = coupons)
         }
     }
 
-    private suspend fun fetchGoods(id: String): Result<String> = withContext(Dispatchers.IO) {
-        runSuspendCatching {
-            delay(300.milliseconds)
-            "iPhone 16"
-        }
+    private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
+        delay(300.milliseconds)
+        "iPhone 16"
     }
 
-    private suspend fun fetchCoupons(id: String): Result<String> = withContext(Dispatchers.IO) {
-        runSuspendCatching {
-            delay(200.milliseconds)
-            "满 5000 减 400"
-        }
+    private suspend fun fetchCoupons(id: String): String = withContext(Dispatchers.IO) {
+        delay(200.milliseconds)
+        "满 5000 减 400"
     }
 }
 \`\`\`
