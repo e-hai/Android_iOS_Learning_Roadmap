@@ -296,18 +296,19 @@ class OrderViewModel : ViewModel() {
                 trackBuyEvent(productId)
             }
 
-            runSuspendCatching {
-                payOrder(productId)
-            }.onSuccess {
-                _uiState.value = OrderUiState(isSuccess = true)
-            }.onFailure { error ->
-                _uiState.value = OrderUiState(error = error.message)
-            }
+            payOrder(productId)
+                .onSuccess {
+                    _uiState.value = OrderUiState(isSuccess = true)
+                }.onFailure { error ->
+                    _uiState.value = OrderUiState(error = error.message)
+                }
         }
     }
 
-    private suspend fun payOrder(productId: String) = withContext(Dispatchers.IO) {
-        delay(500.milliseconds)
+    private suspend fun payOrder(productId: String): Result<Unit> = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            delay(500.milliseconds)
+        }
     }
 
     private suspend fun trackBuyEvent(productId: String) = withContext(Dispatchers.IO) {
