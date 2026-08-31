@@ -237,20 +237,26 @@ internal fun handleCoroutineException(context: CoroutineContext, exception: Thro
 - **场景解释**：第二步查用户依赖第一步的 Token，顺序链式调用；若第一步失败，第二步自动跳过并由 \`runSuspendCatching\` 捕获错误。
 
 \`\`\`kotlin
+data class ProfileUiState(
+    val isLoading: Boolean = false,
+    val user: String? = null,
+    val error: String? = null
+)
+
 class ProfileViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow("初始状态")
-    val uiState: StateFlow<String> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(ProfileUiState())
+    val uiState: StateFlow<ProfileUiState> = _uiState.asStateFlow()
 
     fun loadUserData() {
         viewModelScope.launch {
-            _uiState.value = "加载中..."
+            _uiState.value = ProfileUiState(isLoading = true)
             runSuspendCatching {
                 val token = fetchToken()
                 fetchUserInfo(token)
             }.onSuccess { user ->
-                _uiState.value = "获取成功：$user"
+                _uiState.value = ProfileUiState(user = user)
             }.onFailure { error ->
-                _uiState.value = "加载失败: \${error.message}"
+                _uiState.value = ProfileUiState(error = error.message)
             }
         }
     }
@@ -272,13 +278,19 @@ class ProfileViewModel : ViewModel() {
 - **场景解释**：主任务专心扣款，顺手丢个子任务去后台打点（不用等它）；打点即使报错自己吞掉，绝不能耽误主任务付钱。
 
 \`\`\`kotlin
+data class OrderUiState(
+    val isLoading: Boolean = false,
+    val isSuccess: Boolean = false,
+    val error: String? = null
+)
+
 class OrderViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow("初始状态")
-    val uiState: StateFlow<String> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(OrderUiState())
+    val uiState: StateFlow<OrderUiState> = _uiState.asStateFlow()
 
     fun buyProduct(productId: String) {
         viewModelScope.launch {
-            _uiState.value = "提交中..."
+            _uiState.value = OrderUiState(isLoading = true)
 
             launch {
                 trackBuyEvent(productId)
@@ -287,9 +299,9 @@ class OrderViewModel : ViewModel() {
             runSuspendCatching {
                 payOrder(productId)
             }.onSuccess {
-                _uiState.value = "支付成功"
+                _uiState.value = OrderUiState(isSuccess = true)
             }.onFailure { error ->
-                _uiState.value = "支付失败: \${error.message}"
+                _uiState.value = OrderUiState(error = error.message)
             }
         }
     }
@@ -311,27 +323,34 @@ class OrderViewModel : ViewModel() {
 - **场景解释**：商品信息与优惠券互不依赖，通过 \`async\` 同时发起两个网络请求，最后统一 \`await\` 合并结果；总耗时取决于最慢的一个请求（从 500ms 降至 300ms）。
 
 \`\`\`kotlin
+data class ProductUiState(
+    val isLoading: Boolean = false,
+    val goods: String? = null,
+    val coupons: String? = null,
+    val error: String? = null
+)
+
 class ProductViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow("初始状态")
-    val uiState: StateFlow<String> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(ProductUiState())
+    val uiState: StateFlow<ProductUiState> = _uiState.asStateFlow()
 
     fun loadProductDetail(productId: String) {
         viewModelScope.launch {
-            _uiState.value = "加载中..."
+            _uiState.value = ProductUiState(isLoading = true)
 
             val goodsDeferred = async { fetchGoods(productId) }
             val couponDeferred = async { fetchCoupons(productId) }
 
             val goods = goodsDeferred.await().getOrElse {
-                _uiState.value = "商品加载失败: \${it.message}"
+                _uiState.value = ProductUiState(error = "商品加载失败: \${it.message}")
                 return@launch
             }
             val coupons = couponDeferred.await().getOrElse {
-                _uiState.value = "优惠券加载失败: \${it.message}"
+                _uiState.value = ProductUiState(error = "优惠券加载失败: \${it.message}")
                 return@launch
             }
 
-            _uiState.value = "商品: $goods, 优惠券: $coupons"
+            _uiState.value = ProductUiState(goods = goods, coupons = coupons)
         }
     }
 
@@ -371,6 +390,14 @@ val coupons = couponDeferred.await()
 - **场景解释**：在数据层（Repository）等普通挂起函数内部开辟并发作用域。对外表现为单一同步挂起函数，对内并行加速；任何一个子任务失败时（如批量上传），立即自动熔断并取消其余所有兄弟任务，避免浪费流量。
 
 \`\`\`kotlin
+data class FullProfile(val basic: String, val avatar: String)
+
+data class UserUiState(
+    val isLoading: Boolean = false,
+    val profile: FullProfile? = null,
+    val error: String? = null
+)
+
 class UserRepository {
     suspend fun getFullProfile(userId: String): Result<FullProfile> = coroutineScope {
         runSuspendCatching {
@@ -396,17 +423,17 @@ class UserRepository {
 }
 
 class ProfileViewModel(private val repository: UserRepository) : ViewModel() {
-    private val _uiState = MutableStateFlow("初始状态")
-    val uiState: StateFlow<String> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(UserUiState())
+    val uiState: StateFlow<UserUiState> = _uiState.asStateFlow()
 
     fun load(userId: String) {
         viewModelScope.launch {
-            _uiState.value = "加载中..."
+            _uiState.value = UserUiState(isLoading = true)
             repository.getFullProfile(userId)
                 .onSuccess { profile ->
-                    _uiState.value = "加载成功: $profile"
+                    _uiState.value = UserUiState(profile = profile)
                 }.onFailure { error ->
-                    _uiState.value = "加载失败: \${error.message}"
+                    _uiState.value = UserUiState(error = error.message)
                 }
         }
     }
