@@ -318,30 +318,34 @@ class ProductViewModel : ViewModel() {
     fun loadProductDetail(productId: String) {
         viewModelScope.launch {
             _uiState.value = "加载中..."
-            runSuspendCatching {
-                val goodsDeferred = async { fetchGoods(productId) }
-                val couponDeferred = async { fetchCoupons(productId) }
 
-                val goods = goodsDeferred.await()
-                val coupons = couponDeferred.await()
+            val goodsDeferred = async { fetchGoods(productId) }
+            val couponDeferred = async { fetchCoupons(productId) }
 
-                "商品: $goods, 优惠券: $coupons"
-            }.onSuccess { detail ->
-                _uiState.value = "加载成功: $detail"
-            }.onFailure { error ->
-                _uiState.value = "加载失败: \${error.message}"
+            val goodsRes = goodsDeferred.await()
+            val couponRes = couponDeferred.await()
+
+            if (goodsRes.isSuccess) {
+                val goods = goodsRes.getOrThrow()
+                val coupons = couponRes.getOrDefault("暂无可用优惠券")
+                _uiState.value = "商品: $goods, 优惠券: $coupons"
+            } else {
+                _uiState.value = "商品加载失败: \${goodsRes.exceptionOrNull()?.message}"
             }
         }
     }
 
-    private suspend fun fetchGoods(id: String) = withContext(Dispatchers.IO) {
-        delay(300.milliseconds)
-        "iPhone 16"
+    private suspend fun fetchGoods(id: String): Result<String> = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            delay(300.milliseconds)
+            "iPhone 16"
+        }
     }
 
-    private suspend fun fetchCoupons(id: String) = withContext(Dispatchers.IO) {
-        delay(200.milliseconds)
-        "满 5000 减 400"
+    private suspend fun fetchCoupons(id: String): Result<String> = withContext(Dispatchers.IO) {
+        runSuspendCatching {
+            delay(200.milliseconds)
+        }
     }
 }
 \`\`\`
