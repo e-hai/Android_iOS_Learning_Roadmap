@@ -336,18 +336,19 @@ class ProductViewModel : ViewModel() {
         viewModelScope.launch {
             _uiState.value = ProductUiState(isLoading = true)
 
-            runSuspendCatching {
-                coroutineScope {
-                    val goodsDeferred = async { fetchGoods(productId) }
-                    val couponDeferred = async { fetchCoupons(productId) }
+            val goodsDeferred = async { runSuspendCatching { fetchGoods(productId) } }
+            val couponDeferred = async { runSuspendCatching { fetchCoupons(productId) } }
 
-                    goodsDeferred.await() to couponDeferred.await()
-                }
-            }.onSuccess { (goods, coupons) ->
-                _uiState.value = ProductUiState(goods = goods, coupons = coupons)
-            }.onFailure { error ->
-                _uiState.value = ProductUiState(error = error.message)
+            val goods = goodsDeferred.await().getOrElse {
+                _uiState.value = ProductUiState(error = "商品加载失败: \${it.message}")
+                return@launch
             }
+            val coupons = couponDeferred.await().getOrElse {
+                _uiState.value = ProductUiState(error = "优惠券加载失败: \${it.message}")
+                return@launch
+            }
+
+            _uiState.value = ProductUiState(goods = goods, coupons = coupons)
         }
     }
 
