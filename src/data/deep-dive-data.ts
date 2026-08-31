@@ -325,12 +325,11 @@ class ProductViewModel : ViewModel() {
             val goodsRes = goodsDeferred.await()
             val couponRes = couponDeferred.await()
 
-            if (goodsRes.isSuccess) {
-                val goods = goodsRes.getOrThrow()
-                val coupons = couponRes.getOrDefault("暂无可用优惠券")
-                _uiState.value = "商品: $goods, 优惠券: $coupons"
+            if (goodsRes.isSuccess && couponRes.isSuccess) {
+                _uiState.value = "商品: \${goodsRes.getOrThrow()}, 优惠券: \${couponRes.getOrThrow()}"
             } else {
-                _uiState.value = "商品加载失败: \${goodsRes.exceptionOrNull()?.message}"
+                val error = goodsRes.exceptionOrNull() ?: couponRes.exceptionOrNull()
+                _uiState.value = "加载失败: \${error?.message}"
             }
         }
     }
@@ -345,6 +344,7 @@ class ProductViewModel : ViewModel() {
     private suspend fun fetchCoupons(id: String): Result<String> = withContext(Dispatchers.IO) {
         runSuspendCatching {
             delay(200.milliseconds)
+            "满 5000 减 400"
         }
     }
 }
