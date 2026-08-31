@@ -400,16 +400,14 @@ data class ProductDetailUiState(
 )
 
 class ProductRepository {
-    suspend fun getProductDetail(productId: String): Result<ProductDetail> = coroutineScope {
-        runSuspendCatching {
-            val goodsDeferred = async { fetchGoods(productId) }
-            val couponDeferred = async { fetchCoupons(productId) }
+    suspend fun getProductDetail(productId: String): ProductDetail = coroutineScope {
+        val goodsDeferred = async { fetchGoods(productId) }
+        val couponDeferred = async { fetchCoupons(productId) }
 
-            ProductDetail(
-                goods = goodsDeferred.await(),
-                coupons = couponDeferred.await()
-            )
-        }
+        ProductDetail(
+            goods = goodsDeferred.await(),
+            coupons = couponDeferred.await()
+        )
     }
 
     private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
@@ -430,12 +428,13 @@ class ProductViewModel(private val repository: ProductRepository) : ViewModel() 
     fun load(productId: String) {
         viewModelScope.launch {
             _uiState.value = ProductDetailUiState(isLoading = true)
-            repository.getProductDetail(productId)
-                .onSuccess { detail ->
-                    _uiState.value = ProductDetailUiState(detail = detail)
-                }.onFailure { error ->
-                    _uiState.value = ProductDetailUiState(error = error.message)
-                }
+            runSuspendCatching {
+                repository.getProductDetail(productId)
+            }.onSuccess { detail ->
+                _uiState.value = ProductDetailUiState(detail = detail)
+            }.onFailure { error ->
+                _uiState.value = ProductDetailUiState(error = error.message)
+            }
         }
     }
 }
@@ -455,18 +454,16 @@ data class ProductDetailUiState(
 )
 
 class ProductRepository {
-    suspend fun getProductDetail(productId: String): Result<ProductDetail> = supervisorScope {
-        runSuspendCatching {
-            val goodsDeferred = async { fetchGoods(productId) }
-            val couponDeferred = async {
-                runSuspendCatching { fetchCoupons(productId) }.getOrNull()
-            }
-
-            ProductDetail(
-                goods = goodsDeferred.await(),
-                coupons = couponDeferred.await()
-            )
+    suspend fun getProductDetail(productId: String): ProductDetail = supervisorScope {
+        val goodsDeferred = async { fetchGoods(productId) }
+        val couponDeferred = async {
+            runSuspendCatching { fetchCoupons(productId) }.getOrNull()
         }
+
+        ProductDetail(
+            goods = goodsDeferred.await(),
+            coupons = couponDeferred.await()
+        )
     }
 
     private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
@@ -487,12 +484,13 @@ class ProductViewModel(private val repository: ProductRepository) : ViewModel() 
     fun load(productId: String) {
         viewModelScope.launch {
             _uiState.value = ProductDetailUiState(isLoading = true)
-            repository.getProductDetail(productId)
-                .onSuccess { detail ->
-                    _uiState.value = ProductDetailUiState(detail = detail)
-                }.onFailure { error ->
-                    _uiState.value = ProductDetailUiState(error = error.message)
-                }
+            runSuspendCatching {
+                repository.getProductDetail(productId)
+            }.onSuccess { detail ->
+                _uiState.value = ProductDetailUiState(detail = detail)
+            }.onFailure { error ->
+                _uiState.value = ProductDetailUiState(error = error.message)
+            }
         }
     }
 }
