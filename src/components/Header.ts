@@ -1,3 +1,5 @@
+import { i18n } from '../services/i18n';
+
 export function renderHeader(
   onToggleSidebar: () => void,
   onNavigateHome: () => void,
@@ -5,24 +7,27 @@ export function renderHeader(
   docMode: 'roadmap' | 'deepdive' = 'roadmap',
   deepDivePlatform: 'android' | 'ios' = 'android',
   onToggle3DDoc?: (mode: '3d' | 'doc') => void,
-  onTogglePlatform?: (platform: 'android' | 'ios') => void
+  onTogglePlatform?: (platform: 'android' | 'ios') => void,
+  onOpenSearch?: () => void
 ): HTMLElement {
   const header = document.createElement('header');
   header.className = 'app-header';
 
   const isRoadmap = docMode === 'roadmap';
-  const mainTitle = isRoadmap ? 'Android ⟷ iOS · 双端路线图' : '单端深度进阶';
-  const badgeTitle = isRoadmap ? '双端对照 (16 阶段)' : (deepDivePlatform === 'android' ? 'Android 内幕 (5 领域)' : 'iOS 内幕 (5 领域)');
+  const mainTitle = i18n.t(isRoadmap ? 'header.roadmap.title' : 'header.deepdive.title');
+  const badgeTitle = i18n.t(isRoadmap
+    ? 'header.roadmap.badge'
+    : deepDivePlatform === 'android' ? 'header.android.badge' : 'header.ios.badge');
 
   let centerPlatformSwitchHtml = '';
   if (!isRoadmap) {
     centerPlatformSwitchHtml = `
       <div class="header-platform-toggle">
-        <button class="platform-toggle-btn btn-android ${deepDivePlatform === 'android' ? 'active' : ''}" id="hdr-btn-android" title="切换为 Android 单端深度进阶">
+        <button class="platform-toggle-btn btn-android ${deepDivePlatform === 'android' ? 'active' : ''}" id="hdr-btn-android" title="${i18n.t('header.switch_android')}" aria-pressed="${deepDivePlatform === 'android'}">
           <span class="platform-dot dot-android"></span>
           <span>Android</span>
         </button>
-        <button class="platform-toggle-btn btn-ios ${deepDivePlatform === 'ios' ? 'active' : ''}" id="hdr-btn-ios" title="切换为 iOS 单端深度进阶">
+        <button class="platform-toggle-btn btn-ios ${deepDivePlatform === 'ios' ? 'active' : ''}" id="hdr-btn-ios" title="${i18n.t('header.switch_ios')}" aria-pressed="${deepDivePlatform === 'ios'}">
           <span class="platform-dot dot-ios"></span>
           <span>iOS</span>
         </button>
@@ -32,16 +37,16 @@ export function renderHeader(
 
   header.innerHTML = `
     <div class="header-left">
-      <button class="sidebar-toggle-btn" id="btn-sidebar-toggle" aria-label="Toggle Sidebar" title="展开/收起目录">
+      <button class="sidebar-toggle-btn" id="btn-sidebar-toggle" aria-label="${i18n.t('web.toggle_sidebar')}" title="${i18n.t('web.toggle_sidebar')}" aria-controls="app-sidebar">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg>
       </button>
-      <div class="header-logo" id="header-logo-btn">
+      <button class="header-logo" id="header-logo-btn" aria-label="${i18n.t('header.home')}">
         <div class="brand-icon" style="${!isRoadmap ? (deepDivePlatform === 'android' ? 'background:linear-gradient(135deg, #10b981, #047857);' : 'background:linear-gradient(135deg, #0ea5e9, #0369a1);') : ''}">AR</div>
         <div class="brand-text">
           <span class="brand-title">${mainTitle}</span>
           <span class="brand-badge" style="${!isRoadmap ? (deepDivePlatform === 'android' ? 'color:#10b981;' : 'color:#0ea5e9;') : ''}">${badgeTitle}</span>
         </div>
-      </div>
+      </button>
     </div>
 
     <!-- Center: Platform Switcher (only in deepdive mode) -->
@@ -50,17 +55,21 @@ export function renderHeader(
     </div>
 
     <div class="header-right">
+      <button class="header-search-btn" id="btn-open-search" aria-label="${i18n.t('web.open_search')}" title="${i18n.t('web.open_search')}">
+        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>${i18n.t('header.search')}</span><kbd>⌘K</kbd>
+      </button>
       <!-- 3D Constellation vs Document Switcher -->
-      <div class="view-mode-toggle">
-        <button class="view-mode-btn ${is3DMode ? 'active' : ''}" id="btn-mode-3d" title="切换为 3D 认知星云模式">
-          🌌 3D 星云
+      <div class="view-mode-toggle" role="group" aria-label="${i18n.t('header.view_mode')}">
+        <button class="view-mode-btn ${is3DMode ? 'active' : ''}" id="btn-mode-3d" title="${i18n.t('header.switch_3d')}" aria-pressed="${is3DMode}">
+          🌌 ${i18n.t('header.3d')}
         </button>
-        <button class="view-mode-btn ${!is3DMode ? 'active' : ''}" id="btn-mode-doc" title="切换为文档模式">
-          📄 文档
+        <button class="view-mode-btn ${!is3DMode ? 'active' : ''}" id="btn-mode-doc" title="${i18n.t('header.switch_doc')}" aria-pressed="${!is3DMode}">
+          📄 ${i18n.t('header.doc')}
         </button>
       </div>
 
-      <button class="btn btn-ghost btn-icon" id="btn-theme-toggle" title="切换深色/浅色主题">
+      <button class="btn btn-ghost btn-icon" id="btn-theme-toggle" aria-label="${i18n.t('web.theme_toggle')}" title="${i18n.t('web.theme_toggle')}">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="theme-sun-icon"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
     </div>
@@ -90,6 +99,9 @@ export function renderHeader(
   });
   header.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
     if (onToggle3DDoc) onToggle3DDoc('doc');
+  });
+  header.querySelector('#btn-open-search')?.addEventListener('click', () => {
+    onOpenSearch?.();
   });
 
   const themeBtn = header.querySelector('#btn-theme-toggle') as HTMLButtonElement;

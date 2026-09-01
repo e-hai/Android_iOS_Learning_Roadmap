@@ -140,7 +140,7 @@ export function renderHomeView(
       <div class="section-header-bar" style="background:linear-gradient(90deg, var(--color-android), var(--color-ios));"></div>
       <span class="section-header-title">${i18n.t('home.matrix.title')}</span>
     </div>
-    <p style="font-size:13.5px;color:var(--color-ink-muted);margin-bottom:16px;">全 16 阶段双端工程对照矩阵，点击直接开启对应阶段探索：</p>
+    <p style="font-size:13.5px;color:var(--color-ink-muted);margin-bottom:16px;">${i18n.t('home.matrix.desc')}</p>
 
     <div class="matrix-grid" id="matrix-grid-all"></div>
   `;
@@ -149,8 +149,10 @@ export function renderHomeView(
   const allGrid = matrixSection.querySelector('#matrix-grid-all') as HTMLElement;
 
   stages.forEach((stage) => {
-    const card = document.createElement('div');
+    const card = document.createElement('button');
+    card.type = 'button';
     card.className = 'matrix-card main';
+    card.setAttribute('aria-label', `${String(stage.number).padStart(2, '0')} ${i18n.t(stage.titleKey)}，${stage.rows.length} 项对照`);
     card.innerHTML = `
       <div class="matrix-card-num">${String(stage.number).padStart(2, '0')}</div>
       <div class="matrix-card-info">

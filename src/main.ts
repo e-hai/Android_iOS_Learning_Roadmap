@@ -3,50 +3,51 @@ import './styles/layout.css';
 import './styles/components.css';
 import './styles/visuals.css';
 
-import { stages } from './data/roadmap-data';
 import { renderHeader } from './components/Header';
-import { renderSidebar } from './components/Sidebar';
 import { renderHomeView } from './components/HomeView';
+import { openSearchDialog, SearchTarget } from './components/SearchDialog';
+import { renderSidebar } from './components/Sidebar';
 import { renderStageDetail } from './components/StageDetailView';
 import { renderDeepDiveDocView } from './components/DeepDiveDocView';
-import { renderNeuralConstellationView } from './visuals/macro/NeuralConstellationView';
+import { stages } from './data/roadmap-data';
+import { i18n } from './services/i18n';
+
+type DocMode = 'roadmap' | 'deepdive';
+type Platform = 'android' | 'ios';
 
 class AppController {
-  private is3DMode: boolean = false;
-  private docMode: 'roadmap' | 'deepdive' = 'roadmap';
-  private deepDivePlatform: 'android' | 'ios' = 'android';
-  private currentStageId: string = 'home';
+  private is3DMode = false;
+  private docMode: DocMode = 'roadmap';
+  private deepDivePlatform: Platform = 'android';
+  private currentStageId = 'home';
   private sidebarOpen = false;
   private desktopSidebarCollapsed = false;
+  private documentShellKey = '';
+  private renderVersion = 0;
+  private dispose3DView: (() => void) | null = null;
 
   constructor() {
     this.desktopSidebarCollapsed = localStorage.getItem('learning_sidebar_collapsed') === 'true';
-    if (this.desktopSidebarCollapsed) {
-      document.body.classList.add('sidebar-collapsed');
-    }
-    this.docMode = (localStorage.getItem('learning_cockpit_doc_mode') as 'roadmap' | 'deepdive') || 'roadmap';
-    this.deepDivePlatform = (localStorage.getItem('learning_deepdive_platform') as 'android' | 'ios') || 'android';
+    document.body.classList.toggle('sidebar-collapsed', this.desktopSidebarCollapsed);
+    this.docMode = (localStorage.getItem('learning_cockpit_doc_mode') as DocMode) || 'roadmap';
+    this.deepDivePlatform = (localStorage.getItem('learning_deepdive_platform') as Platform) || 'android';
     this.is3DMode = localStorage.getItem('learning_cockpit_view_mode') === '3d';
 
     this.initTheme();
     this.initRouting();
     this.initGlobalShortcuts();
-    this.render();
+    void this.render();
   }
 
-  private initTheme() {
+  private initTheme(): void {
     const savedTheme = localStorage.getItem('learning_cockpit_theme');
-    if (savedTheme) {
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    } else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      document.documentElement.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    }
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    document.documentElement.setAttribute('data-theme', savedTheme || (prefersDark ? 'dark' : 'light'));
   }
 
-  private initRouting() {
+  private initRouting(): void {
     const parseHash = () => {
-      const hash = window.location.hash.replace('#', '').trim();
+      const hash = window.location.hash.slice(1).trim();
       if (hash === '3d') {
         this.is3DMode = true;
       } else if (hash === 'deepdive') {
@@ -56,8 +57,8 @@ class AppController {
       } else if (hash.startsWith('deepdive-')) {
         this.is3DMode = false;
         this.docMode = 'deepdive';
-        this.currentStageId = hash.replace('deepdive-', '');
-      } else if (hash && stages.some((s) => s.id === hash)) {
+        this.currentStageId = hash.slice('deepdive-'.length);
+      } else if (hash && stages.some((stage) => stage.id === hash)) {
         this.is3DMode = false;
         this.docMode = 'roadmap';
         this.currentStageId = hash;
@@ -70,202 +71,260 @@ class AppController {
     window.addEventListener('hashchange', () => {
       parseHash();
       this.closeSidebar();
-      this.render();
+      void this.render(true);
     });
-
     parseHash();
   }
 
-  private toggle3DDoc(mode: '3d' | 'doc') {
-    this.is3DMode = mode === '3d';
-    localStorage.setItem('learning_cockpit_view_mode', mode);
-    if (this.is3DMode) {
-      window.location.hash = '3d';
-    } else {
-      this.updateHash();
-    }
-    this.render();
-  }
-
-  private switchDocMode(nextDocMode: 'roadmap' | 'deepdive') {
-    this.docMode = nextDocMode;
-    localStorage.setItem('learning_cockpit_doc_mode', nextDocMode);
-    this.is3DMode = false;
-    localStorage.setItem('learning_cockpit_view_mode', 'doc');
-
-    if (nextDocMode === 'roadmap') {
-      this.currentStageId = 'home';
-    } else {
-      this.currentStageId = 'all';
-    }
-    this.updateHash();
-    this.render();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  private switchPlatform(platform: 'android' | 'ios') {
-    this.deepDivePlatform = platform;
-    localStorage.setItem('learning_deepdive_platform', platform);
-    this.render();
-  }
-
-  private updateHash() {
-    if (this.is3DMode) {
-      window.location.hash = '3d';
-    } else if (this.docMode === 'deepdive') {
-      window.location.hash = this.currentStageId === 'all' ? 'deepdive' : `deepdive-${this.currentStageId}`;
-    } else {
-      window.location.hash = this.currentStageId === 'home' ? '' : this.currentStageId;
-    }
-  }
-
-  private navigateStage(stageId: string) {
-    this.currentStageId = stageId;
-    this.updateHash();
-    this.closeSidebar();
-    this.render();
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  private initGlobalShortcuts() {
-    window.addEventListener('keydown', (e) => {
-      // ⌘B or Ctrl+B for sidebar toggle
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'b') {
-        e.preventDefault();
+  private initGlobalShortcuts(): void {
+    window.addEventListener('keydown', (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        this.openSearch();
+      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+        event.preventDefault();
         this.toggleSidebar();
-      }
-      // ⌘D or Ctrl+D for Home Overview
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
-        e.preventDefault();
+      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
+        event.preventDefault();
         this.switchDocMode('roadmap');
-      }
-      // ⌘M for 3D/Doc toggle
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm') {
-        e.preventDefault();
+      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'm') {
+        event.preventDefault();
         this.toggle3DDoc(this.is3DMode ? 'doc' : '3d');
       }
     });
   }
 
-  private toggleSidebar() {
+  private navigateToHash(hash: string): void {
+    const nextHash = hash ? `#${hash}` : '';
+    if (window.location.hash === nextHash) {
+      void this.render(true);
+    } else {
+      window.location.hash = hash;
+    }
+  }
+
+  private updateHash(): void {
+    if (this.is3DMode) {
+      this.navigateToHash('3d');
+    } else if (this.docMode === 'deepdive') {
+      this.navigateToHash(this.currentStageId === 'all' ? 'deepdive' : `deepdive-${this.currentStageId}`);
+    } else {
+      this.navigateToHash(this.currentStageId === 'home' ? '' : this.currentStageId);
+    }
+  }
+
+  private toggle3DDoc(mode: '3d' | 'doc'): void {
+    this.is3DMode = mode === '3d';
+    localStorage.setItem('learning_cockpit_view_mode', mode);
+    this.updateHash();
+  }
+
+  private switchDocMode(nextMode: DocMode): void {
+    this.docMode = nextMode;
+    this.currentStageId = nextMode === 'roadmap' ? 'home' : 'all';
+    this.is3DMode = false;
+    localStorage.setItem('learning_cockpit_doc_mode', nextMode);
+    localStorage.setItem('learning_cockpit_view_mode', 'doc');
+    this.updateHash();
+  }
+
+  private switchPlatform(platform: Platform): void {
+    if (platform === this.deepDivePlatform) return;
+    this.deepDivePlatform = platform;
+    localStorage.setItem('learning_deepdive_platform', platform);
+    void this.render();
+  }
+
+  private navigateStage(stageId: string): void {
+    this.currentStageId = stageId;
+    this.updateHash();
+  }
+
+  private openSearch(): void {
+    openSearchDialog((target) => this.navigateSearchResult(target));
+  }
+
+  private navigateSearchResult(target: SearchTarget): void {
+    this.is3DMode = false;
+    this.docMode = target.mode;
+    this.currentStageId = target.targetId;
+    if (target.platform) {
+      this.deepDivePlatform = target.platform;
+      localStorage.setItem('learning_deepdive_platform', target.platform);
+    }
+    localStorage.setItem('learning_cockpit_doc_mode', target.mode);
+    localStorage.setItem('learning_cockpit_view_mode', 'doc');
+    this.updateHash();
+  }
+
+  private toggleSidebar(): void {
     if (window.innerWidth <= 960) {
       this.sidebarOpen = !this.sidebarOpen;
-      const sidebar = document.getElementById('app-sidebar');
-      const backdrop = document.getElementById('sidebar-backdrop');
-      if (sidebar) sidebar.classList.toggle('open', this.sidebarOpen);
-      if (backdrop) backdrop.classList.toggle('open', this.sidebarOpen);
-    } else {
-      this.desktopSidebarCollapsed = !this.desktopSidebarCollapsed;
-      document.body.classList.toggle('sidebar-collapsed', this.desktopSidebarCollapsed);
-      localStorage.setItem('learning_sidebar_collapsed', String(this.desktopSidebarCollapsed));
-    }
-  }
-
-  private closeSidebar() {
-    if (window.innerWidth <= 960) {
-      this.sidebarOpen = false;
-      const sidebar = document.getElementById('app-sidebar');
-      const backdrop = document.getElementById('sidebar-backdrop');
-      if (sidebar) sidebar.classList.remove('open');
-      if (backdrop) backdrop.classList.remove('open');
-    }
-  }
-
-  private render() {
-    const app = document.getElementById('app');
-    if (!app) return;
-
-    app.innerHTML = '';
-
-    // Atmosphere Background
-    const bg = document.createElement('div');
-    bg.className = 'atmosphere-bg';
-    app.appendChild(bg);
-
-    // 1. If in 3D Constellation Mode:
-    if (this.is3DMode) {
-      const constellationView = renderNeuralConstellationView(
-        (mode) => this.toggle3DDoc(mode),
-        this.docMode,
-        this.deepDivePlatform,
-        (platform) => this.switchPlatform(platform)
-      );
-      app.appendChild(constellationView);
+      document.getElementById('app-sidebar')?.classList.toggle('open', this.sidebarOpen);
+      document.getElementById('sidebar-backdrop')?.classList.toggle('open', this.sidebarOpen);
+      document.getElementById('btn-sidebar-toggle')?.setAttribute('aria-expanded', String(this.sidebarOpen));
       return;
     }
 
-    // 2. Header (Document Mode)
+    this.desktopSidebarCollapsed = !this.desktopSidebarCollapsed;
+    document.body.classList.toggle('sidebar-collapsed', this.desktopSidebarCollapsed);
+    localStorage.setItem('learning_sidebar_collapsed', String(this.desktopSidebarCollapsed));
+    document.getElementById('btn-sidebar-toggle')?.setAttribute('aria-expanded', String(!this.desktopSidebarCollapsed));
+  }
+
+  private closeSidebar(): void {
+    if (window.innerWidth > 960) return;
+    this.sidebarOpen = false;
+    document.getElementById('app-sidebar')?.classList.remove('open');
+    document.getElementById('sidebar-backdrop')?.classList.remove('open');
+    document.getElementById('btn-sidebar-toggle')?.setAttribute('aria-expanded', 'false');
+  }
+
+  private createAtmosphere(): HTMLElement {
+    const background = document.createElement('div');
+    background.className = 'atmosphere-bg';
+    background.setAttribute('aria-hidden', 'true');
+    return background;
+  }
+
+  private disposeActive3D(): void {
+    this.dispose3DView?.();
+    this.dispose3DView = null;
+  }
+
+  private createDocumentShell(app: HTMLElement): HTMLElement {
+    this.disposeActive3D();
+    app.replaceChildren(this.createAtmosphere());
+
+    const skipLink = document.createElement('a');
+    skipLink.className = 'skip-link';
+    skipLink.href = '#main-content';
+    skipLink.textContent = '跳到主要内容';
+    app.appendChild(skipLink);
+
     const header = renderHeader(
       () => this.toggleSidebar(),
-      () => {
-        if (this.docMode === 'roadmap') this.navigateStage('home');
-        else this.navigateStage('all');
-      },
-      this.is3DMode,
+      () => this.navigateStage(this.docMode === 'roadmap' ? 'home' : 'all'),
+      false,
       this.docMode,
       this.deepDivePlatform,
       (mode) => this.toggle3DDoc(mode),
-      (platform) => this.switchPlatform(platform)
+      (platform) => this.switchPlatform(platform),
+      () => this.openSearch(),
+    );
+    header.querySelector('#btn-sidebar-toggle')?.setAttribute(
+      'aria-expanded',
+      String(window.innerWidth <= 960 ? this.sidebarOpen : !this.desktopSidebarCollapsed),
     );
     app.appendChild(header);
 
-    // 3. Body Layout
     const body = document.createElement('div');
     body.className = 'app-body';
-
-    // Sidebar
-    const sidebar = renderSidebar(
+    body.appendChild(renderSidebar(
       this.currentStageId,
       (id) => this.navigateStage(id),
       this.docMode,
       this.deepDivePlatform,
-      (nextMode) => this.switchDocMode(nextMode)
-    );
-    body.appendChild(sidebar);
+      (mode) => this.switchDocMode(mode),
+    ));
 
-    // Sidebar Mobile Backdrop
-    const sidebarBackdrop = document.createElement('div');
-    sidebarBackdrop.className = `sidebar-backdrop ${this.sidebarOpen ? 'open' : ''}`;
-    sidebarBackdrop.id = 'sidebar-backdrop';
-    sidebarBackdrop.addEventListener('click', () => this.closeSidebar());
-    body.appendChild(sidebarBackdrop);
+    const backdrop = document.createElement('div');
+    backdrop.className = `sidebar-backdrop ${this.sidebarOpen ? 'open' : ''}`;
+    backdrop.id = 'sidebar-backdrop';
+    backdrop.setAttribute('aria-hidden', 'true');
+    backdrop.addEventListener('click', () => this.closeSidebar());
+    body.appendChild(backdrop);
 
-    // Main Content
     const content = document.createElement('main');
     content.className = 'app-content';
-
-    if (this.docMode === 'deepdive') {
-      content.appendChild(
-        renderDeepDiveDocView(
-          this.currentStageId,
-          this.deepDivePlatform,
-          (stageId) => this.navigateStage(stageId)
-        )
-      );
-    } else {
-      // Roadmap Mode
-      if (this.currentStageId === 'home' || this.currentStageId === 'all') {
-        content.appendChild(
-          renderHomeView((id) => this.navigateStage(id))
-        );
-      } else {
-        const stage = stages.find((s) => s.id === this.currentStageId);
-        if (stage) {
-          content.appendChild(
-            renderStageDetail(stage, (id) => this.navigateStage(id))
-          );
-        } else {
-          content.appendChild(
-            renderHomeView((id) => this.navigateStage(id))
-          );
-        }
-      }
-    }
-
+    content.id = 'main-content';
+    content.tabIndex = -1;
     body.appendChild(content);
     app.appendChild(body);
+    return content;
+  }
+
+  private updateSidebarSelection(): void {
+    document.querySelectorAll<HTMLElement>('[data-nav-target]').forEach((item) => {
+      const isActive = item.dataset.navTarget === this.currentStageId;
+      item.classList.toggle('active', isActive);
+      item.setAttribute('aria-current', isActive ? 'page' : 'false');
+    });
+  }
+
+  private renderDocumentContent(content: HTMLElement): void {
+    if (this.docMode === 'deepdive') {
+      content.replaceChildren(renderDeepDiveDocView(
+        this.currentStageId,
+        this.deepDivePlatform,
+        (stageId) => this.navigateStage(stageId),
+      ));
+    } else if (this.currentStageId === 'home' || this.currentStageId === 'all') {
+      content.replaceChildren(renderHomeView((id) => this.navigateStage(id)));
+    } else {
+      const stage = stages.find((candidate) => candidate.id === this.currentStageId);
+      content.replaceChildren(stage
+        ? renderStageDetail(stage, (id) => this.navigateStage(id))
+        : renderHomeView((id) => this.navigateStage(id)));
+    }
+  }
+
+  private async render(shouldFocusContent = false): Promise<void> {
+    const app = document.getElementById('app');
+    if (!app) return;
+    const version = ++this.renderVersion;
+
+    if (this.is3DMode) {
+      this.documentShellKey = '';
+      this.disposeActive3D();
+      app.replaceChildren(this.createAtmosphere());
+
+      const loading = document.createElement('p');
+      loading.className = 'view-loading';
+      loading.textContent = '正在加载 3D 认知星云…';
+      app.appendChild(loading);
+
+      try {
+        const { renderNeuralConstellationView } = await import('./visuals/macro/NeuralConstellationView');
+        if (version !== this.renderVersion || !this.is3DMode) return;
+
+        const view = renderNeuralConstellationView(
+          (mode) => this.toggle3DDoc(mode),
+          this.docMode,
+          this.deepDivePlatform,
+          (platform) => this.switchPlatform(platform),
+        );
+        loading.remove();
+        app.appendChild(view.element);
+        this.dispose3DView = view.dispose;
+      } catch (error) {
+        if (version !== this.renderVersion || !this.is3DMode) return;
+        console.error('Unable to initialize 3D view', error);
+        loading.className = 'view-loading view-error';
+        loading.innerHTML = `
+          <strong>${i18n.t('view3d.unavailable')}</strong>
+          <span>${i18n.t('view3d.unavailable_desc')}</span>
+          <button class="btn btn-primary" type="button">${i18n.t('view3d.return_doc')}</button>
+        `;
+        loading.querySelector('button')?.addEventListener('click', () => this.toggle3DDoc('doc'));
+      }
+      return;
+    }
+
+    this.disposeActive3D();
+    const shellKey = `${this.docMode}:${this.deepDivePlatform}`;
+    let content = document.getElementById('main-content');
+    if (this.documentShellKey !== shellKey || !(content instanceof HTMLElement)) {
+      content = this.createDocumentShell(app);
+      this.documentShellKey = shellKey;
+    } else {
+      this.updateSidebarSelection();
+    }
+
+    this.renderDocumentContent(content);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (shouldFocusContent) content.focus({ preventScroll: true });
   }
 }
 
-// Start App
 new AppController();

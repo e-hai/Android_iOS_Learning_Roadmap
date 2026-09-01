@@ -264,18 +264,18 @@ function renderSingleChapterView(
 
   let prevBtnHtml = '<div></div>';
   if (prevChapter) {
-    prevBtnHtml = `<button class="btn btn-secondary btn-sm" id="btn-prev-chap">← 上一节: ${prevChapter.tag} · ${truncateText(prevChapter.title, 14)}</button>`;
+    prevBtnHtml = `<button class="btn btn-secondary btn-sm" id="btn-prev-chap">← ${i18n.t('deepdive.prev_chapter')}：${prevChapter.tag} · ${truncateText(prevChapter.title, 14)}</button>`;
   } else if (prevDomain) {
-    prevBtnHtml = `<button class="btn btn-secondary btn-sm" id="btn-prev-chap">← 上一领域: ${i18n.t(prevDomain.titleKey)}</button>`;
+    prevBtnHtml = `<button class="btn btn-secondary btn-sm" id="btn-prev-chap">← ${i18n.t('deepdive.prev_domain')}：${i18n.t(prevDomain.titleKey)}</button>`;
   }
 
   let nextBtnHtml = '<div></div>';
   if (nextChapter) {
-    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-next-chap">下一节: ${nextChapter.tag} · ${truncateText(nextChapter.title, 14)} →</button>`;
+    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-next-chap">${i18n.t('deepdive.next_chapter')}：${nextChapter.tag} · ${truncateText(nextChapter.title, 14)} →</button>`;
   } else if (nextDomain) {
-    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-next-chap">下一领域: ${i18n.t(nextDomain.titleKey)} →</button>`;
+    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-next-chap">${i18n.t('deepdive.next_domain')}：${i18n.t(nextDomain.titleKey)} →</button>`;
   } else {
-    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-finish-all">🎉 完成全部领域学习 ➔</button>`;
+    nextBtnHtml = `<button class="btn btn-primary btn-sm" id="btn-finish-all">🎉 ${i18n.t('deepdive.finish')} ➔</button>`;
   }
 
   navFooter.innerHTML = `
@@ -372,9 +372,10 @@ function renderPlatformOverview(
     modulesGrid.className = 'portal-compact-grid';
 
     modules.forEach((mod, mIdx) => {
-      const card = document.createElement('div');
+      const card = document.createElement('button');
+      card.type = 'button';
       card.className = 'portal-compact-card';
-      card.style.cursor = 'pointer';
+      card.setAttribute('aria-label', `${mod.title}，${mod.tag}，研读章节`);
 
       card.innerHTML = `
         <div class="compact-card-header">

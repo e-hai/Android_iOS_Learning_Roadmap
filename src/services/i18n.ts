@@ -3,10 +3,6 @@ import { zhHans } from '../data/locales/zh-Hans';
 class I18nService {
   private dictionary: Record<string, string> = zhHans;
 
-  getLanguage(): string {
-    return 'zh-Hans';
-  }
-
   t(key: string, ...args: (string | number)[]): string {
     let val = this.dictionary[key] || key;
 

@@ -13,7 +13,7 @@ export function renderComparisonTable(
   const hasNotes = showNote && rows.some((r) => !!r.note);
 
   const resolveText = (text: string) => {
-    if (text.startsWith('row.cell.') || text.startsWith('row.note.') || text.startsWith('cheat.')) {
+    if (text.startsWith('row.note.') || text.startsWith('cheat.')) {
       return i18n.t(text);
     }
     return text;
@@ -21,19 +21,23 @@ export function renderComparisonTable(
 
   const table = document.createElement('table');
   table.className = 'comparison-table';
+  const caption = document.createElement('caption');
+  caption.className = 'sr-only';
+  caption.textContent = `${androidHeader} 与 ${iosHeader} 概念对照`;
+  table.appendChild(caption);
 
   const thead = document.createElement('thead');
   thead.innerHTML = `
     <tr>
-      <th class="th-android">
+      <th class="th-android" scope="col">
         <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--color-android);margin-right:6px;"></span>
         ${androidHeader}
       </th>
-      <th class="th-ios">
+      <th class="th-ios" scope="col">
         <span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--color-ios);margin-right:6px;"></span>
         ${iosHeader}
       </th>
-      ${hasNotes ? `<th class="th-note">${i18n.t('table.note')}</th>` : ''}
+      ${hasNotes ? `<th class="th-note" scope="col">${i18n.t('table.note')}</th>` : ''}
     </tr>
   `;
   table.appendChild(thead);

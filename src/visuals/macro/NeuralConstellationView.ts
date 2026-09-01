@@ -25,24 +25,33 @@ interface PalaceNode {
   pos: THREE.Vector3;
 }
 
+export interface NeuralConstellationView {
+  element: HTMLElement;
+  dispose: () => void;
+}
+
 export function renderNeuralConstellationView(
   onSwitchViewMode: (mode: '3d' | 'doc') => void,
   knowledgeMode: 'roadmap' | 'deepdive' = 'roadmap',
   deepDivePlatform: 'android' | 'ios' = 'android',
   onSwitchPlatform?: (platform: 'android' | 'ios') => void
-): HTMLElement {
+): NeuralConstellationView {
+  const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const container = document.createElement('div');
   container.className = 'constellation-view-container';
 
   // 1. Canvas Wrap
   const canvasWrap = document.createElement('div');
   canvasWrap.className = 'constellation-canvas-wrap';
+  canvasWrap.tabIndex = 0;
+  canvasWrap.setAttribute('role', 'application');
+  canvasWrap.setAttribute('aria-label', '3D 认知星云。可拖动旋转、滚轮缩放；完整内容也可在文档模式中访问。');
   container.appendChild(canvasWrap);
 
   const sceneManager = new ThreeSceneManager(canvasWrap, {
     cameraPos: [0, 16, 32],
     fov: 45,
-    autoRotate: true,
+    autoRotate: !prefersReducedMotion,
   });
 
   const { scene, camera } = sceneManager;
@@ -383,6 +392,12 @@ export function renderNeuralConstellationView(
 
     <!-- Right: 3D Tools & Theme -->
     <div class="top-bar-right">
+      <label class="constellation-node-picker">
+        <span class="sr-only">选择知识节点</span>
+        <select id="constellation-node-select" aria-label="选择知识节点">
+          <option value="">键盘选择知识节点</option>
+        </select>
+      </label>
       <button class="tool-pill-btn active" id="btn-toggle-spin" title="切换 3D 星系自转">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
         <span>3D 旋转</span>
@@ -398,6 +413,13 @@ export function renderNeuralConstellationView(
     </div>
   `;
   container.appendChild(topBar);
+  const nodeSelect = topBar.querySelector<HTMLSelectElement>('#constellation-node-select');
+  allNodes.forEach((node, index) => {
+    const option = document.createElement('option');
+    option.value = String(index);
+    option.textContent = `${node.stageTitle} · ${node.title}`;
+    nodeSelect?.appendChild(option);
+  });
 
   // 4. Legend HUD in bottom-left
   const legend = document.createElement('div');
@@ -422,6 +444,9 @@ export function renderNeuralConstellationView(
   // 6. Holographic Detail Lens (Bottom-right focus HUD)
   const hudLens = document.createElement('div');
   hudLens.className = 'palace-hud-lens';
+  hudLens.setAttribute('role', 'region');
+  hudLens.setAttribute('aria-live', 'polite');
+  hudLens.setAttribute('aria-label', '知识节点详情');
   container.appendChild(hudLens);
 
   // 7. Raycasting & Interaction
@@ -467,6 +492,15 @@ export function renderNeuralConstellationView(
         hoverTooltip.classList.remove('visible');
       }
     }
+  };
+
+  const onMouseLeave = () => {
+    if (hoveredNode) {
+      gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+      hoveredNode = null;
+    }
+    document.body.style.cursor = '';
+    hoverTooltip.classList.remove('visible');
   };
 
   const showHudDetail = (node: PalaceNode) => {
@@ -685,8 +719,16 @@ export function renderNeuralConstellationView(
     }
   };
 
+  const onNodeSelect = () => {
+    if (!nodeSelect?.value) return;
+    const node = allNodes[Number(nodeSelect.value)];
+    if (node) flyToNode(node);
+  };
+
   canvasWrap.addEventListener('mousemove', onMouseMove);
+  canvasWrap.addEventListener('mouseleave', onMouseLeave);
   canvasWrap.addEventListener('click', onClick);
+  nodeSelect?.addEventListener('change', onNodeSelect);
 
   // 8. Top Bar Event Listeners
   topBar.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
@@ -701,14 +743,17 @@ export function renderNeuralConstellationView(
   });
 
   // Spin, Reset, and Theme Controls
-  let isSpinning = true;
+  let isSpinning = !prefersReducedMotion;
   const spinBtn = topBar.querySelector('#btn-toggle-spin');
+  spinBtn?.classList.toggle('active', isSpinning);
+  spinBtn?.setAttribute('aria-pressed', String(isSpinning));
   spinBtn?.addEventListener('click', () => {
     isSpinning = !isSpinning;
     if (sceneManager.controls) {
       sceneManager.controls.autoRotate = isSpinning;
     }
     spinBtn.classList.toggle('active', isSpinning);
+    spinBtn.setAttribute('aria-pressed', String(isSpinning));
   });
 
   topBar.querySelector('#btn-reset-cam')?.addEventListener('click', () => {
@@ -726,16 +771,18 @@ export function renderNeuralConstellationView(
 
   // 9. Synchronized 3D Animation & Real-Time Star Core Tooltip Tracking
   sceneManager.onTickCallback = (_delta, time) => {
-    // Subtle star rotation
-    stars.rotation.y += 0.00015;
+    if (!prefersReducedMotion) {
+      // Subtle star rotation
+      stars.rotation.y += 0.00015;
 
-    // Gentle Node Floating & Halo Rotation
-    allNodes.forEach((n, idx) => {
-      if (n.haloMesh) {
-        n.haloMesh.rotation.z += 0.005;
-      }
-      n.mesh.position.y = n.pos.y + Math.sin(time * 1.5 + idx) * 0.03;
-    });
+      // Gentle Node Floating & Halo Rotation
+      allNodes.forEach((n, idx) => {
+        if (n.haloMesh) {
+          n.haloMesh.rotation.z += 0.005;
+        }
+        n.mesh.position.y = n.pos.y + Math.sin(time * 1.5 + idx) * 0.03;
+      });
+    }
 
     // Real-Time Tooltip Anchor Tracking (Directly above the hovered 3D star core)
     if (hoveredNode) {
@@ -758,7 +805,20 @@ export function renderNeuralConstellationView(
     }
   };
 
-  return container;
+  return {
+    element: container,
+    dispose: () => {
+      gsap.killTweensOf(camera.position);
+      allNodes.forEach((node) => gsap.killTweensOf(node.mesh.scale));
+      canvasWrap.removeEventListener('mousemove', onMouseMove);
+      canvasWrap.removeEventListener('mouseleave', onMouseLeave);
+      canvasWrap.removeEventListener('click', onClick);
+      nodeSelect?.removeEventListener('change', onNodeSelect);
+      document.body.style.cursor = '';
+      sceneManager.onTickCallback = undefined;
+      sceneManager.dispose();
+    },
+  };
 }
 
 function escapeHtml(text: string): string {

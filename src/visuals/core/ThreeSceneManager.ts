@@ -149,17 +149,20 @@ export class ThreeSceneManager {
 
     // Traverse and dispose geometries and materials
     this.scene.traverse((object) => {
-      if (object instanceof THREE.Mesh) {
-        object.geometry?.dispose();
-        if (Array.isArray(object.material)) {
-          object.material.forEach((m) => m.dispose());
+      const renderable = object as THREE.Mesh;
+      renderable.geometry?.dispose();
+      if (renderable.material) {
+        if (Array.isArray(renderable.material)) {
+          renderable.material.forEach((material) => material.dispose());
         } else {
-          object.material?.dispose();
+          renderable.material.dispose();
         }
       }
     });
 
+    this.scene.clear();
     this.renderer.dispose();
+    this.renderer.forceContextLoss();
     if (this.renderer.domElement && this.renderer.domElement.parentNode) {
       this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
     }

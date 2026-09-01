@@ -61,7 +61,6 @@ export interface LearningStage {
   rows: ComparisonRow[];
   sections?: ComparisonSection[];
   extraHintKey?: string;
-  deepDive?: PlatformDeepDive;
 }
 
 export interface DeepDiveDomain {
@@ -71,7 +70,5 @@ export interface DeepDiveDomain {
   descKey: string;
   deepDive: PlatformDeepDive;
 }
-
-export type Language = 'zh-Hans' | 'en';
 
 export type NavigationTarget = 'home' | string; // 'home' or stage id
