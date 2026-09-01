@@ -7,14 +7,21 @@
   height: 100vh;
   height: 100dvh;
   padding-bottom: env(safe-area-inset-bottom);
-  background: radial-gradient(circle at 50% 50%, #0c1527 0%, #050811 100%);
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 42%, rgba(45, 212, 191, 0.16) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 45% at 18% 78%, rgba(56, 189, 248, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 40% at 82% 22%, rgba(167, 139, 250, 0.1) 0%, transparent 48%),
+    radial-gradient(circle at 50% 50%, #0c1527 0%, #050811 100%);
   overflow: hidden;
   display: flex;
   z-index: 50;
 }
 
 [data-theme="light"] .constellation-view-container {
-  background: radial-gradient(circle at 50% 50%, #f1f5f9 0%, #e2e8f0 100%);
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 42%, rgba(13, 148, 136, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 45% at 18% 78%, rgba(14, 165, 233, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, #f1f5f9 0%, #e2e8f0 100%);
 }
 
 .constellation-canvas-wrap {
@@ -102,52 +109,12 @@
   letter-spacing: 0.5px;
 }
 
-/* Center Tools: Palace Search & Filter Pills */
+/* Center Tools: Filter Pills */
 .top-bar-center {
   pointer-events: auto;
   display: flex;
   align-items: center;
   gap: 10px;
-}
-
-.palace-search-box {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.palace-search-input {
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: var(--radius-full);
-  padding: 6px 14px 6px 34px;
-  color: #fff;
-  font-size: 12.5px;
-  width: 220px;
-  outline: none;
-  transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
-}
-
-[data-theme="light"] .palace-search-input {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: var(--color-border);
-  color: var(--color-ink);
-}
-
-.palace-search-input:focus {
-  width: 270px;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 12px var(--color-accent-ring);
-}
-
-.palace-search-icon {
-  position: absolute;
-  left: 12px;
-  color: var(--color-ink-muted);
-  pointer-events: none;
 }
 
 .constellation-filter-tabs {
@@ -493,6 +460,92 @@
   box-shadow: 0 0 6px #fbbf24;
 }
 
+
+.palace-legend-hud .legend-guide {
+  max-width: 220px;
+  margin-bottom: 4px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  color: #cbd5e1;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+[data-theme="light"] .palace-legend-hud .legend-guide {
+  border-bottom-color: var(--color-border);
+  color: var(--color-ink);
+}
+
+.palace-guide-tip {
+  position: absolute;
+  top: 78px;
+  left: 50%;
+  z-index: 28;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 10px 16px;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(8, 15, 30, 0.78);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35), 0 0 24px rgba(45, 212, 191, 0.12);
+  color: #e2e8f0;
+  text-align: center;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transform: translate(-50%, -8px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 420ms ease, transform 420ms ease;
+}
+
+.palace-guide-tip.is-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.palace-guide-tip.is-fading {
+  opacity: 0;
+  transform: translate(-50%, -6px);
+}
+
+.palace-guide-tip strong {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #5eead4;
+}
+
+.palace-guide-tip span {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #cbd5e1;
+}
+
+[data-theme="light"] .palace-guide-tip {
+  border-color: rgba(13, 148, 136, 0.35);
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--color-ink);
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.12);
+}
+
+[data-theme="light"] .palace-guide-tip strong {
+  color: var(--color-accent);
+}
+
+[data-theme="light"] .palace-guide-tip span {
+  color: var(--color-ink-muted);
+}
+
+@media (max-width: 720px) {
+  .palace-guide-tip {
+    top: auto;
+    bottom: 118px;
+    padding: 8px 12px;
+  }
+}
+
 /* Global View Mode Switcher */
 .view-mode-toggle {
   display: inline-flex;
@@ -546,9 +599,6 @@
   .top-bar-center {
     justify-content: center;
     flex-wrap: wrap;
-  }
-  .palace-search-input {
-    width: 160px;
   }
 }
 

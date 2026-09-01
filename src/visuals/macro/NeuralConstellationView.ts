@@ -9,6 +9,8 @@ import { renderArchitectureDiagram } from '../../components/ArchitectureDiagram'
 interface PalaceNode {
   mesh: THREE.Mesh;
   haloMesh?: THREE.Mesh;
+  glowMesh?: THREE.Mesh;
+  labelSprite?: THREE.Sprite;
   type: 'stage' | 'concept' | 'spark' | 'deepdive';
   stageId: string;
   stageTitle: string;
@@ -47,6 +49,51 @@ function easeOutQuad(t: number): number {
   return 1 - (1 - t) * (1 - t);
 }
 
+
+function createRoomLabelSprite(title: string, accentHex: string, isDark: boolean): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Soft plate — room placard for memory palace navigation
+  const plateW = 480;
+  const plateH = 64;
+  const plateX = (canvas.width - plateW) / 2;
+  const plateY = (canvas.height - plateH) / 2;
+  ctx.fillStyle = isDark ? 'rgba(8, 15, 30, 0.72)' : 'rgba(255, 255, 255, 0.82)';
+  ctx.strokeStyle = accentHex;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (typeof (ctx as any).roundRect === 'function') {
+    (ctx as any).roundRect(plateX, plateY, plateW, plateH, 18);
+  } else {
+    ctx.rect(plateX, plateY, plateW, plateH);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = isDark ? '#e2e8f0' : '#0f172a';
+  ctx.font = '700 36px "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const label = title.length > 14 ? `${title.slice(0, 14)}…` : title;
+  ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+    opacity: 0.92,
+  });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(3.6, 0.9, 1);
+  return sprite;
+}
+
 export function renderNeuralConstellationView(
   onSwitchViewMode: (mode: '3d' | 'doc') => void,
   knowledgeMode: 'roadmap' | 'deepdive' = 'roadmap',
@@ -62,7 +109,7 @@ export function renderNeuralConstellationView(
   canvasWrap.className = 'constellation-canvas-wrap';
   canvasWrap.tabIndex = 0;
   canvasWrap.setAttribute('role', 'application');
-  canvasWrap.setAttribute('aria-label', '3D 认知星云。可拖动旋转、滚轮缩放；完整内容也可在文档模式中访问。');
+  canvasWrap.setAttribute('aria-label', '3D 记忆宫殿星云。可拖动旋转、滚轮缩放；每个主星核是一座知识殿堂，点击进入房间。完整内容也可在文档模式中访问。');
   container.appendChild(canvasWrap);
 
   const sceneManager = new ThreeSceneManager(canvasWrap, {
@@ -120,24 +167,35 @@ export function renderNeuralConstellationView(
   };
 
 
-  // 1. Subtle, Quiet Deep Space Starfield (极简深邃背景)
-  const starCount = 90;
+  // 1. Memory-palace atmosphere: fog + layered starfield
+  const isDarkTheme = sceneManager.theme.isDark;
+  scene.fog = new THREE.FogExp2(isDarkTheme ? 0x070d1a : 0xdbe4f0, isDarkTheme ? 0.016 : 0.011);
+
+  const starCount = 160;
   const starGeom = new THREE.BufferGeometry();
   const starPositions = new Float32Array(starCount * 3);
-
+  const starColors = new Float32Array(starCount * 3);
   for (let i = 0; i < starCount; i++) {
-    starPositions[i * 3] = (Math.random() - 0.5) * 120;
-    starPositions[i * 3 + 1] = (Math.random() - 0.5) * 120;
-    starPositions[i * 3 + 2] = (Math.random() - 0.5) * 120;
+    const radius = 28 + Math.random() * 70;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+    starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta) * 0.55;
+    starPositions[i * 3 + 2] = radius * Math.cos(phi);
+    const tint = 0.72 + Math.random() * 0.28;
+    starColors[i * 3] = tint * (isDarkTheme ? 0.72 : 0.5);
+    starColors[i * 3 + 1] = tint * (isDarkTheme ? 0.86 : 0.68);
+    starColors[i * 3 + 2] = tint;
   }
-
   starGeom.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-
+  starGeom.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
   const starMat = new THREE.PointsMaterial({
-    size: 0.8,
-    color: 0x94a3b8,
+    size: 0.55,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.4,
+    opacity: isDarkTheme ? 0.55 : 0.32,
+    sizeAttenuation: true,
+    depthWrite: false,
   });
   const stars = new THREE.Points(starGeom, starMat);
   scene.add(stars);
@@ -175,6 +233,96 @@ export function renderNeuralConstellationView(
   const matModule = new THREE.MeshBasicMaterial({ color: platformColor });
   const matSpark = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
 
+  // Soft bloom stand-ins (shared) — keep MeshBasic to stay cheap
+  const geoGlowLarge = new THREE.SphereGeometry(1.85, 12, 12);
+  const geoGlow = new THREE.SphereGeometry(1.55, 12, 12);
+  const matGlow = new THREE.MeshBasicMaterial({
+    color: knowledgeMode === 'deepdive' ? platformColor : 0x38bdf8,
+    transparent: true,
+    opacity: isDarkTheme ? 0.16 : 0.12,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const accentCss = '#' + (knowledgeMode === 'deepdive' ? platformColor : 0x38bdf8).toString(16).padStart(6, '0');
+
+  // Central locus — the palace entrance / mental origin
+  const locusCore = new THREE.Mesh(
+    new THREE.OctahedronGeometry(0.55, 0),
+    new THREE.MeshBasicMaterial({ color: knowledgeMode === 'deepdive' ? platformColor : 0x5eead4 }),
+  );
+  palaceGroup.add(locusCore);
+  const locusGlow = new THREE.Mesh(
+    new THREE.SphereGeometry(1.2, 12, 12),
+    new THREE.MeshBasicMaterial({
+      color: knowledgeMode === 'deepdive' ? platformColor : 0x2dd4bf,
+      transparent: true,
+      opacity: isDarkTheme ? 0.18 : 0.12,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    }),
+  );
+  palaceGroup.add(locusGlow);
+
+  // Orbit ring — suggests walking a palace corridor in a circle
+  const orbitRing = new THREE.Mesh(
+    new THREE.RingGeometry(
+      knowledgeMode === 'deepdive' ? 9.4 : 12.4,
+      knowledgeMode === 'deepdive' ? 10.6 : 13.6,
+      64,
+    ),
+    new THREE.MeshBasicMaterial({
+      color: knowledgeMode === 'deepdive' ? platformColor : 0x38bdf8,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: isDarkTheme ? 0.14 : 0.1,
+      depthWrite: false,
+    }),
+  );
+  orbitRing.rotation.x = -Math.PI / 2;
+  orbitRing.position.y = -2.4;
+  palaceGroup.add(orbitRing);
+
+  // Soft dust motes near the palace plane
+  const dustCount = 40;
+  const dustGeom = new THREE.BufferGeometry();
+  const dustPos = new Float32Array(dustCount * 3);
+  for (let i = 0; i < dustCount; i++) {
+    dustPos[i * 3] = (Math.random() - 0.5) * 42;
+    dustPos[i * 3 + 1] = (Math.random() - 0.5) * 14;
+    dustPos[i * 3 + 2] = (Math.random() - 0.5) * 42;
+  }
+  dustGeom.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+  const dust = new THREE.Points(
+    dustGeom,
+    new THREE.PointsMaterial({
+      size: 3.8,
+      color: knowledgeMode === 'deepdive' ? platformColor : 0x38bdf8,
+      transparent: true,
+      opacity: isDarkTheme ? 0.07 : 0.045,
+      depthWrite: false,
+      sizeAttenuation: true,
+    }),
+  );
+  scene.add(dust);
+
+  const decorateStageRoom = (
+    _hubMesh: THREE.Mesh,
+    _haloMesh: THREE.Mesh,
+    hubPos: THREE.Vector3,
+    roomTitle: string,
+    large: boolean,
+  ) => {
+    const glowMesh = new THREE.Mesh(large ? geoGlowLarge : geoGlow, matGlow);
+    glowMesh.position.copy(hubPos);
+    palaceGroup.add(glowMesh);
+
+    const labelSprite = createRoomLabelSprite(roomTitle, accentCss, isDarkTheme);
+    labelSprite.position.set(hubPos.x, hubPos.y + (large ? 2.15 : 1.9), hubPos.z);
+    palaceGroup.add(labelSprite);
+
+    return { glowMesh, labelSprite };
+  };
+
   if (knowledgeMode === 'deepdive') {
     // 5 Industrial Domains in Deep Dive Mode
     deepDiveDomains.forEach((domain, sIdx) => {
@@ -198,15 +346,19 @@ export function renderNeuralConstellationView(
       haloMesh.rotation.x = Math.PI / 2;
       palaceGroup.add(haloMesh);
 
+      const room = decorateStageRoom(hubMesh, haloMesh, hubPos, domainTitle, true);
+
       allNodes.push({
         mesh: hubMesh,
         haloMesh,
+        glowMesh: room.glowMesh,
+        labelSprite: room.labelSprite,
         type: 'stage',
         stageId: domain.id,
         stageTitle: domainTitle,
         isAdv: false,
-        title: `${domainTitle} · ${platformName} 进阶`,
-        subtitle: `领域 ${String(domain.number).padStart(2, '0')} 星核`,
+        title: `${domainTitle} · ${platformName} 殿堂`,
+        subtitle: `记忆殿堂 ${String(domain.number).padStart(2, '0')}`,
         pos: hubPos,
       });
 
@@ -269,15 +421,19 @@ export function renderNeuralConstellationView(
       haloMesh.rotation.x = Math.PI / 2;
       palaceGroup.add(haloMesh);
 
+      const room = decorateStageRoom(hubMesh, haloMesh, hubPos, stageTitle, false);
+
       allNodes.push({
         mesh: hubMesh,
         haloMesh,
+        glowMesh: room.glowMesh,
+        labelSprite: room.labelSprite,
         type: 'stage',
         stageId: stage.id,
         stageTitle,
         isAdv: false,
-        title: `${stageTitle} · 双端星核`,
-        subtitle: `阶段 ${String(stage.number).padStart(2, '0')} 星核`,
+        title: `${stageTitle} · 双端殿堂`,
+        subtitle: `记忆殿堂 ${String(stage.number).padStart(2, '0')}`,
         pos: hubPos,
       });
 
@@ -402,7 +558,7 @@ export function renderNeuralConstellationView(
       <div class="constellation-title-group">
         <div class="constellation-brand-badge" style="${isDeepDive ? (deepDivePlatform === 'android' ? 'border-color:#10b981;color:#10b981;' : 'border-color:#0ea5e9;color:#0ea5e9;') : ''}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
-          <span>${isDeepDive ? `单端深度进阶 · ${platformName} 3D 星云` : 'Android ⟷ iOS 3D 认知星云'}</span>
+          <span>${isDeepDive ? `记忆宫殿 · ${platformName} 深度殿堂` : '记忆宫殿 · Android ⟷ iOS 认知星云'}</span>
         </div>
       </div>
 
@@ -449,20 +605,35 @@ export function renderNeuralConstellationView(
     nodeSelect?.appendChild(option);
   });
 
-  // 4. Legend HUD in bottom-left
+  // 4. Legend HUD + memory-palace guide in bottom-left
   const legend = document.createElement('div');
   legend.className = 'palace-legend-hud';
   legend.innerHTML = `
+    <div class="legend-guide">把每个主星核当作一座房间：先记住位置，再点开装知识。</div>
     <div class="legend-item">
       <span class="legend-dot" style="background:${isDeepDive ? (deepDivePlatform === 'android' ? '#10b981' : '#0ea5e9') : '#0d9488'};box-shadow:0 0 6px ${isDeepDive ? (deepDivePlatform === 'android' ? '#10b981' : '#0ea5e9') : '#0d9488'};"></span>
-      <span>${isDeepDive ? `${platformName} 阶段星核` : '阶段对照星核'}</span>
+      <span>${isDeepDive ? `${platformName} 殿堂主星核` : '殿堂主星核（房间）'}</span>
     </div>
     <div class="legend-item">
       <span class="legend-dot" style="background:${isDeepDive ? (deepDivePlatform === 'android' ? '#34d399' : '#38bdf8') : '#38bdf8'};"></span>
-      <span>${isDeepDive ? '底层机制 / 性能调优专题' : '核心语法对标突触'}</span>
+      <span>${isDeepDive ? '房间内专题展柜' : '房间内概念展柜'}</span>
+    </div>
+    <div class="legend-item">
+      <span class="legend-dot" style="background:#f59e0b;box-shadow:0 0 6px #f59e0b;"></span>
+      <span>${isDeepDive ? '关键路径 / 避坑灯标' : '避坑灯标（金色）'}</span>
     </div>
   `;
   container.appendChild(legend);
+
+  const guideTip = document.createElement('div');
+  guideTip.className = 'palace-guide-tip';
+  guideTip.innerHTML = `
+    <strong>记忆宫殿用法</strong>
+    <span>中心是入口 · 圆环是回廊 · 主星核是房间 · 点击房间开始存放对照知识</span>
+  `;
+  container.appendChild(guideTip);
+  window.setTimeout(() => guideTip.classList.add('is-visible'), 80);
+  window.setTimeout(() => guideTip.classList.add('is-fading'), prefersReducedMotion ? 1200 : 5200);
 
   // 5. Floating Hover Tooltip (Anchored above hovered star core in 3D space)
   const hoverTooltip = document.createElement('div');
@@ -799,16 +970,29 @@ export function renderNeuralConstellationView(
   sceneManager.onTickCallback = (delta, time) => {
     updateTweens(delta);
     if (!prefersReducedMotion) {
-      // Subtle star rotation
-      stars.rotation.y += 0.00015;
+      // Subtle star / dust drift
+      stars.rotation.y += 0.00012;
+      dust.rotation.y -= 0.00008;
+      locusCore.rotation.y += 0.004;
+      locusGlow.scale.setScalar(1 + Math.sin(time * 1.4) * 0.08);
 
-      // Gentle Node Floating & Halo Rotation
+      // Gentle room floating, halo spin, glow pulse
       allNodes.forEach((n, idx) => {
         if (n.type !== 'stage') return;
+        const bob = Math.sin(time * 1.15 + idx) * 0.03;
+        n.mesh.position.y = n.pos.y + bob;
         if (n.haloMesh) {
+          n.haloMesh.position.y = n.pos.y + bob;
           n.haloMesh.rotation.z += 0.004;
         }
-        n.mesh.position.y = n.pos.y + Math.sin(time * 1.2 + idx) * 0.025;
+        if (n.glowMesh) {
+          n.glowMesh.position.y = n.pos.y + bob;
+          const pulse = 1 + Math.sin(time * 1.6 + idx * 0.7) * 0.08;
+          n.glowMesh.scale.setScalar(pulse);
+        }
+        if (n.labelSprite) {
+          n.labelSprite.position.y = n.pos.y + bob + 2.0;
+        }
       });
     }
 

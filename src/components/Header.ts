@@ -8,8 +8,7 @@ export function renderHeader(
   docMode: 'roadmap' | 'deepdive' = 'roadmap',
   deepDivePlatform: 'android' | 'ios' = 'android',
   onToggle3DDoc?: (mode: '3d' | 'doc') => void,
-  onTogglePlatform?: (platform: 'android' | 'ios') => void,
-  onOpenSearch?: () => void
+  onTogglePlatform?: (platform: 'android' | 'ios') => void
 ): HTMLElement {
   const header = document.createElement('header');
   header.className = 'app-header';
@@ -56,10 +55,6 @@ export function renderHeader(
     </div>
 
     <div class="header-right">
-      <button class="header-search-btn" id="btn-open-search" aria-label="${i18n.t('web.open_search')}" title="${i18n.t('web.open_search')}">
-        <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <span>${i18n.t('header.search')}</span><kbd>⌘K</kbd>
-      </button>
       <!-- 3D Constellation vs Document Switcher -->
       <div class="view-mode-toggle" role="group" aria-label="${i18n.t('header.view_mode')}">
         <button class="view-mode-btn ${is3DMode ? 'active' : ''}" id="btn-mode-3d" title="${i18n.t('header.switch_3d')}" aria-pressed="${is3DMode}">
@@ -104,9 +99,6 @@ export function renderHeader(
   btn3d?.addEventListener('focus', () => void preload3DConstellation(), { once: true });
   header.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
     if (onToggle3DDoc) onToggle3DDoc('doc');
-  });
-  header.querySelector('#btn-open-search')?.addEventListener('click', () => {
-    onOpenSearch?.();
   });
 
   const themeBtn = header.querySelector('#btn-theme-toggle') as HTMLButtonElement;

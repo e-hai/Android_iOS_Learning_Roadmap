@@ -5,7 +5,6 @@ import './styles/visuals.css';
 
 import { renderHeader } from './components/Header';
 import { renderHomeView } from './components/HomeView';
-import { openSearchDialog, SearchTarget } from './components/SearchDialog';
 import { renderSidebar } from './components/Sidebar';
 import { renderStageDetail } from './components/StageDetailView';
 import { renderDeepDiveDocView } from './components/DeepDiveDocView';
@@ -97,10 +96,7 @@ class AppController {
 
   private initGlobalShortcuts(): void {
     window.addEventListener('keydown', (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        this.openSearch();
-      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
         event.preventDefault();
         this.toggleSidebar();
       } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
@@ -159,23 +155,6 @@ class AppController {
     this.updateHash();
   }
 
-  private openSearch(): void {
-    openSearchDialog((target) => this.navigateSearchResult(target));
-  }
-
-  private navigateSearchResult(target: SearchTarget): void {
-    this.is3DMode = false;
-    this.docMode = target.mode;
-    this.currentStageId = target.targetId;
-    if (target.platform) {
-      this.deepDivePlatform = target.platform;
-      localStorage.setItem('learning_deepdive_platform', target.platform);
-    }
-    localStorage.setItem('learning_cockpit_doc_mode', target.mode);
-    localStorage.setItem('learning_cockpit_view_mode', 'doc');
-    this.updateHash();
-  }
-
   private toggleSidebar(): void {
     if (window.innerWidth <= 960) {
       this.sidebarOpen = !this.sidebarOpen;
@@ -229,7 +208,6 @@ class AppController {
       this.deepDivePlatform,
       (mode) => this.toggle3DDoc(mode),
       (platform) => this.switchPlatform(platform),
-      () => this.openSearch(),
     );
     header.querySelector('#btn-sidebar-toggle')?.setAttribute(
       'aria-expanded',
