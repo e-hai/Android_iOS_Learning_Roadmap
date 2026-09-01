@@ -28,6 +28,9 @@ interface PalaceNode {
 
 export interface NeuralConstellationView {
   element: HTMLElement;
+  knowledgeKey: string;
+  pause: () => void;
+  resume: () => void;
   dispose: () => void;
 }
 
@@ -632,8 +635,17 @@ export function renderNeuralConstellationView(
     <span>中心是入口 · 圆环是回廊 · 主星核是房间 · 点击房间开始存放对照知识</span>
   `;
   container.appendChild(guideTip);
-  window.setTimeout(() => guideTip.classList.add('is-visible'), 80);
-  window.setTimeout(() => guideTip.classList.add('is-fading'), prefersReducedMotion ? 1200 : 5200);
+  const pendingTimers: number[] = [];
+  const later = (fn: () => void, ms: number) => {
+    const id = window.setTimeout(() => {
+      const index = pendingTimers.indexOf(id);
+      if (index >= 0) pendingTimers.splice(index, 1);
+      fn();
+    }, ms);
+    pendingTimers.push(id);
+  };
+  later(() => guideTip.classList.add('is-visible'), 80);
+  later(() => guideTip.classList.add('is-fading'), prefersReducedMotion ? 1200 : 5200);
 
   // 5. Floating Hover Tooltip (Anchored above hovered star core in 3D space)
   const hoverTooltip = document.createElement('div');
@@ -958,12 +970,40 @@ export function renderNeuralConstellationView(
     sceneManager.resetCamera([0, 16, 32], [0, 0, 0]);
   });
 
+  const applyAtmosphereTheme = () => {
+    sceneManager.refreshTheme();
+    const dark = sceneManager.theme.isDark;
+    scene.fog = new THREE.FogExp2(dark ? 0x070d1a : 0xdbe4f0, dark ? 0.016 : 0.011);
+    starMat.opacity = dark ? 0.55 : 0.32;
+    const dustMat = dust.material as THREE.PointsMaterial;
+    dustMat.opacity = dark ? 0.07 : 0.045;
+    matGlow.opacity = dark ? 0.16 : 0.12;
+    const locusGlowMat = locusGlow.material as THREE.MeshBasicMaterial;
+    locusGlowMat.opacity = dark ? 0.18 : 0.12;
+  };
+
+  const pauseView = () => {
+    pendingTimers.forEach((id) => window.clearTimeout(id));
+    pendingTimers.length = 0;
+    hoveredNode = null;
+    hoverTooltip.classList.remove('visible');
+    hudLens.classList.remove('active');
+    document.body.style.cursor = '';
+    sceneManager.pause();
+  };
+
+  const resumeView = () => {
+    applyAtmosphereTheme();
+    sceneManager.resume();
+  };
+
   const themeBtn = topBar.querySelector('#btn-theme-toggle') as HTMLButtonElement;
   themeBtn.addEventListener('click', () => {
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const nextTheme = isDark ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', nextTheme);
     localStorage.setItem('learning_cockpit_theme', nextTheme);
+    applyAtmosphereTheme();
   });
 
   // 9. Synchronized 3D Animation & Real-Time Star Core Tooltip Tracking
@@ -1019,14 +1059,17 @@ export function renderNeuralConstellationView(
 
   return {
     element: container,
+    knowledgeKey: `${knowledgeMode}:${deepDivePlatform}`,
+    pause: pauseView,
+    resume: resumeView,
     dispose: () => {
+      pauseView();
       killTweensOf(camera.position);
       allNodes.forEach((node) => killTweensOf(node.mesh.scale));
       canvasWrap.removeEventListener('mousemove', onMouseMove);
       canvasWrap.removeEventListener('mouseleave', onMouseLeave);
       canvasWrap.removeEventListener('click', onClick);
       nodeSelect?.removeEventListener('change', onNodeSelect);
-      document.body.style.cursor = '';
       sceneManager.onTickCallback = undefined;
       sceneManager.dispose();
     },

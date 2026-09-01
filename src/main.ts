@@ -15,6 +15,14 @@ import { preload3DConstellation } from './visuals/preload3d';
 type DocMode = 'roadmap' | 'deepdive';
 type Platform = 'android' | 'ios';
 
+interface ParkedConstellation {
+  element: HTMLElement;
+  knowledgeKey: string;
+  pause: () => void;
+  resume: () => void;
+  dispose: () => void;
+}
+
 class AppController {
   private is3DMode = false;
   private docMode: DocMode = 'roadmap';
@@ -24,7 +32,7 @@ class AppController {
   private desktopSidebarCollapsed = false;
   private documentShellKey = '';
   private renderVersion = 0;
-  private dispose3DView: (() => void) | null = null;
+  private parked3D: ParkedConstellation | null = null;
 
   constructor() {
     this.desktopSidebarCollapsed = localStorage.getItem('learning_sidebar_collapsed') === 'true';
@@ -185,13 +193,24 @@ class AppController {
     return background;
   }
 
-  private disposeActive3D(): void {
-    this.dispose3DView?.();
-    this.dispose3DView = null;
+  private constellationKey(): string {
+    return `${this.docMode}:${this.deepDivePlatform}`;
+  }
+
+  /** Pause WebGL and detach the 3D view without destroying the GPU context. */
+  private park3D(): void {
+    if (!this.parked3D) return;
+    this.parked3D.pause();
+    this.parked3D.element.remove();
+  }
+
+  private disposeParked3D(): void {
+    this.parked3D?.dispose();
+    this.parked3D = null;
   }
 
   private createDocumentShell(app: HTMLElement): HTMLElement {
-    this.disposeActive3D();
+    this.park3D();
     app.replaceChildren(this.createAtmosphere());
 
     const skipLink = document.createElement('a');
@@ -272,8 +291,23 @@ class AppController {
     const version = ++this.renderVersion;
 
     if (this.is3DMode) {
+      const key = this.constellationKey();
+      if (this.parked3D?.knowledgeKey === key && this.parked3D.element.isConnected) {
+        return;
+      }
+
+      this.park3D();
+
+      if (this.parked3D && this.parked3D.knowledgeKey === key) {
+        this.documentShellKey = '';
+        app.replaceChildren(this.createAtmosphere());
+        app.appendChild(this.parked3D.element);
+        this.parked3D.resume();
+        return;
+      }
+
+      this.disposeParked3D();
       this.documentShellKey = '';
-      this.disposeActive3D();
       app.replaceChildren(this.createAtmosphere());
 
       const loading = document.createElement('p');
@@ -291,9 +325,13 @@ class AppController {
           this.deepDivePlatform,
           (platform) => this.switchPlatform(platform),
         );
+        if (version !== this.renderVersion || !this.is3DMode) {
+          view.dispose();
+          return;
+        }
         loading.remove();
         app.appendChild(view.element);
-        this.dispose3DView = view.dispose;
+        this.parked3D = view;
       } catch (error) {
         if (version !== this.renderVersion || !this.is3DMode) return;
         console.error('Unable to initialize 3D view', error);
@@ -308,7 +346,7 @@ class AppController {
       return;
     }
 
-    this.disposeActive3D();
+    this.park3D();
     const shellKey = `${this.docMode}:${this.deepDivePlatform}`;
     let content = document.getElementById('main-content');
     if (this.documentShellKey !== shellKey || !(content instanceof HTMLElement)) {

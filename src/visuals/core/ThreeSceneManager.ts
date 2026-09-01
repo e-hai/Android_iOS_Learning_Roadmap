@@ -23,6 +23,9 @@ export class ThreeSceneManager {
   private clock = new THREE.Clock();
   public onTickCallback?: (delta: number, time: number) => void;
   private isDisposed = false;
+  private isPaused = false;
+  private ambientLight: THREE.AmbientLight | null = null;
+  private dirLight: THREE.DirectionalLight | null = null;
 
   constructor(container: HTMLElement, options: SceneManagerOptions = {}) {
     this.container = container;
@@ -75,17 +78,17 @@ export class ThreeSceneManager {
 
   private setupLighting() {
     // Unlit MeshBasicMaterials dominate the constellation; keep lights minimal.
-    const ambientLight = new THREE.AmbientLight(0xffffff, this.theme.isDark ? 0.85 : 1);
-    this.scene.add(ambientLight);
+    this.ambientLight = new THREE.AmbientLight(0xffffff, this.theme.isDark ? 0.85 : 1);
+    this.scene.add(this.ambientLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, this.theme.isDark ? 0.55 : 0.4);
-    dirLight.position.set(8, 12, 6);
-    this.scene.add(dirLight);
+    this.dirLight = new THREE.DirectionalLight(0xffffff, this.theme.isDark ? 0.55 : 0.4);
+    this.dirLight.position.set(8, 12, 6);
+    this.scene.add(this.dirLight);
   }
 
   private setupResize() {
     this.resizeObserver = new ResizeObserver((entries) => {
-      if (this.isDisposed) return;
+      if (this.isDisposed || this.isPaused) return;
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
         if (width > 0 && height > 0) {
@@ -98,8 +101,40 @@ export class ThreeSceneManager {
     this.resizeObserver.observe(this.container);
   }
 
+  public syncSize(): void {
+    const width = this.container.clientWidth;
+    const height = this.container.clientHeight;
+    if (width <= 0 || height <= 0) return;
+    this.camera.aspect = width / height;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(width, height);
+  }
+
+  public refreshTheme(): void {
+    this.theme = get3DThemeColors();
+    if (this.ambientLight) this.ambientLight.intensity = this.theme.isDark ? 0.85 : 1;
+    if (this.dirLight) this.dirLight.intensity = this.theme.isDark ? 0.55 : 0.4;
+  }
+
+  public pause(): void {
+    if (this.isDisposed || this.isPaused) return;
+    this.isPaused = true;
+    if (this.reqId !== null) {
+      cancelAnimationFrame(this.reqId);
+      this.reqId = null;
+    }
+  }
+
+  public resume(): void {
+    if (this.isDisposed || !this.isPaused) return;
+    this.isPaused = false;
+    this.syncSize();
+    this.clock.getDelta();
+    this.animate();
+  }
+
   private animate = () => {
-    if (this.isDisposed) return;
+    if (this.isDisposed || this.isPaused) return;
 
     this.reqId = requestAnimationFrame(this.animate);
 
@@ -127,6 +162,7 @@ export class ThreeSceneManager {
 
   public dispose() {
     this.isDisposed = true;
+    this.isPaused = true;
 
     if (this.reqId !== null) {
       cancelAnimationFrame(this.reqId);
