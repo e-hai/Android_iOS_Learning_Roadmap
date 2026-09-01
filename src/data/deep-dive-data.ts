@@ -354,7 +354,7 @@ val coupons = couponDeferred.await()
 
 ### 六、黑盒并发
 
-- **场景解释**：把第五点的并行聚合从 ViewModel 下沉成 Repository 的一个挂起函数，对外仍是黑盒。第五点把异常吞在每路 \`async\` 里，子 Job 永远成功，失败不会取消另一路请求；且 \`suspend fun\` **不是** \`CoroutineScope\`，不能直接 \`async\`。这里用 \`coroutineScope { }\` 临时开作用域：对内两个 \`async\` 直接抛，语义是**全成或全败**，ViewModel 只 \`runSuspendCatching { repository.getProductDetail() }\`。不要在 Repository 里把子任务包成 \`Result\`，否则熔断失效。
+- **场景解释**：把第五点的并行从 ViewModel 收成 Repository 的一个挂起函数。\`suspend fun\` 不是 Scope，不能直接 \`async\`，所以用 \`coroutineScope\`：对内全成或全败，对外一次调用。
 
 \`\`\`kotlin
 data class ProductDetail(val goods: String, val coupons: String)
@@ -395,6 +395,24 @@ class ProductViewModel(private val repository: ProductRepository) : ViewModel() 
         }
     }
 }
+\`\`\`
+
+- **使用误区**：要保住全成全败，异常必须漏出子 Job，交给 \`coroutineScope\` 抛给调用方。
+  1. **不要在 \`async\` 里接异常**：子 Job 会变成成功，兄弟不会取消，仓库对外也像成功返回。
+  2. **不要对 \`await\` 接异常**：子 Job 一失败，scope 已经在取消兄弟；catch 住 \`await\` 救不活这段 \`coroutineScope\`，也保不住另一路。
+
+\`\`\`kotlin
+// ❌ 在 async 里接住：子 Job 成功，没有熔断
+val couponDeferred = async {
+    runSuspendCatching { fetchCoupons(productId) }
+}
+
+// ❌ 对 await 接住：商品请求已被连坐取消，整段 scope 仍已失败
+val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
+
+// ✅ 直接抛，让 coroutineScope 交到仓库外面
+val goods = goodsDeferred.await()
+val coupons = couponDeferred.await()
 \`\`\`
 
 ### 七、局部容灾
