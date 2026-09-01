@@ -417,7 +417,7 @@ val coupons = couponDeferred.await()
 
 ### 七、局部容灾
 
-- **场景解释**：优惠券是次要数据，失败应降级为 \`null\`，商品必须继续。第六点的 \`coroutineScope\` 会让优惠券失败连坐取消商品请求，所以换成 \`supervisorScope\`：子任务失败默认不取消兄弟。捕获写在 **\`couponDeferred.await()\`**，不要包进 \`async\`——否则子 Job 永远成功，两种 Scope 将没有区别。商品 \`await\` 仍直接抛错，核心接口失败则整页失败。
+- **场景解释**：优惠券是次要数据，失败应降级为 \`null\`，商品必须继续。第六点在 \`coroutineScope\` 里对 \`await\` 接异常救不了兄弟请求（子失败已经连坐取消）。换成 \`supervisorScope\` 后，子任务失败默认不取消兄弟，但块自己抛仍会整段取消，所以必须在次要路的 **\`couponDeferred.await()\`** 上接住。核心路 \`goodsDeferred.await()\` 仍直接抛，整页失败。
 
 \`\`\`kotlin
 data class ProductDetail(val goods: String, val coupons: String?)
@@ -427,8 +427,8 @@ class ProductRepository {
         val goodsDeferred = async { fetchGoods(productId) }
         val couponDeferred = async { fetchCoupons(productId) }
 
-        val goods = goodsDeferred.await()
-        val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
+        val goods = goodsDeferred.await() // 核心路：直接抛，整页失败
+        val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull() // 次要路：只在 await 上接
         ProductDetail(goods, coupons)
     }
 
@@ -457,6 +457,19 @@ class ProductViewModel(private val repository: ProductRepository) : ViewModel() 
         }
     }
 }
+\`\`\`
+
+- **使用误区**：不要在 \`async\` 里接异常。子 Job 会变成成功，\`supervisorScope\` 与 \`coroutineScope\` 对这条任务没有区别，监督白开。
+
+\`\`\`kotlin
+// ❌ 包进 async：子 Job 成功，两种 Scope 没区别
+val couponDeferred = async {
+    runSuspendCatching { fetchCoupons(productId) }
+}
+
+// ✅ 让 async 直接抛，只在次要路的 await 上接
+val couponDeferred = async { fetchCoupons(productId) }
+val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
 \`\`\``,
       },
       {
