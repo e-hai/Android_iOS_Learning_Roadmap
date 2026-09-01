@@ -300,19 +300,19 @@ class OrderViewModel : ViewModel() {
 
 ### 五、并行聚合
 
-- **场景解释**：商品与优惠券互不依赖，必须**两个都成功**才展示。在 \`launch\` 里用 \`coroutineScope\` + \`async\` 同时发起；任一失败会**取消另一路**，再由外层 \`runSuspendCatching\` 收口。不要把 \`runSuspendCatching\` 塞进每个 \`async\`——异常被吞掉后兄弟任务会继续跑完，既取不了消防抖流量，\`return@launch\` 也等不到结构化取消。总耗时仍是 \`max(300ms, 200ms)\`。
+- **场景解释**：商品与优惠券互不依赖，用 \`async\` 同时发出去，再统一 \`await\` 合并；总耗时是 \`max(300ms, 200ms)\`。这里父协程就是 \`viewModelScope.launch\`，**不必再套 \`coroutineScope\`**（那是第六点的主角）。\`async\` 直接挂在 \`launch\` 上：两个都成功才 \`onSuccess\`；任一抛错会取消另一路，由外层 \`runSuspendCatching\` 收成 \`onFailure\`。不要把 \`runSuspendCatching\` 塞进 \`async\` 块，否则异常被吞，兄弟请求会继续跑完。
 
 \`\`\`kotlin
 class ProductViewModel : ViewModel() {
     fun loadProductDetail(productId: String) {
         viewModelScope.launch {
             Log.d("Product", "开始加载商品与优惠券...")
+
+            val goodsDeferred = async { fetchGoods(productId) }
+            val couponDeferred = async { fetchCoupons(productId) }
+
             runSuspendCatching {
-                coroutineScope {
-                    val goodsDeferred = async { fetchGoods(productId) }
-                    val couponDeferred = async { fetchCoupons(productId) }
-                    "商品=\${goodsDeferred.await()}, 优惠券=\${couponDeferred.await()}"
-                }
+                "商品=\${goodsDeferred.await()}, 优惠券=\${couponDeferred.await()}"
             }.onSuccess { summary ->
                 Log.d("Product", "加载成功: $summary")
             }.onFailure { error ->
@@ -350,7 +350,7 @@ val coupons = couponDeferred.await()
 
 ### 六、黑盒并发
 
-- **场景解释**：把第五点的 \`coroutineScope\` 原样下沉到 Repository，ViewModel 只调用一个 \`suspend\`。\`coroutineScope\` 的语义是**全成或全败**：子 \`async\` 抛错会取消兄弟任务并向上抛出（结构化并发的熔断），由 ViewModel 的 \`runSuspendCatching\` 统一变成 \`onFailure\`。不要在 Repository 里把子任务包成 \`Result\`，否则熔断失效，错误边界也被撕开。
+- **场景解释**：把第五点的并行聚合从 ViewModel 下沉到 Repository。\`suspend fun\` **不是** \`CoroutineScope\`，里面不能直接 \`async\`，所以要用 \`coroutineScope { }\` 临时开一个作用域：对内仍是两个 \`async\`，对外是一个挂起函数。语义仍是**全成或全败**（子任务抛错取消兄弟并向上抛出），ViewModel 只 \`runSuspendCatching { repository.getProductDetail() }\`。不要在 Repository 里把子任务包成 \`Result\`，否则熔断失效。
 
 \`\`\`kotlin
 data class ProductDetail(val goods: String, val coupons: String)
@@ -395,7 +395,7 @@ class ProductViewModel(private val repository: ProductRepository) : ViewModel() 
 
 ### 七、局部容灾
 
-- **场景解释**：优惠券是次要数据，失败应降级为 \`null\`，**不能取消**正在进行的商品请求。必须用 \`supervisorScope\`（水密隔舱）：子任务失败默认不连坐兄弟。捕获要写在 **\`await\` 处**，而不是包进 \`async\` 块——若在 \`async\` 里 \`getOrNull()\`，子 Job 永远成功，\`supervisorScope\` 与 \`coroutineScope\` 将没有区别。商品 \`await\` 仍直接抛错，核心接口失败则整页失败。
+- **场景解释**：第六点的 \`coroutineScope\` 会让优惠券失败连坐取消商品请求。优惠券是次要数据，失败应降级为 \`null\`，商品必须继续。把作用域换成 \`supervisorScope\`（水密隔舱）：子任务失败默认不取消兄弟。捕获写在 **\`couponDeferred.await()\`**，不要包进 \`async\`——否则子 Job 永远成功，两种 Scope 将没有区别。商品 \`await\` 仍直接抛错，核心接口失败则整页失败。
 
 \`\`\`kotlin
 data class ProductDetail(val goods: String, val coupons: String?)
