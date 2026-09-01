@@ -40,16 +40,16 @@ export class ThreeSceneManager {
     const [cx, cy, cz] = options.cameraPos ?? [0, 4, 10];
     this.camera.position.set(cx, cy, cz);
 
-    // 3. Renderer
+    // 3. Renderer — keep first frame cheap (no shadows, capped DPR)
+    const isCoarsePointer = window.matchMedia('(pointer: coarse)').matches;
     this.renderer = new THREE.WebGLRenderer({
-      antialias: true,
+      antialias: !isCoarsePointer,
       alpha: true,
       powerPreference: 'high-performance',
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, isCoarsePointer ? 1.25 : 1.5));
     this.renderer.setSize(width, height);
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = false;
     container.appendChild(this.renderer.domElement);
 
     // 4. OrbitControls
@@ -74,17 +74,13 @@ export class ThreeSceneManager {
   }
 
   private setupLighting() {
-    const ambientLight = new THREE.AmbientLight(0xffffff, this.theme.isDark ? 0.7 : 0.9);
+    // Unlit MeshBasicMaterials dominate the constellation; keep lights minimal.
+    const ambientLight = new THREE.AmbientLight(0xffffff, this.theme.isDark ? 0.85 : 1);
     this.scene.add(ambientLight);
 
-    const dirLight1 = new THREE.DirectionalLight(0xffffff, this.theme.isDark ? 1.4 : 1.2);
-    dirLight1.position.set(10, 15, 10);
-    dirLight1.castShadow = true;
-    this.scene.add(dirLight1);
-
-    const dirLight2 = new THREE.DirectionalLight(this.theme.iosGlow, 0.6);
-    dirLight2.position.set(-10, -5, -10);
-    this.scene.add(dirLight2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, this.theme.isDark ? 0.55 : 0.4);
+    dirLight.position.set(8, 12, 6);
+    this.scene.add(dirLight);
   }
 
   private setupResize() {

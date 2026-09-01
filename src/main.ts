@@ -11,6 +11,7 @@ import { renderStageDetail } from './components/StageDetailView';
 import { renderDeepDiveDocView } from './components/DeepDiveDocView';
 import { stages } from './data/roadmap-data';
 import { i18n } from './services/i18n';
+import { preload3DConstellation } from './visuals/preload3d';
 
 type DocMode = 'roadmap' | 'deepdive';
 type Platform = 'android' | 'ios';
@@ -37,6 +38,24 @@ class AppController {
     this.initRouting();
     this.initGlobalShortcuts();
     void this.render();
+    this.schedule3DPreload();
+  }
+
+  /** Warm Three.js + constellation chunk after first paint / on idle. */
+  private schedule3DPreload(): void {
+    if (this.is3DMode) {
+      void preload3DConstellation();
+      return;
+    }
+    const run = () => void preload3DConstellation();
+    const ric = (window as Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    }).requestIdleCallback;
+    if (typeof ric === 'function') {
+      ric(run, { timeout: 2500 });
+    } else {
+      setTimeout(run, 1200);
+    }
   }
 
   private initTheme(): void {
@@ -285,7 +304,7 @@ class AppController {
       app.appendChild(loading);
 
       try {
-        const { renderNeuralConstellationView } = await import('./visuals/macro/NeuralConstellationView');
+        const { renderNeuralConstellationView } = await preload3DConstellation();
         if (version !== this.renderVersion || !this.is3DMode) return;
 
         const view = renderNeuralConstellationView(

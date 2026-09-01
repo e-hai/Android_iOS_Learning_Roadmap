@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import gsap from 'gsap';
 import { ThreeSceneManager } from '../core/ThreeSceneManager';
 import { stages } from '../../data/roadmap-data';
 import { deepDiveDomains } from '../../data/deep-dive-data';
@@ -30,6 +29,24 @@ export interface NeuralConstellationView {
   dispose: () => void;
 }
 
+type Vec3Tween = {
+  object: { x: number; y: number; z: number };
+  to: { x: number; y: number; z: number };
+  duration: number;
+  elapsed: number;
+  ease: (t: number) => number;
+  onUpdate?: () => void;
+  onComplete?: () => void;
+};
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function easeOutQuad(t: number): number {
+  return 1 - (1 - t) * (1 - t);
+}
+
 export function renderNeuralConstellationView(
   onSwitchViewMode: (mode: '3d' | 'doc') => void,
   knowledgeMode: 'roadmap' | 'deepdive' = 'roadmap',
@@ -58,8 +75,53 @@ export function renderNeuralConstellationView(
   const palaceGroup = new THREE.Group();
   scene.add(palaceGroup);
 
+  const activeTweens: Vec3Tween[] = [];
+  const tweenFrom = new WeakMap<object, { x: number; y: number; z: number }>();
+
+  const killTweensOf = (object: { x: number; y: number; z: number }) => {
+    for (let i = activeTweens.length - 1; i >= 0; i--) {
+      if (activeTweens[i].object === object) activeTweens.splice(i, 1);
+    }
+  };
+
+  const tweenTo = (
+    object: { x: number; y: number; z: number },
+    to: { x: number; y: number; z: number },
+    duration: number,
+    ease: (t: number) => number,
+    onUpdate?: () => void,
+    onComplete?: () => void,
+  ) => {
+    killTweensOf(object);
+    tweenFrom.set(object, { x: object.x, y: object.y, z: object.z });
+    activeTweens.push({ object, to, duration, elapsed: 0, ease, onUpdate, onComplete });
+  };
+
+  const updateTweens = (delta: number) => {
+    for (let i = activeTweens.length - 1; i >= 0; i--) {
+      const tw = activeTweens[i];
+      const from = tweenFrom.get(tw.object);
+      if (!from) {
+        activeTweens.splice(i, 1);
+        continue;
+      }
+      tw.elapsed += delta;
+      const t = Math.min(1, tw.elapsed / tw.duration);
+      const e = tw.ease(t);
+      tw.object.x = from.x + (tw.to.x - from.x) * e;
+      tw.object.y = from.y + (tw.to.y - from.y) * e;
+      tw.object.z = from.z + (tw.to.z - from.z) * e;
+      tw.onUpdate?.();
+      if (t >= 1) {
+        activeTweens.splice(i, 1);
+        tw.onComplete?.();
+      }
+    }
+  };
+
+
   // 1. Subtle, Quiet Deep Space Starfield (极简深邃背景)
-  const starCount = 220;
+  const starCount = 90;
   const starGeom = new THREE.BufferGeometry();
   const starPositions = new Float32Array(starCount * 3);
 
@@ -82,6 +144,7 @@ export function renderNeuralConstellationView(
 
   // 2. Build 3D Memory Palace Node Network
   const allNodes: PalaceNode[] = [];
+  const raycastMeshes: THREE.Object3D[] = [];
 
   const lineMatSynapse = new THREE.LineBasicMaterial({
     color: knowledgeMode === 'deepdive' ? (deepDivePlatform === 'android' ? 0x10b981 : 0x0ea5e9) : 0x38bdf8,
@@ -96,7 +159,21 @@ export function renderNeuralConstellationView(
 
   const platformName = deepDivePlatform === 'android' ? 'Android' : 'iOS';
   const platformColor = deepDivePlatform === 'android' ? 0x10b981 : 0x0ea5e9;
-  const platformEmissive = deepDivePlatform === 'android' ? 0x047857 : 0x0369a1;
+  // Shared low-poly assets — avoid per-node geometry/material allocation
+  const geoHubLarge = new THREE.SphereGeometry(1.0, 12, 12);
+  const geoHub = new THREE.SphereGeometry(0.85, 12, 12);
+  const geoHaloLarge = new THREE.RingGeometry(1.35, 1.5, 24);
+  const geoHalo = new THREE.RingGeometry(1.15, 1.3, 24);
+  const geoConcept = new THREE.SphereGeometry(0.22, 8, 8);
+  const geoModule = new THREE.DodecahedronGeometry(0.28, 0);
+  const geoSpark = new THREE.OctahedronGeometry(0.18);
+  const matHub = new THREE.MeshBasicMaterial({ color: platformColor });
+  const matHubRoadmap = new THREE.MeshBasicMaterial({ color: 0x0ea5e9 });
+  const matHalo = new THREE.MeshBasicMaterial({ color: platformColor, side: THREE.DoubleSide, transparent: true, opacity: 0.45 });
+  const matHaloRoadmap = new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.45 });
+  const matConcept = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+  const matModule = new THREE.MeshBasicMaterial({ color: platformColor });
+  const matSpark = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
 
   if (knowledgeMode === 'deepdive') {
     // 5 Industrial Domains in Deep Dive Mode
@@ -111,27 +188,12 @@ export function renderNeuralConstellationView(
       const domainTitle = i18n.t(domain.titleKey);
 
       // Level 1: Domain Star Core (Clean, High-legibility Sphere)
-      const hubGeom = new THREE.SphereGeometry(1.0, 32, 32);
-      const hubMat = new THREE.MeshStandardMaterial({
-        color: platformColor,
-        emissive: platformEmissive,
-        emissiveIntensity: 0.75,
-        roughness: 0.2,
-        metalness: 0.2,
-      });
-      const hubMesh = new THREE.Mesh(hubGeom, hubMat);
+      const hubMesh = new THREE.Mesh(geoHubLarge, matHub);
       hubMesh.position.copy(hubPos);
       palaceGroup.add(hubMesh);
 
       // Clean Halo Ring
-      const haloGeom = new THREE.RingGeometry(1.35, 1.5, 32);
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: platformColor,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.5,
-      });
-      const haloMesh = new THREE.Mesh(haloGeom, haloMat);
+      const haloMesh = new THREE.Mesh(geoHaloLarge, matHalo);
       haloMesh.position.copy(hubPos);
       haloMesh.rotation.x = Math.PI / 2;
       palaceGroup.add(haloMesh);
@@ -160,14 +222,7 @@ export function renderNeuralConstellationView(
           hubZ + Math.sin(mAngle) * mRadius
         );
 
-        const mGeom = new THREE.DodecahedronGeometry(0.28);
-        const mMat = new THREE.MeshStandardMaterial({
-          color: platformColor,
-          emissive: platformEmissive,
-          emissiveIntensity: 0.7,
-          roughness: 0.25,
-        });
-        const mMesh = new THREE.Mesh(mGeom, mMat);
+        const mMesh = new THREE.Mesh(geoModule, matModule);
         mMesh.position.copy(mPos);
         palaceGroup.add(mMesh);
 
@@ -204,27 +259,12 @@ export function renderNeuralConstellationView(
       const stageTitle = i18n.t(stage.titleKey);
 
       // Level 1: Stage Core Hub
-      const hubGeom = new THREE.SphereGeometry(0.85, 32, 32);
-      const hubMat = new THREE.MeshStandardMaterial({
-        color: 0x0ea5e9,
-        emissive: 0x0284c7,
-        emissiveIntensity: 0.75,
-        roughness: 0.2,
-        metalness: 0.2,
-      });
-      const hubMesh = new THREE.Mesh(hubGeom, hubMat);
+      const hubMesh = new THREE.Mesh(geoHub, matHubRoadmap);
       hubMesh.position.copy(hubPos);
       palaceGroup.add(hubMesh);
 
       // Dynamic Halo Ring
-      const haloGeom = new THREE.RingGeometry(1.15, 1.3, 32);
-      const haloMat = new THREE.MeshBasicMaterial({
-        color: 0x38bdf8,
-        side: THREE.DoubleSide,
-        transparent: true,
-        opacity: 0.5,
-      });
-      const haloMesh = new THREE.Mesh(haloGeom, haloMat);
+      const haloMesh = new THREE.Mesh(geoHalo, matHaloRoadmap);
       haloMesh.position.copy(hubPos);
       haloMesh.rotation.x = Math.PI / 2;
       palaceGroup.add(haloMesh);
@@ -252,14 +292,7 @@ export function renderNeuralConstellationView(
           hubZ + Math.sin(cAngle) * cRadius
         );
 
-        const cGeom = new THREE.SphereGeometry(0.22, 16, 16);
-        const cMat = new THREE.MeshStandardMaterial({
-          color: 0x38bdf8,
-          emissive: 0x0284c7,
-          emissiveIntensity: 0.6,
-          roughness: 0.3,
-        });
-        const cMesh = new THREE.Mesh(cGeom, cMat);
+        const cMesh = new THREE.Mesh(geoConcept, matConcept);
         cMesh.position.copy(cPos);
         palaceGroup.add(cMesh);
 
@@ -291,14 +324,7 @@ export function renderNeuralConstellationView(
           hubZ + Math.sin(gAngle) * gRadius
         );
 
-        const gGeom = new THREE.OctahedronGeometry(0.18);
-        const gMat = new THREE.MeshStandardMaterial({
-          color: 0xf59e0b,
-          emissive: 0xd97706,
-          emissiveIntensity: 0.85,
-          roughness: 0.2,
-        });
-        const gMesh = new THREE.Mesh(gGeom, gMat);
+        const gMesh = new THREE.Mesh(geoSpark, matSpark);
         gMesh.position.copy(gPos);
         palaceGroup.add(gMesh);
 
@@ -347,6 +373,8 @@ export function renderNeuralConstellationView(
       palaceGroup.add(beam);
     }
   }
+
+  raycastMeshes.push(...allNodes.map((n) => n.mesh));
 
   // 3. Unified 3D Mode Top Bar (Dedicated in 3D Mode)
   const isDeepDive = knowledgeMode === 'deepdive';
@@ -460,15 +488,14 @@ export function renderNeuralConstellationView(
     mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
 
     raycaster.setFromCamera(mouse, camera);
-    const meshes = allNodes.map((n) => n.mesh);
-    const intersects = raycaster.intersectObjects(meshes);
+    const intersects = raycaster.intersectObjects(raycastMeshes);
 
     if (intersects.length > 0) {
       const hitMesh = intersects[0].object as THREE.Mesh;
       const node = allNodes.find((n) => n.mesh === hitMesh);
       if (node && node !== hoveredNode) {
         if (hoveredNode) {
-          gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+          tweenTo(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1 }, 0.18, easeOutQuad);
         }
         hoveredNode = node;
         document.body.style.cursor = 'pointer';
@@ -482,11 +509,11 @@ export function renderNeuralConstellationView(
         hoverTooltip.classList.add('visible');
 
         // Scale up node mesh slightly
-        gsap.to(node.mesh.scale, { x: 1.35, y: 1.35, z: 1.35, duration: 0.2 });
+        tweenTo(node.mesh.scale, { x: 1.35, y: 1.35, z: 1.35 }, 0.18, easeOutQuad);
       }
     } else {
       if (hoveredNode) {
-        gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+        tweenTo(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1 }, 0.18, easeOutQuad);
         hoveredNode = null;
         document.body.style.cursor = 'default';
         hoverTooltip.classList.remove('visible');
@@ -496,7 +523,7 @@ export function renderNeuralConstellationView(
 
   const onMouseLeave = () => {
     if (hoveredNode) {
-      gsap.to(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1, duration: 0.2 });
+      tweenTo(hoveredNode.mesh.scale, { x: 1, y: 1, z: 1 }, 0.18, easeOutQuad);
       hoveredNode = null;
     }
     document.body.style.cursor = '';
@@ -695,22 +722,21 @@ export function renderNeuralConstellationView(
 
     const finalCamPos = targetPos.clone().add(camOffset);
 
-    gsap.to(camera.position, {
-      x: finalCamPos.x,
-      y: finalCamPos.y,
-      z: finalCamPos.z,
-      duration: 1.2,
-      ease: 'power3.inOut',
-      onUpdate: () => {
+    tweenTo(
+      camera.position,
+      { x: finalCamPos.x, y: finalCamPos.y, z: finalCamPos.z },
+      prefersReducedMotion ? 0.01 : 0.9,
+      easeInOutCubic,
+      () => {
         if (sceneManager.controls) {
           sceneManager.controls.target.copy(targetPos);
           sceneManager.controls.update();
         }
       },
-      onComplete: () => {
+      () => {
         showHudDetail(targetNode);
       },
-    });
+    );
   };
 
   const onClick = () => {
@@ -770,17 +796,19 @@ export function renderNeuralConstellationView(
   });
 
   // 9. Synchronized 3D Animation & Real-Time Star Core Tooltip Tracking
-  sceneManager.onTickCallback = (_delta, time) => {
+  sceneManager.onTickCallback = (delta, time) => {
+    updateTweens(delta);
     if (!prefersReducedMotion) {
       // Subtle star rotation
       stars.rotation.y += 0.00015;
 
       // Gentle Node Floating & Halo Rotation
       allNodes.forEach((n, idx) => {
+        if (n.type !== 'stage') return;
         if (n.haloMesh) {
-          n.haloMesh.rotation.z += 0.005;
+          n.haloMesh.rotation.z += 0.004;
         }
-        n.mesh.position.y = n.pos.y + Math.sin(time * 1.5 + idx) * 0.03;
+        n.mesh.position.y = n.pos.y + Math.sin(time * 1.2 + idx) * 0.025;
       });
     }
 
@@ -808,8 +836,8 @@ export function renderNeuralConstellationView(
   return {
     element: container,
     dispose: () => {
-      gsap.killTweensOf(camera.position);
-      allNodes.forEach((node) => gsap.killTweensOf(node.mesh.scale));
+      killTweensOf(camera.position);
+      allNodes.forEach((node) => killTweensOf(node.mesh.scale));
       canvasWrap.removeEventListener('mousemove', onMouseMove);
       canvasWrap.removeEventListener('mouseleave', onMouseLeave);
       canvasWrap.removeEventListener('click', onClick);

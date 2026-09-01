@@ -1,4 +1,5 @@
 import { i18n } from '../services/i18n';
+import { preload3DConstellation } from '../visuals/preload3d';
 
 export function renderHeader(
   onToggleSidebar: () => void,
@@ -94,9 +95,13 @@ export function renderHeader(
     if (onTogglePlatform) onTogglePlatform('ios');
   });
 
-  header.querySelector('#btn-mode-3d')?.addEventListener('click', () => {
+  const btn3d = header.querySelector('#btn-mode-3d');
+  btn3d?.addEventListener('click', () => {
     if (onToggle3DDoc) onToggle3DDoc('3d');
   });
+  // Prefetch chunk when user intends to enter 3D
+  btn3d?.addEventListener('pointerenter', () => void preload3DConstellation(), { once: true });
+  btn3d?.addEventListener('focus', () => void preload3DConstellation(), { once: true });
   header.querySelector('#btn-mode-doc')?.addEventListener('click', () => {
     if (onToggle3DDoc) onToggle3DDoc('doc');
   });
