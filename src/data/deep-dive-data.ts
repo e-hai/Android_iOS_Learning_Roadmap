@@ -490,6 +490,74 @@ val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
   - 用 \`launch\` 去拼返回值：只有 \`Job\`，合并不了，要返回值用 \`async\`。
   - 在 \`coroutineScope\` 里接 \`async\` 或 \`await\`：熔断没了，也救不活兄弟。
   - 开了 \`supervisorScope\` 却在 \`async\` 里接，或次要路裸 \`await\`：监督无效，或块失败又全灭。
+
+### 九、冷流多次值
+
+- **场景解释**：下载进度、搜索联想会连续出值，不是「算完一次就返回」。第八点收口的 \`launch\` / \`async\` / 两种 Scope 都是一次性 Job。多次值用构建器 \`flow { }\`：有人收集才开始跑，块里多次 \`emit\`，块正常 return 则流结束。日常 App 在这条冷流上再接高频操作符：变换、切线程、防抖、取消过期请求、多源拼状态、接到 UI 或另开协程收集。上游失败用 **\`catch\`**，不要把整个 \`collect { }\` 再包成 \`runSuspendCatching\`。
+
+| 操作符 | 日常干什么 |
+|---|---|
+| \`map\` / \`filter\` | 变换、丢掉不需要的元素 |
+| \`onEach\` | 不改变数据，旁路打日志 / 副作用；再配合 \`collect()\` 让后面的 \`catch\` 能接到消费异常 |
+| \`catch\` | 只接它**上游**的失败，可 \`emit\` 降级 |
+| \`flowOn\` | 只切换**上游**调度器（如 \`Dispatchers.IO\`） |
+| \`debounce\` | 搜索框停一下再发，避免每个字打一次网 |
+| \`flatMapLatest\` | 新查询来了就取消上一次请求 |
+| \`combine\` | 搜索词 + Tab 等**持续状态**拼成一屏条件 |
+| \`stateIn\` | 冷流在 ViewModel 里收成 \`StateFlow\` 给 UI |
+| \`collect { }\` / \`collect()\` | 当前协程收到底；无参版给 \`onEach\` 链收尾 |
+| \`launchIn\` | 另开协程收集，当前函数不等（\`init\` 里订长流） |
+
+\`\`\`kotlin
+class SearchViewModel : ViewModel() {
+    private val queryFlow = MutableStateFlow("")
+    private val tabFlow = MutableStateFlow("综合")
+
+    val results: StateFlow<List<String>> = combine(queryFlow, tabFlow) { query, tab ->
+        query.trim() to tab
+    }
+        .debounce(300.milliseconds)
+        .filter { (query, _) -> query.isNotEmpty() }
+        .flatMapLatest { (query, tab) ->
+            flow {
+                emit(search(query, tab))
+            }.flowOn(Dispatchers.IO)
+        }
+        .map { list -> list.take(20) }
+        .catch { error ->
+            Log.e("Search", "搜索失败: \${error.message}")
+            emit(emptyList())
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
+    init {
+        results
+            .onEach { list -> Log.d("Search", "结果数: \${list.size}") }
+            .launchIn(viewModelScope)
+    }
+
+    fun onQuery(text: String) {
+        queryFlow.value = text
+    }
+
+    private suspend fun search(query: String, tab: String): List<String> {
+        delay(200.milliseconds)
+        return listOf("\$tab:\$query")
+    }
+}
+\`\`\`
+
+- **使用误区**：
+  - 只定义 \`flow { }\` 不去收集：冷流不会跑。
+  - 把一次 \`suspend\` 再包成 \`flow { emit(repo.fetch()) }\`：多此一举，直接 \`launch\` 里调仓库即可。
+  - 在 \`flow { }\` 里 \`launch\` 子协程再 \`emit\`：\`emit\` 只能在这条生产协程里顺序调用。
+  - 用 \`runSuspendCatching { collect { } }\` 接生产失败：上游走 \`catch\`。\`catch\` 接不住 **\`collect { }\` 里**的 throw；要把消费放进 \`onEach\`，再 \`.catch { }.collect()\`。
+  - 以为 \`flowOn\` 会改 \`collect\` 所在线程：它只影响上游。
+  - 在同一个 \`launch\` 里顺序 \`collect\` 两条热流：第一条不结束第二条开不了，长订阅用 \`launchIn\` 或各自 \`launch\`。
 `,
       },
       {
