@@ -470,7 +470,27 @@ val couponDeferred = async {
 // ✅ 让 async 直接抛，只在次要路的 await 上接
 val couponDeferred = async { fetchCoupons(productId) }
 val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
-\`\`\``,
+\`\`\`
+
+### 八、对照收口
+
+- **场景解释**：第四到七点分别解决旁路、要返回值、全成全败、部分降级。这里把 \`launch\` / \`async\` / \`coroutineScope\` / \`supervisorScope\` 放回同一套判断：子 Job 是否把异常漏出去，以及异常接到哪。
+
+| 你要的 | 用什么 | 异常接到哪 |
+|---|---|---|
+| 不等结果、别耽误主任务 | 内层 \`launch\` | 写在这条 \`launch\` **体内** |
+| 并行且要返回值，失败变成 \`Result\` | \`async\` + \`await\` | 可以接在 \`async\` **体内**；此时 Scope 看不见失败 |
+| 并行、全成全败、对外一个 \`suspend\` | \`coroutineScope\` + \`async\` | 两边都不要接，让 scope 抛给调用方 |
+| 并行、次要路可失败 | \`supervisorScope\` + \`async\` | 不要接在 \`async\` 里；只接次要路的 \`await\`；核心路继续抛 |
+
+- 这四个看的都是 **lambda 有没有把异常漏出去**，不是 \`Result.success\`。
+- 单次 \`suspend\` 调用仍走官方默认：\`launch\` 里 \`try/catch\`（或 \`runSuspendCatching\`）包住仓库调用，不必上 Scope。
+
+- **使用误区**：
+  - 用 \`launch\` 去拼返回值：只有 \`Job\`，合并不了，要返回值用 \`async\`。
+  - 在 \`coroutineScope\` 里接 \`async\` 或 \`await\`：熔断没了，也救不活兄弟。
+  - 开了 \`supervisorScope\` 却在 \`async\` 里接，或次要路裸 \`await\`：监督无效，或块失败又全灭。
+`,
       },
       {
         tag: '内存模型',
