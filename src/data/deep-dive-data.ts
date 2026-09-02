@@ -553,15 +553,15 @@ class SearchViewModel : ViewModel() {
 
 ### 十、热流与队列
 
-- **场景解释**：第九点的 \`flow { }\` 是冷的，有人收集才生产，且每个收集者各跑一遍。界面要「现在长什么样」、多处同时听一件事、或一次性跳转只能被拿走一次，要用 \`StateFlow<T>\`、\`SharedFlow<T>\`、\`Channel<E>\`。
+- **场景解释**：第九点的 \`flow { }\` 是冷的，有人收集才生产，且每个收集者各跑一遍。界面「现在长什么样」用 \`StateFlow<T>\`；多处同时听一件事用 \`SharedFlow<T>\`；导航 / Toast 这类**副作用**不是状态，用 \`Channel<E>\` 排队，只被拿走一次。
 
 | | \`StateFlow<T>\` | \`SharedFlow<T>\` | \`Channel<E>\` |
 |---|---|---|---|
-| 是什么 | 带当前值的状态 | 广播事件 | 队列 |
+| 是什么 | 带当前值的状态 | 广播事件 | 副作用队列 |
 | 一条值给谁 | 所有订阅者看同一份最新状态 | 当时所有 collector 各收一份 | 只有一个 receiver 拿走 |
 | 有没有「现在」 | 有，必须带初始值 | 默认没有；\`replay > 0\` 才补历史 | 没有当前值，只有还没被拿走的缓冲 |
 | 晚到的订阅者 | 立刻拿到最新一条 | \`replay = 0\` 则错过 | 还能拿缓冲里剩下的 |
-| 典型 | 整页 UiState、登录态 | 多处同时听「登录成功」 | Toast、导航、支付结果 |
+| 典型 | 整页 UiState、登录态 | 多处同时听「登录成功」 | 导航、Toast、支付结果（UiEffect） |
 
 \`\`\`diagram
                     emit / send
@@ -570,7 +570,7 @@ class SearchViewModel : ViewModel() {
          ▼               ▼               ▼
    ┌───────────┐  ┌───────────┐  ┌───────────┐
    │ StateFlow │  │SharedFlow │  │  Channel  │
-   │  当前状态  │  │   广播     │  │   队列     │
+   │  当前状态  │  │   广播     │  │  副作用    │
    └─────┬─────┘  └─────┬─────┘  └─────┬─────┘
     ┌────┴────┐     ┌────┴────┐          │
     ▼         ▼     ▼         ▼          ▼
@@ -612,20 +612,153 @@ class HomeViewModel : ViewModel() {
       },
       {
         tag: '内存模型',
-        title: 'JVM / ART 垃圾回收与 LeakCanary 引用链探测原理',
-        explanation: 'Android ART 运行时采用基于分代 (Generational) 与并发标记清除 (CMC) 算法。年轻代通过移动复制减少内存碎片，老年代采用 CMS 或 Region-based GC。LeakCanary 的核心原理是在 Activity/Fragment 销毁时 (onDestroy)，将目标对象包装为 KeyedWeakReference 并挂载到 ReferenceQueue 引用队列；延迟 5 秒触发 GC 后若该引用仍未进入队列，说明对象被静态单例或长生命周期后台线程强引用，LeakCanary 进而导出 Hprof 堆转储并解析最短 GC Roots 强引用链。',
-        codeSnippet: `// 自定义核心对象泄漏监听
-class ObjectWatcher {
-    private val queue = ReferenceQueue<Any>()
-    private val watchedObjects = ConcurrentHashMap<String, KeyedWeakReference>()
+        title: '可达性、引用类型与泄漏排查',
+        pipeline: [
+          { title: 'GC Roots 与可达性', subtitle: '从根出发能碰到的对象才算活着', category: 'theory' },
+          { title: '强引用与弱引用', subtitle: '握得住才泄漏；WeakReference 可被回收', category: 'theory' },
+          { title: 'ART 何时回收', subtitle: '分代堆上不可达对象才会被清掉', category: 'engineering' },
+          { title: '常见泄漏形态', subtitle: '单例、回调、Handler 抓住短命对象', category: 'engineering' },
+          { title: 'LeakCanary 探测', subtitle: '销毁后弱引用仍未入队即疑似泄漏', category: 'engineering' },
+          { title: '读链与拆链', subtitle: '沿最短强引用链找到该松开的那一环', category: 'engineering' },
+        ],
+        explanation: `### 1. GC Roots 与可达性
+- **通俗心智**：垃圾回收不问「你还想不想要」，只问「从根出发还能不能摸到你」。摸不到的对象才是垃圾。
+- **常见根**：线程栈上的局部变量、静态字段、JNI 全局引用等。Activity 被静态字段抓住，对 GC 来说它仍然可达。
 
-    fun watch(watchedObject: Any, description: String) {
-        val key = UUID.randomUUID().toString()
-        val ref = KeyedWeakReference(watchedObject, key, description, queue)
-        watchedObjects[key] = ref
-        // 5秒后检查 queue 是否出队...
+### 2. 强引用与弱引用
+- **强引用**：\`val activity = this\` 这种普通引用，可达则绝不因内存压力被回收。
+- **弱引用**：\`WeakReference(activity)\` 不阻止回收；GC 后 \`get()\` 可能为 \`null\`。软引用介于两者之间，Android 业务里更少用。
+- **工程直觉**：泄漏几乎都是「不该活这么久的对象，被更长命的强引用抓住」。
+
+### 3. ART 何时回收
+- **分代直觉**：新对象多在年轻代，活得久的晋升到老年代；不可达对象在一次 GC 后被清掉。
+- **不必死记算法名**：日常排查先确认「谁还握着强引用」，再考虑 GC 参数与版本差异。
+
+### 4. 常见泄漏形态
+- **单例 / 伴生对象** 持有 \`Activity\` / \`View\` / \`Context\`。
+- **Listener / 回调** 注册后未按生命周期注销。
+- **静态 \`Handler\` / 匿名内部类** 隐式持有外部 \`Activity\`，消息还在队列里时页面已销毁。
+
+### 5. LeakCanary 探测
+- **流程**：页面 \`onDestroy\` 后用弱引用盯住对象 → 等一段时间并触发 GC → 若弱引用仍未进入 \`ReferenceQueue\`，则导出 Hprof，算最短强引用链。
+- **结论**：它证明的是「销毁后仍可达」，并指出链路上每一环，而不是替你改代码。
+
+### 6. 读链与拆链
+- **读链**：从 GC Root 走到泄漏对象，每一跳都是一个字段或集合元素。
+- **拆链**：松开不该跨生命周期的那一环——\`null\` 掉引用、注销回调、改用 \`ApplicationContext\`、或让短命对象只被短命持有者引用。`,
+        extendedDeepDive: `### 第一层：可达性判定
+\`\`\`diagram
+GC Roots（静态字段 / 栈帧 / JNI…）
+    │ 强引用边
+    ▼
+可达对象图 ──▶ 存活
+摸不到的对象 ──▶ 可被回收
+\`\`\`
+
+### 第二层：引用强度（业务常用）
+\`\`\`diagram
+强引用 Strong ──▶ 可达则保留
+弱引用 Weak  ──▶ 不阻止回收，get() 可能为 null
+（软引用 Soft 介于两者，缓存场景偶用）
+\`\`\`
+
+### 第三层：LeakCanary 探测时序
+\`\`\`diagram
+Activity.onDestroy
+    │
+    ▼
+KeyedWeakReference(activity) + ReferenceQueue
+    │
+    ▼
+延迟一段时间 + 请求 GC
+    │
+    ├─ 弱引用已入队 ──▶ 对象已被回收，无泄漏
+    └─ 仍未入队 ──▶ 导出 Hprof，解析最短强引用链
+\`\`\``,
+        caseStudy: `### 一、伴生对象抓住 Activity
+
+- **场景解释**：工具类用伴生对象缓存「当前页面」，方便全局弹 Toast。页面销毁后静态字段仍握着 \`Activity\`，旋转或反复进出后旧页面无法回收。
+
+\`\`\`kotlin
+class LeakActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        CurrentPage.activity = this
+        Log.d("Leak", "已把 Activity 交给伴生对象")
     }
-}`,
+
+    override fun onDestroy() {
+        // 忘记 CurrentPage.activity = null
+        super.onDestroy()
+        Log.d("Leak", "onDestroy，但静态字段可能仍握着 this")
+    }
+}
+
+object CurrentPage {
+    var activity: Activity? = null
+}
+\`\`\`
+
+\`\`\`kotlin
+// ✅ 销毁时松开；或根本不要缓存 Activity，改传 ApplicationContext
+override fun onDestroy() {
+    if (CurrentPage.activity === this) {
+        CurrentPage.activity = null
+    }
+    super.onDestroy()
+}
+\`\`\`
+
+### 二、Listener 注册后未注销
+
+- **场景解释**：仓库是长生命周期单例，\`addListener\` 把页面回调放进列表。页面销毁后列表里仍有该回调，回调若捕获了页面，页面就泄漏。
+
+\`\`\`kotlin
+object LocationRepo {
+    private val listeners = mutableListOf<(String) -> Unit>()
+
+    fun addListener(listener: (String) -> Unit) {
+        listeners += listener
+    }
+
+    fun removeListener(listener: (String) -> Unit) {
+        listeners -= listener
+    }
+}
+
+class MapActivity : AppCompatActivity() {
+    private val onLocation: (String) -> Unit = { loc ->
+        Log.d("Leak", "页面还在收位置: \${loc}")
+    }
+
+    override fun onStart() {
+        super.onStart()
+        LocationRepo.addListener(onLocation)
+    }
+
+    override fun onStop() {
+        // ❌ 若漏掉 remove，单例继续握着 onLocation → 握着 Activity
+        LocationRepo.removeListener(onLocation)
+        super.onStop()
+    }
+}
+\`\`\`
+
+### 三、读 LeakCanary 最短链并拆掉
+
+- **场景解释**：报告给出从 GC Root 到 \`LeakActivity\` 的最短强引用链。要拆的是链上「跨生命周期」的那一环，而不是在业务里手动调 GC。
+
+\`\`\`diagram
+GcRoot: CurrentPage 的静态字段 activity
+    │
+    ▼
+LeakActivity instance
+\`\`\`
+
+- 链上是 \`CurrentPage.activity\` → 在 \`onDestroy\` 置 \`null\`，或改为不持有 \`Activity\`。
+- 链上是 \`LocationRepo.listeners\` → 在 \`onStop\` / \`onDestroy\` 对称 \`removeListener\`。
+- 链上是 \`Handler\` / \`Message.obj\` → 销毁时 \`removeCallbacksAndMessages(null)\`，或使用静态 \`Handler\` + 弱引用（并确认消息里不再强引用页面）。
+`,
       },
       {
         tag: '渲染底层',
