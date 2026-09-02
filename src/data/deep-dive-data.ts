@@ -611,19 +611,56 @@ class HomeViewModel : ViewModel() {
 `,
       },
       {
-        tag: '渲染底层',
-        title: 'Compose Slot Table 插槽表架构与重组跳过 (Skip) 条件',
-        explanation: 'Jetpack Compose 不生成传统 View 树，而是维护一个平铺的 Slot Table 线性数组（内含 Gap Buffer 间隙缓冲区）。Composable 函数的每次调用，其参数、remember 缓存以及子组件均存储在 Slot Table 的插槽中。重组发生时，Compose 编译器通过 @Stable / @Immutable 标注检查输入参数的 Structural Equality (equals)。若所有参数均未改变且标记为稳定，Composer 直接跳过函数执行并将 Gap Buffer 游标移动至下一组件。',
-        codeSnippet: `// 强制启用稳定类型，使 Compose 能够跳过重组
+        tag: '声明式 UI',
+        title: 'Jetpack Compose',
+        pipeline: [
+          { title: '声明式 UI', subtitle: '描述界面长什么样，由框架去更新', category: 'theory' },
+          { title: '@Composable', subtitle: '编译成对 Composer 的调用，不是普通函数', category: 'theory' },
+          { title: '状态驱动重组', subtitle: '读到的 State 变了，只重跑相关组合', category: 'engineering' },
+          { title: 'Slot Table', subtitle: '用平铺插槽记住上次的结构和 remember', category: 'engineering' },
+          { title: '重组跳过 Skip', subtitle: '参数稳定且 equals 未变则可整段跳过', category: 'engineering' },
+          { title: '副作用边界', subtitle: 'LaunchedEffect / DisposableEffect 对齐组合寿命', category: 'engineering' },
+        ],
+        explanation: `### 1. 声明式 UI
+- **通俗心智**：命令式 View 是「找到那个按钮，再 setText」。Compose 是「根据当前状态，界面应该是这样」——变的是数据，树由运行时去对齐。
+- **和 XML View 的差别**：没有 \`findViewById\` 改控件；同一套 \`@Composable\` 在状态变化时被再次调用（重组）。
+
+### 2. @Composable
+- **不是普通函数**：编译器会插入 \`Composer\`，用来记录调用顺序、缓存 \`remember\`、决定下一段要不要 Skip。
+- **调用顺序就是身份**：同样的 \`Text\` 写两次，靠在 Slot Table 里的位置区分，而不是靠 View id。
+
+### 3. 状态驱动重组
+- **订阅规则**：组合过程中读到的 \`MutableState\` / \`StateFlow.collectAsState\` 会把当前组合登记为观察者；值一变，这些组合被标记为失效并再执行。
+- **状态放哪**：一屏业务状态通常在 ViewModel；仅控件内部用 \`remember { mutableStateOf() }\`。
+
+### 4. Slot Table
+- **平铺数组**：不维护传统 View 树节点对象，用带间隙缓冲的线性表记下每次 Composable 调用、参数组和 \`remember\` 的值。
+- **工程价值**：重组时按组对比，不必整棵 XML 树 diff。
+
+### 5. 重组跳过（Skip）
+- **条件**：参数被编译器视为稳定（基础类型、\`@Stable\` / \`@Immutable\`），且 \`equals\` 与上次相同，则这段组合及其子组合可以直接 Skip。
+- **常见踩坑**：不稳定的 \`List\`、每次重组都 \`new\` 的 lambda / 匿名对象，会导致无法 Skip。
+
+### 6. 副作用边界
+- **UI 描述里不要直接搞异步**：网络、监听要放进 \`LaunchedEffect\` / \`DisposableEffect\`，随进入或离开组合启动和取消。
+- **列表**：\`LazyColumn\` 必须提供稳定 \`key\`，否则复用错位、多余重组。`,
+        codeSnippet: `@Composable
+fun CounterCard() {
+    var count by remember { mutableStateOf(0) }
+    Column {
+        Text(text = "点击次数: \$count")
+        Button(onClick = { count++ }) {
+            Text("加一")
+        }
+    }
+}
+
 @Immutable
-data class UserUiModel(
-    val id: String,
-    val name: String,
-    val tags: ImmutableList<String> // 必须使用不可变集合，避免 List<T> 不稳定
-)
+data class UserUiModel(val id: String, val name: String)
 
 @Composable
-fun UserCard(user: UserUiModel) { // user 稳定且 equals 相同，重组被完全跳过
+fun UserCard(user: UserUiModel) {
+    // user 稳定且内容没变时，这段可以被 Skip
     Text(text = user.name)
 }`,
       },
