@@ -634,8 +634,8 @@ class HomeViewModel : ViewModel() {
 - **DisposableEffect(key)**：需要成对的注册/注销（监听器、回调）时用 \`onDispose\`。
 
 ### 3. 生命周期
-- **两条寿命**：Effect 跟的是「这段组合还在不在树上」；\`viewModel()\`、\`collectAsStateWithLifecycle\` 跟的是 \`LifecycleOwner\`（Activity/Fragment 的 RESUMED 等）。
-- **后台**：页面进后台时组合往往还在，只用 \`LaunchedEffect\` 收集 Flow，后台仍会更新。可见性敏感的采集要带 Lifecycle。
+- **对齐谁**：三个 API 跟 \`LocalLifecycleOwner\`（一般是当前页 NavBackStackEntry），不是组合槽。A→B 时 Activity 仍 \`RESUMED\`，A 的 Entry 会 pause/stop；按 Home 才是 Activity 自己 pause/stop，Entry 跟着掉。
+- **怎么选**：Flow → \`collectAsStateWithLifecycle\`；可见即可 → \`LifecycleStartEffect\`；必须在前台 → \`LifecycleResumeEffect\`。
 
 ### 4. Lazy 列表
 - **通俗心智**：\`Column { items.forEach { Row() } }\` 会把所有行都组合进去。\`LazyColumn\` 只组合可见窗口附近的项。
@@ -686,7 +686,7 @@ fun SearchScreen() {
 ### 二、副作用：进页拉数、离开注销
 
 - **场景解释**：\`@Composable\` 会反复执行，请求 / 监听不能写在函数体里。\`LaunchedEffect\` 与 \`DisposableEffect\` 都对齐 **组合进出**（离开树或 key 变 → 旧的结束、新的再来）；A→B→A 会重新进树，两者都会再跑。
-- **怎么选**：能挂起、取消即停 → \`LaunchedEffect\`（详情按 id 拉数、会话 / 行情 \`collect\`、搜索防抖）。必须成对 add/remove → \`DisposableEffect\`（定位回调、返回键、传感器、三方 \`setListener\`）。仓库已是 Flow 只 \`collect\`，不要再套 \`DisposableEffect\`。
+- **怎么选**：能挂起、取消即停 → \`LaunchedEffect\`（详情按 id 拉数、会话 / 行情 \`collect\`、搜索防抖）。必须成对 add/remove → \`DisposableEffect\`（定位回调、返回键、传感器、三方 \`setListener\`）。
 - **边界**：点按钮才请求 → ViewModel / \`rememberCoroutineScope\`。这个页面实例只做一次（首包、首次进入打点）→ ViewModel \`init\`。用户看见了 / 停留曝光 → 生命周期，不是这两种。
 
 \`\`\`kotlin
@@ -711,22 +711,31 @@ fun UserDetail(userId: String, repo: UserRepo) {
 
 ### 三、生命周期：可见时才收集
 
-- **场景解释**：\`LaunchedEffect\` 只保证「组合还在」。Activity 进后台时组合通常还在，Flow 仍会往下发。位置、相机、轮询这种要跟 \`onResume\`/\`onPause\` 对齐。
+- **场景解释**：上一节 Effect 只保证组合还在，进后台仍可能 \`collect\`。本节三个 API 对齐 \`LifecycleOwner\`（Compose 里一般是 **当前页的 NavBackStackEntry**），不是组合槽，也不等于「只有 Activity 一份生命周期」。单 Activity 导航下，A→全屏 B：**Activity 不会** \`onPause\`/\`onStop\`，A 的 Entry 会；按 Home / 跳到别的 Activity：Activity 自己 pause/stop，当前页 Entry 跟着掉。对 A 的 \`LifecycleResumeEffect\` 来说，**跳到 B 再返回** 和 **Activity pause/resume** 都是进入/离开 \`RESUMED\`，分不清是哪一种。B 若是 Dialog 盖在 A 上，A 往往只 \`onPause\`、未必 \`onStop\`。
+- **怎么选**：Flow 转界面状态 → \`collectAsStateWithLifecycle()\`（默认低于 \`STARTED\` 停收；必须在前台再收则 \`minActiveState = RESUMED\`）。可见即可、不必在前台交互 → \`LifecycleStartEffect\`。定位、相机、停留曝光 → \`LifecycleResumeEffect\`，在 \`onPauseOrDispose\` 里停。
+- **边界**：离开组合也会 \`onPauseOrDispose\`。A→B 不等于 Activity 销毁。
 
 \`\`\`kotlin
 class FeedViewModel : ViewModel() {
     val items: StateFlow<List<FeedItem>> = repository.observeFeed()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun onVisible() { /* 开始定位 / 记下停留起点 */ }
+    fun onHidden() { /* 停定位 / 上报停留时长 */ }
 }
 
 @Composable
 fun FeedRoute(vm: FeedViewModel = viewModel()) {
     val items by vm.items.collectAsStateWithLifecycle()
+
+    LifecycleResumeEffect(Unit) {
+        vm.onVisible()
+        onPauseOrDispose { vm.onHidden() }
+    }
+
     FeedList(items)
 }
 \`\`\`
-
-\`collectAsStateWithLifecycle()\` 默认在 \`STARTED\` 以下停止收集。需要更严时指定 \`minActiveState = Lifecycle.State.RESUMED\`。
 
 ### 四、列表：LazyColumn 与稳定 key
 
