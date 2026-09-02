@@ -614,55 +614,258 @@ class HomeViewModel : ViewModel() {
         tag: '声明式 UI',
         title: 'Jetpack Compose',
         pipeline: [
-          { title: '声明式 UI', subtitle: '描述界面长什么样，由框架去更新', category: 'theory' },
-          { title: '@Composable', subtitle: '编译成对 Composer 的调用，不是普通函数', category: 'theory' },
-          { title: '状态驱动重组', subtitle: '读到的 State 变了，只重跑相关组合', category: 'engineering' },
-          { title: 'Slot Table', subtitle: '用平铺插槽记住上次的结构和 remember', category: 'engineering' },
-          { title: '重组跳过 Skip', subtitle: '参数稳定且 equals 未变则可整段跳过', category: 'engineering' },
-          { title: '副作用边界', subtitle: 'LaunchedEffect / DisposableEffect 对齐组合寿命', category: 'engineering' },
+          { title: '界面状态', subtitle: 'remember / ViewModel；读到的 State 驱动重组', category: 'engineering' },
+          { title: '副作用', subtitle: 'LaunchedEffect / DisposableEffect 对齐组合寿命', category: 'engineering' },
+          { title: '生命周期', subtitle: '组合在树上 ≠ Activity RESUMED', category: 'engineering' },
+          { title: 'Lazy 列表', subtitle: '只组合可见项；用稳定 key 保住行状态', category: 'engineering' },
+          { title: '动画', subtitle: '动画打在 State 上，不要 delay 循环赋值', category: 'engineering' },
+          { title: '指针事件', subtitle: 'clickable / pointerInput；修饰顺序决定谁先吃', category: 'engineering' },
+          { title: '自定义绘制', subtitle: 'drawBehind / Canvas / Layout 拆开职责', category: 'engineering' },
+          { title: 'AndroidView', subtitle: 'factory 建一次，update 里同步 Compose 状态', category: 'engineering' },
         ],
-        explanation: `### 1. 声明式 UI
-- **通俗心智**：命令式 View 是「找到那个按钮，再 setText」。Compose 是「根据当前状态，界面应该是这样」——变的是数据，树由运行时去对齐。
-- **和 XML View 的差别**：没有 \`findViewById\` 改控件；同一套 \`@Composable\` 在状态变化时被再次调用（重组）。
+        explanation: `### 1. 界面状态
+- **通俗心智**：\`@Composable\` 会被反复调用，局部变量每次都是新的。要跨重组保住的值，放进 \`remember\` / \`mutableStateOf\`；一屏业务状态放 ViewModel 的 \`StateFlow\`。
+- **订阅规则**：组合时读到的 \`State\` 会把当前组合登记为观察者，值变了只重跑这些组合。没读到的不会重组。
+- **提升**：多个子组件要共用同一份数，状态放到它们共同的父组合，通过参数往下传、事件往上抛。
 
-### 2. @Composable
-- **不是普通函数**：编译器会插入 \`Composer\`，用来记录调用顺序、缓存 \`remember\`、决定下一段要不要 Skip。
-- **调用顺序就是身份**：同样的 \`Text\` 写两次，靠在 Slot Table 里的位置区分，而不是靠 View id。
+### 2. 副作用
+- **通俗心智**：函数体只描述「现在 UI 长什么样」。网络、监听、弹窗、写磁盘会在重组时被跑多次，必须放进 Effect。
+- **LaunchedEffect(key)**：进入组合时启动协程，离开或 key 变化时取消再开。
+- **DisposableEffect(key)**：需要成对的注册/注销（监听器、回调）时用 \`onDispose\`。
 
-### 3. 状态驱动重组
-- **订阅规则**：组合过程中读到的 \`MutableState\` / \`StateFlow.collectAsState\` 会把当前组合登记为观察者；值一变，这些组合被标记为失效并再执行。
-- **状态放哪**：一屏业务状态通常在 ViewModel；仅控件内部用 \`remember { mutableStateOf() }\`。
+### 3. 生命周期
+- **两条寿命**：Effect 跟的是「这段组合还在不在树上」；\`viewModel()\`、\`collectAsStateWithLifecycle\` 跟的是 \`LifecycleOwner\`（Activity/Fragment 的 RESUMED 等）。
+- **后台**：页面进后台时组合往往还在，只用 \`LaunchedEffect\` 收集 Flow，后台仍会更新。可见性敏感的采集要带 Lifecycle。
 
-### 4. Slot Table
-- **平铺数组**：不维护传统 View 树节点对象，用带间隙缓冲的线性表记下每次 Composable 调用、参数组和 \`remember\` 的值。
-- **工程价值**：重组时按组对比，不必整棵 XML 树 diff。
+### 4. Lazy 列表
+- **通俗心智**：\`Column { items.forEach { Row() } }\` 会把所有行都组合进去。\`LazyColumn\` 只组合可见窗口附近的项。
+- **key**：同一行滑出再滑入，要靠稳定 \`key\` 把 \`remember\` 和滚动位置对回这一行，不能靠列表下标。
 
-### 5. 重组跳过（Skip）
-- **条件**：参数被编译器视为稳定（基础类型、\`@Stable\` / \`@Immutable\`），且 \`equals\` 与上次相同，则这段组合及其子组合可以直接 Skip。
-- **常见踩坑**：不稳定的 \`List\`、每次重组都 \`new\` 的 lambda / 匿名对象，会导致无法 Skip。
+### 5. 动画
+- **通俗心智**：目标值放进 State，用 \`animate*AsState\` / \`Animatable\` / \`AnimatedVisibility\` 让框架按帧插值。不要自己 \`delay\` + 改 State 冒充动画。
 
-### 6. 副作用边界
-- **UI 描述里不要直接搞异步**：网络、监听要放进 \`LaunchedEffect\` / \`DisposableEffect\`，随进入或离开组合启动和取消。
-- **列表**：\`LazyColumn\` 必须提供稳定 \`key\`，否则复用错位、多余重组。`,
+### 6. 指针事件
+- **点击**：\`Modifier.clickable\` / \`Button(onClick)\`。需要拖、双击、长按再用 \`pointerInput { detectTapGestures / detectDragGestures }\`。
+- **修饰顺序**：先写的 Modifier 更靠外；\`clickable\` 和 \`pointerInput\` 叠在一起时，谁先消费由顺序和 \`awaitPointerEventScope\` 的消费策略决定。
+
+### 7. 自定义绘制
+- **画**：已有节点上叠加用 \`Modifier.drawBehind\` / \`drawWithContent\`；独立画布用 \`Canvas { }\`。
+- **量与摆**：自定义排布用 \`Layout { measurables, constraints -> }\` 或 \`Modifier.layout\`。绘制里不要做分配很重的对象。
+
+### 8. AndroidView
+- **用途**：地图、WebView、只有 View SDK 的控件。\`factory\` 里创建一次，\`update\` 里用当前 Compose 状态改 View。
+- **列表**：\`Lazy\` 的 item 里塞 \`AndroidView\` 会按行持有真 View，只在没有 Compose 替代时用。`,
         codeSnippet: `@Composable
+fun ProfileRoute(vm: ProfileViewModel = viewModel()) {
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    ProfileScreen(ui = ui, onRetry = vm::retry)
+}`,
+        caseStudy: `### 一、页面状态：remember 与提升
+
+- **场景解释**：输入框、开关、计数要在多次重组之间活下来。普通 \`var\` 写在 \`@Composable\` 里每次都重置。
+
+\`\`\`kotlin
+@Composable
 fun CounterCard() {
     var count by remember { mutableStateOf(0) }
     Column {
-        Text(text = "点击次数: \$count")
-        Button(onClick = { count++ }) {
-            Text("加一")
+        Text("点击次数: \$count")
+        Button(onClick = { count++ }) { Text("加一") }
+    }
+}
+
+@Composable
+fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
+    TextField(value = query, onValueChange = onQueryChange)
+}
+
+@Composable
+fun SearchScreen() {
+    var query by rememberSaveable { mutableStateOf("") }
+    SearchBar(query = query, onQueryChange = { query = it })
+}
+\`\`\`
+
+控件内部状态用 \`remember\`；旋转后还要在的用 \`rememberSaveable\`；多个子组件共用时把状态放到父组合再往下传。
+
+### 二、副作用：进页拉数、离开注销
+
+- **场景解释**：状态能驱动 UI 了，但 \`@Composable\` 会被反复执行。函数体里直接 \`viewModelScope.launch\` 或 \`addListener\` 会重复请求、重复注册。
+
+\`\`\`kotlin
+@Composable
+fun UserDetail(userId: String, repo: UserRepo) {
+    var user by remember { mutableStateOf<User?>(null) }
+
+    LaunchedEffect(userId) {
+        user = repo.fetch(userId)
+    }
+
+    DisposableEffect(userId) {
+        val listener = repo.observe(userId) { user = it }
+        onDispose { repo.remove(listener) }
+    }
+
+    Text(user?.name ?: "加载中")
+}
+\`\`\`
+
+\`userId\` 变了会取消旧协程、拆掉旧监听，再按新 id 来一遍。
+
+### 三、生命周期：可见时才收集
+
+- **场景解释**：\`LaunchedEffect\` 只保证「组合还在」。Activity 进后台时组合通常还在，Flow 仍会往下发。位置、相机、轮询这种要跟 \`onResume\`/\`onPause\` 对齐。
+
+\`\`\`kotlin
+class FeedViewModel : ViewModel() {
+    val items: StateFlow<List<FeedItem>> = repository.observeFeed()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+}
+
+@Composable
+fun FeedRoute(vm: FeedViewModel = viewModel()) {
+    val items by vm.items.collectAsStateWithLifecycle()
+    FeedList(items)
+}
+\`\`\`
+
+\`collectAsStateWithLifecycle()\` 默认在 \`STARTED\` 以下停止收集。需要更严时指定 \`minActiveState = Lifecycle.State.RESUMED\`。
+
+### 四、列表：LazyColumn 与稳定 key
+
+- **场景解释**：\`Column { list.forEach { Item(it) } }\` 会把所有行都组合进去，长列表卡顿。改用 \`LazyColumn\` 后，若不用稳定 \`key\`，滑出再滑入会把行内 \`remember\` 对错人。
+
+\`\`\`kotlin
+@Composable
+fun FeedList(items: List<FeedItem>) {
+    LazyColumn {
+        items(items, key = { it.id }) { item ->
+            FeedRow(item)
         }
     }
 }
 
-@Immutable
-data class UserUiModel(val id: String, val name: String)
+@Composable
+fun FeedRow(item: FeedItem) {
+    var expanded by remember { mutableStateOf(false) }
+    Text(
+        text = if (expanded) item.body else item.title,
+        modifier = Modifier.clickable { expanded = !expanded },
+    )
+}
+\`\`\`
+
+\`key = { it.id }\` 让「展开」跟着这一条数据走，而不是跟着槽位下标走。
+
+### 五、动画：目标值交给动画 API
+
+- **场景解释**：列表和状态会瞬间切换。用 \`delay\` 循环改 State 会每帧重组。动画 API 按帧插值，打断时也对着新目标走。
+
+\`\`\`kotlin
+@Composable
+fun FavoriteIcon(selected: Boolean) {
+    val scale by animateFloatAsState(if (selected) 1.2f else 1f, label = "fav")
+    Icon(
+        imageVector = Icons.Filled.Favorite,
+        contentDescription = null,
+        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+    )
+}
 
 @Composable
-fun UserCard(user: UserUiModel) {
-    // user 稳定且内容没变时，这段可以被 Skip
-    Text(text = user.name)
-}`,
+fun Panel(open: Boolean) {
+    AnimatedVisibility(visible = open) {
+        Text("面板内容")
+    }
+}
+\`\`\`
+
+连续手势拖动再用 \`Animatable\` + \`pointerInput\` 里 \`snapTo\` / \`animateTo\`。
+
+### 六、事件：点击与手势
+
+- **场景解释**：动画和点击只要 \`clickable\` 就够。拖动、长按、自己决定谁消费事件时，要用 \`pointerInput\`。
+
+\`\`\`kotlin
+@Composable
+fun CardActions(onOpen: () -> Unit, onOffset: (Float) -> Unit) {
+    Box(
+        Modifier
+            .clickable(onClick = onOpen)
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { _, dragAmount ->
+                    onOffset(dragAmount)
+                }
+            },
+    ) {
+        Text("左右拖，点按打开")
+    }
+}
+\`\`\`
+
+需要嵌套滚动（列表在 BottomSheet 里）时，用系统自带的 nested scroll，而不是自己在 \`pointerInput\` 里把 delta 吃光。
+
+### 七、自定义绘制：画与布局分开
+
+- **场景解释**：手势能拿到位移了，系统组件画不出进度环、刻度。在已有组件上叠加用 draw Modifier；完全自己量孩子用 \`Layout\`。
+
+\`\`\`kotlin
+@Composable
+fun ProgressRing(progress: Float, modifier: Modifier = Modifier) {
+    Canvas(modifier.size(48.dp)) {
+        drawArc(
+            color = Color.Gray,
+            startAngle = -90f,
+            sweepAngle = 360f * progress,
+            useCenter = false,
+            style = Stroke(width = 4.dp.toPx()),
+        )
+    }
+}
+
+@Composable
+fun HorizontalSplit(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(content, modifier) { measurables, constraints ->
+        val half = constraints.maxWidth / 2
+        val placeables = measurables.map {
+            it.measure(constraints.copy(minWidth = half, maxWidth = half))
+        }
+        layout(constraints.maxWidth, placeables.maxOf { it.height }) {
+            var x = 0
+            placeables.forEach {
+                it.placeRelative(x, 0)
+                x += half
+            }
+        }
+    }
+}
+\`\`\`
+
+### 八、AndroidView：包一层传统控件
+
+- **场景解释**：绘制和 Lazy 解决不了 WebView、地图这类只有 View SDK 的控件。用 \`AndroidView\` 嵌进去，但不要每次重组都 \`factory\` 里 new。
+
+\`\`\`kotlin
+@Composable
+fun WebPane(url: String, modifier: Modifier = Modifier) {
+    AndroidView(
+        modifier = modifier,
+        factory = { context ->
+            WebView(context).apply {
+                settings.javaScriptEnabled = true
+            }
+        },
+        update = { web ->
+            if (web.url != url) web.loadUrl(url)
+        },
+    )
+}
+\`\`\`
+
+Compose 状态当唯一数据源，只在 \`update\` 里写 View。Activity 的 \`onResume\`/\`onPause\`（地图）仍要在宿主里自己调。`,
       },
       {
         tag: '网络底层',
