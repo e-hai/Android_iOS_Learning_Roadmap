@@ -493,7 +493,7 @@ val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
 
 ### 九、冷流多次值
 
-- **场景解释**：下载进度、搜索联想会连续出值，不是「算完一次就返回」。第八点收口的 \`launch\` / \`async\` / 两种 Scope 都是一次性 Job。多次值用构建器 \`flow { }\`：有人收集才开始跑，块里多次 \`emit\`，块正常 return 则流结束。日常 App 在这条冷流上再接高频操作符：变换、切线程、防抖、取消过期请求、多源拼状态、接到 UI 或另开协程收集。上游失败用 **\`catch\`**，不要把整个 \`collect { }\` 再包成 \`runSuspendCatching\`。
+- **场景解释**：搜索联想会连续出结果，不是算完一次就返回。第八点的 \`launch\` / \`async\` / 两种 Scope 都是一次性 Job，所以改用 \`flow { }\` 多次 \`emit\`。
 
 | 操作符 | 日常干什么 |
 |---|---|
@@ -551,13 +551,63 @@ class SearchViewModel : ViewModel() {
 }
 \`\`\`
 
-- **使用误区**：
-  - 只定义 \`flow { }\` 不去收集：冷流不会跑。
-  - 把一次 \`suspend\` 再包成 \`flow { emit(repo.fetch()) }\`：多此一举，直接 \`launch\` 里调仓库即可。
-  - 在 \`flow { }\` 里 \`launch\` 子协程再 \`emit\`：\`emit\` 只能在这条生产协程里顺序调用。
-  - 用 \`runSuspendCatching { collect { } }\` 接生产失败：上游走 \`catch\`。\`catch\` 接不住 **\`collect { }\` 里**的 throw；要把消费放进 \`onEach\`，再 \`.catch { }.collect()\`。
-  - 以为 \`flowOn\` 会改 \`collect\` 所在线程：它只影响上游。
-  - 在同一个 \`launch\` 里顺序 \`collect\` 两条热流：第一条不结束第二条开不了，长订阅用 \`launchIn\` 或各自 \`launch\`。
+### 十、热流与队列
+
+- **场景解释**：第九点的 \`flow { }\` 是冷的，有人收集才生产，且每个收集者各跑一遍。界面要「现在长什么样」、多处同时听一件事、或一次性跳转只能被拿走一次，要用 \`StateFlow<T>\`、\`SharedFlow<T>\`、\`Channel<E>\`。
+
+| | \`StateFlow<T>\` | \`SharedFlow<T>\` | \`Channel<E>\` |
+|---|---|---|---|
+| 是什么 | 带当前值的状态 | 广播事件 | 队列 |
+| 一条值给谁 | 所有订阅者看同一份最新状态 | 当时所有 collector 各收一份 | 只有一个 receiver 拿走 |
+| 有没有「现在」 | 有，必须带初始值 | 默认没有；\`replay > 0\` 才补历史 | 没有当前值，只有还没被拿走的缓冲 |
+| 晚到的订阅者 | 立刻拿到最新一条 | \`replay = 0\` 则错过 | 还能拿缓冲里剩下的 |
+| 典型 | 整页 UiState、登录态 | 多处同时听「登录成功」 | Toast、导航、支付结果 |
+
+\`\`\`diagram
+                    emit / send
+                         │
+         ┌───────────────┼───────────────┐
+         ▼               ▼               ▼
+   ┌───────────┐  ┌───────────┐  ┌───────────┐
+   │ StateFlow │  │SharedFlow │  │  Channel  │
+   │  当前状态  │  │   广播     │  │   队列     │
+   └─────┬─────┘  └─────┬─────┘  └─────┬─────┘
+    ┌────┴────┐     ┌────┴────┐          │
+    ▼         ▼     ▼         ▼          ▼
+  订阅者A   订阅者B  订阅者A   订阅者B    唯一消费者
+\`\`\`
+
+\`\`\`kotlin
+class HomeViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow("未登录")
+    val uiState: StateFlow<String> = _uiState.asStateFlow()
+
+    private val _loginEvent = MutableSharedFlow<String>(replay = 0)
+    val loginEvent: SharedFlow<String> = _loginEvent.asSharedFlow()
+
+    private val _effects = Channel<String>(Channel.BUFFERED)
+
+    fun login() {
+        viewModelScope.launch {
+            _uiState.value = "已登录"
+            _loginEvent.emit("登录成功")
+            _effects.send("去首页")
+        }
+    }
+
+    init {
+        uiState
+            .onEach { state -> Log.d("Home", "状态: \${state}") }
+            .launchIn(viewModelScope)
+        loginEvent
+            .onEach { event -> Log.d("Home", "广播: \${event}") }
+            .launchIn(viewModelScope)
+        _effects.receiveAsFlow()
+            .onEach { effect -> Log.d("Home", "副作用: \${effect}") }
+            .launchIn(viewModelScope)
+    }
+}
+\`\`\`
 `,
       },
       {
