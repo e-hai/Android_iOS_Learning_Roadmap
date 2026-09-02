@@ -181,7 +181,7 @@ function renderSingleChapterView(
     const extSection = document.createElement('section');
     extSection.className = 'chapter-content-section extended-deep-dive-section';
     const sectionTitle = platform === 'android'
-      ? 'Kotlin 协程 5 层垂直架构透视'
+      ? '分层架构透视'
       : 'Swift 并发 4 级全景透视';
     extSection.innerHTML = `
       <div class="section-header">

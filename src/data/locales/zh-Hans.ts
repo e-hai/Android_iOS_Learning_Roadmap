@@ -310,7 +310,7 @@ export const zhHans: Record<string, string> = {
   "sidebar.to_roadmap": "切换至：双端路线图",
   "sidebar.to_roadmap_desc": "16 阶段双端工程全景对照",
   "stage.domain_01_basics.title": "平台基础与核心框架",
-  "stage.domain_01_basics.goal": "深入掌握移动端基础与核心框架体系：Kotlin 协程与并发调度、现代语法与内存模型、声明式 UI (Compose/SwiftUI)、网络访问与通信 (OkHttp/URLSession)、本地持久化 (Room/SwiftData)、页面路由 (Navigation3) 与依赖注入 (Koin)。",
+  "stage.domain_01_basics.goal": "深入掌握移动端基础与核心框架体系：Kotlin 协程与并发调度、声明式 UI (Compose/SwiftUI)、网络访问与通信 (OkHttp/URLSession)、本地持久化 (Room/SwiftData)、页面路由 (Navigation3) 与依赖注入 (Koin)。",
   "stage.domain_01_basics.hint": "[ 模块 01: 平台基础与核心框架全景架构 ]\n\n 1. 【并发核心】\n    Android: 协程挂起状态机 (K1/K2) + Continuation + Dispatchers + repeatOnLifecycle\n    iOS:     Swift Concurrency (async/await) + Task 树 + @MainActor + Actor 数据隔离\n\n 2. 【声明式 UI、列表与手势】\n    Android: Compose Slot Table + remember/LaunchedEffect + LazyColumn + pointerInput / NestedScroll\n    iOS:     SwiftUI AttributeGraph + @State/.task + List / LazyVStack + DragGesture\n\n 3. 【网络通信与本地持久化】\n    Android: Retrofit + OkHttp (连接池/拦截器) ──▶ Room (Schema 迁移/Flow 响应式)\n    iOS:     URLSession (后台守护/自定义协议) ──▶ SwiftData / CoreData (ModelContext)",
   "stage.domain_01_basics.note.0": "【协程/并发与生命周期绑定】Android 必须使用 collectAsStateWithLifecycle() 或 repeatOnLifecycle 收集状态流，避免后台无谓消耗 CPU；iOS 必须在 ViewModel 标记 @MainActor 并使用 .task 自动取消任务。",
   "stage.domain_01_basics.note.1": "【Compose Slot Table 与重组优化】使用 @Stable / @Immutable 标注非纯基础类型参数，确保 Compose 编译器生成跳过重组字节码；列表必须显式指定稳定 key 与 contentType 避免全表重绘。",

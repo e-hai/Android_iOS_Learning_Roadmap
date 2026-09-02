@@ -37,728 +37,6 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
 ### 6. Job + Dispatcher：身份与调度的两条正交轴
 - **Job（身份与拓扑树）**：负责管理生命周期、父子协程树取消级联与异常隔离（\`SupervisorJob\` 保护兄弟任务）。
 - **Dispatcher（物理调度载体）**：负责把恢复任务分发到具体的线程队列（\`Main\` 绑定主线程 Looper，\`Default\` 运行 CPU 密集型工作窃取线程池，\`IO\` 弹性扩张阻塞线程池）。两者完全正交解耦。`,
-        extendedDeepDive: `### 第一层：编译器层（不可见，自动生成）
-\`\`\`diagram
-suspend 函数
-    │ 编译时 CPS 转换
-    ▼
-Continuation + 状态机（每个挂起点对应一个状态）
-\`\`\`
-
-### 第二层：基础接口层（协程的地基）
-\`\`\`diagram
-Continuation<T>（续体，挂起/恢复的核心）
-    ├── val context: CoroutineContext
-    └── fun resumeWith(result: Result<T>)
-
-CoroutineContext（上下文容器，存储配置元素）
-    └── Element（内部接口，上下文的元素）
-            ├── Job（接口）                          ← 协程生命周期
-            ├── CoroutineDispatcher（抽象类）        ← 线程调度
-            └── CoroutineExceptionHandler（接口）     ← 异常兜底
-\`\`\`
-
-### 第三层：Job 实现层（两个独立分支）
-\`\`\`diagram
-Job（接口）
-    │
-    ├── CompletableJob（接口）              ← 分支 1：纯句柄，无协程体
-    │       └── JobImpl（类）               ← Job() 工厂函数创建
-    │               └── SupervisorJobImpl   ← SupervisorJob() 工厂函数创建
-    │
-    └── AbstractCoroutine<T>（抽象类）      ← 分支 2：真正的协程
-            ├── 实现 Job                    ← 生命周期管理
-            ├── 实现 Continuation           ← 挂起/恢复
-            ├── 实现 CoroutineScope         ← 启动子协程
-            │
-            ├── StandaloneCoroutine         ← launch 创建
-            ├── DeferredCoroutine           ← async 创建
-            ├── BlockingCoroutine           ← runBlocking 创建
-            └── ScopeCoroutine              ← coroutineScope 创建
-                    └── SupervisorCoroutine ← supervisorScope 创建
-\`\`\`
-
-### 第四层：构建器层（日常开发使用的 API）
-\`\`\`diagram
-CoroutineScope（接口，提供运行环境）
-    ├── fun launch(...): Job                ← 创建协程
-    ├── fun <T> async(...): Deferred<T>     ← 创建协程并返回结果
-    └── 扩展函数
-
-挂起函数构建器
-    ├── runBlocking { }                     ← 阻塞式，创建 BlockingCoroutine
-    ├── coroutineScope { }                  ← 临时作用域，等待所有子协程，创建 ScopeCoroutine
-    └── supervisorScope { }                 ← 临时作用域，隔离异常，创建 SupervisorCoroutine
-
-Job 工厂函数
-    ├── Job(parent: Job? = null): CompletableJob
-    └── SupervisorJob(parent: Job? = null): CompletableJob
-
-调度器
-    ├── Dispatchers.Main                    ← Android 主线程
-    ├── Dispatchers.IO                      ← IO 线程池
-    ├── Dispatchers.Default                 ← CPU 线程池
-    └── Dispatchers.Unconfined              ← 不切换线程
-\`\`\`
-
-### 第五层：应用层（Android 开发直接使用）
-\`\`\`diagram
-生命周期感知作用域
-    ├── viewModelScope                     ← ViewModel 存活期间
-    ├── lifecycleScope                     ← Activity/Fragment 存活期间
-    └── rememberCoroutineScope             ← Composable 存活期间
-
-响应式 API
-    ├── Flow<T>                            ← 冷流
-    ├── StateFlow<T>                       ← 状态流
-    ├── SharedFlow<T>                      ← 共享流
-    └── Channel<E>                         ← 通道
-\`\`\``,
-        caseStudy: `### 一、viewModelScope 场景下 Job 与 SupervisorJob 的行为差异
-
-\`viewModelScope\` 内部实际的 Context 是 \`SupervisorJob() + Dispatchers.Main.immediate\`。为了搞清楚这个选择背后的原因，用 \`Job()\` 和 \`SupervisorJob()\` 各写一组对照代码，分两轮实验：先看不装异常处理器时的差异，再看装了 \`CoroutineExceptionHandler\` 之后差异是否还成立。
-
-#### 实验一：不安装 CoroutineExceptionHandler
-
-\`\`\`kotlin
-fun testJob() {
-    val scope = CoroutineScope(Job() + Dispatchers.Main.immediate)
-
-    scope.launch {
-        throw RuntimeException("任务 A 致命错误")
-    }
-
-    scope.launch {
-        delay(500.milliseconds)
-        println("[任务 B] 完成")
-    }
-}
-
-fun testSupervisorJob() {
-    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
-    supervisorScope.launch {
-        throw RuntimeException("任务 A 致命错误")
-    }
-    supervisorScope.launch {
-        delay(500.milliseconds)
-        println("[任务 B] 完成")
-    }
-}
-\`\`\`
-
-- **Job() 结果**：控制台只看到 A 的异常堆栈，\`[任务 B] 完成\` **不会被打印**；应用**崩溃**。
-- **testSupervisorJob() 结果**：控制台只看到 A 的异常堆栈，\`[任务 B] 完成\` **大概率不会被打印**（协程未杀 B，但因 A 未捕获导致进程崩溃陪葬）；应用**崩溃**。
-
-#### 实验二：安装 CoroutineExceptionHandler
-
-\`\`\`kotlin
-fun testJob() {
-    val scope = CoroutineScope(Job() + Dispatchers.Main.immediate)
-
-    scope.launch(CoroutineExceptionHandler { _, e ->
-        println("[任务 A] handler 捕获: \${e.message}")
-    }) {
-        throw RuntimeException("任务 A 致命错误")
-    }
-
-    scope.launch {
-        delay(500.milliseconds)
-        println("[任务 B] 完成")
-    }
-}
-
-fun testSupervisorJob() {
-    val supervisorScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-
-    supervisorScope.launch(CoroutineExceptionHandler { _, e ->
-        println("[任务 A] handler 捕获: \${e.message}")
-    }) {
-        throw RuntimeException("任务 A 致命错误")
-    }
-    supervisorScope.launch {
-        delay(500.milliseconds)
-        println("[任务 B] 完成")
-    }
-}
-\`\`\`
-
-- **Job() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **不会被打印**；应用**正常**。
-- **testSupervisorJob() 结果**：控制台看到 A 的异常堆栈，\`[任务 B] 完成\` **被打印**；应用**正常**。
-
-### 二、协程安全版 runSuspendCatching
-
-\`\`\`kotlin
-/**
- * 协程安全版 runCatching：自动放行 CancellationException，保证生命周期正常取消！
- */
-inline fun <T> runSuspendCatching(block: () -> T): Result<T> {
-    return try {
-        Result.success(block())
-    } catch (e: CancellationException) {
-        throw e // ⚡ 核心：遇到取消异常必须重新抛出，绝不当成业务异常吞掉！
-    } catch (e: Throwable) {
-        Result.failure(e)
-    }
-}
-\`\`\`
-
-- **为什么要单独封装？**：Kotlin 标准库的 \`runCatching\` 内部无脑捕获了 \`Throwable\`，会把用户退出页面时的正常取消信号（\`CancellationException\`）当成普通业务错误吞掉，导致协程无法及时终止、继续违规刷新已销毁的 UI。
-
-- **重新抛出 CancellationException 为什么不会导致崩溃？**：当你在 \`runSuspendCatching\` 内部 \`throw e\`（重新抛出取消异常）时，这个异常会一路冒泡到 \`launch\` 的最顶层。
-
-让我们看一下 Kotlin 协程底层在顶层收拢异常时的真实源码处理逻辑（精简示意）：
-
-\`\`\`kotlin
-// kotlinx.coroutines 官方底层异常分发逻辑
-internal fun handleCoroutineException(context: CoroutineContext, exception: Throwable) {
-    // ⚡ 协程框架的特权判断：
-    if (exception is CancellationException) {
-        // 1. 如果是取消异常，直接标记协程为 CANCELLED 正常退出
-        // 2. 绝不调用 CoroutineExceptionHandler！
-        // 3. 绝不上报给操作系统的 UncaughtExceptionHandler！
-        return // 👈 静默安全退出，0 崩溃！
-    }
-    // 只有非 CancellationException 的真正严重错误，才会去激活 CEH 或触发崩溃
-    val handler = context[CoroutineExceptionHandler]
-    if (handler != null) {
-        handler.handleException(context, exception)
-    } else {
-        // 没装 CEH，交给 Java 线程默认处理器，App 闪退
-        Thread.currentThread().uncaughtExceptionHandler.uncaughtException(...)
-    }
-}
-\`\`\`
-
-也就是说，协程框架在最顶层会对 \`CancellationException\` 进行特殊拦截与静默放行，它是受框架官方保护的！
-
-### 三、链式流转
-
-- **场景解释**：第二步查用户依赖第一步的 Token，顺序链式调用；若第一步失败，第二步自动跳过并由 \`runSuspendCatching\` 捕获错误。
-
-\`\`\`kotlin
-class ProfileViewModel : ViewModel() {
-    fun loadUserData() {
-        viewModelScope.launch {
-            Log.d("Profile", "开始加载用户数据...")
-            runSuspendCatching {
-                val token = fetchToken()
-                fetchUserInfo(token)
-            }.onSuccess { user ->
-                Log.d("Profile", "获取成功: $user")
-            }.onFailure { error ->
-                Log.e("Profile", "加载失败: \${error.message}")
-            }
-        }
-    }
-
-    private suspend fun fetchToken(): String = withContext(Dispatchers.IO) {
-        delay(300.milliseconds)
-        "token_888888"
-    }
-
-    private suspend fun fetchUserInfo(token: String): String = withContext(Dispatchers.IO) {
-        delay(300.milliseconds)
-        "用户 [张三]，使用凭据: $token"
-    }
-}
-\`\`\`
-
-### 四、旁路并发
-
-- **场景解释**：主任务专心扣款，顺手丢个子任务去后台打点（不用等它）；打点即使报错自己吞掉，绝不能耽误主任务付钱。
-
-\`\`\`kotlin
-class OrderViewModel : ViewModel() {
-    fun buyProduct(productId: String) {
-        viewModelScope.launch {
-            Log.d("Order", "开始提交订单...")
-
-            launch {
-                runSuspendCatching { trackBuyEvent(productId) }
-            }
-
-            runSuspendCatching {
-                payOrder(productId)
-            }.onSuccess {
-                Log.d("Order", "支付成功")
-            }.onFailure { error ->
-                Log.e("Order", "支付失败: \${error.message}")
-            }
-        }
-    }
-
-    private suspend fun payOrder(productId: String) = withContext(Dispatchers.IO) {
-        delay(500.milliseconds)
-    }
-
-    private suspend fun trackBuyEvent(productId: String) = withContext(Dispatchers.IO) {
-        delay(200.milliseconds)
-    }
-}
-\`\`\`
-
-### 五、并行聚合
-
-- **场景解释**：详情页要同时拉商品和优惠券，两路互不依赖，但都要返回值再拼成一屏，当作一次整体加载。第四点的内层 \`launch\` 只能拿到 \`Job\`，没有结果可合并，所以改用 \`async\`：先齐发拿到 \`Deferred\`，再统一 \`await\`。
-
-\`\`\`kotlin
-class ProductViewModel : ViewModel() {
-    fun loadProductDetail(productId: String) {
-        viewModelScope.launch {
-            Log.d("Product", "开始加载商品与优惠券...")
-            val goodsDeferred = async {
-                runSuspendCatching { fetchGoods(productId) }
-            }
-            val couponDeferred = async {
-                runSuspendCatching { fetchCoupons(productId) }
-            }
-            val goods = goodsDeferred.await().getOrElse {
-                Log.d("Product", "加载商品失败")
-                return@launch
-            }
-            val coupons = couponDeferred.await().getOrElse {
-                Log.d("Product", "加载优惠券失败")
-                return@launch
-            }
-            Log.d("Product", "合并结果: 商品=$goods, 优惠券=$coupons")
-        }
-    }
-
-    private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
-        delay(300.milliseconds)
-        "iPhone 16"
-    }
-
-    private suspend fun fetchCoupons(id: String): String = withContext(Dispatchers.IO) {
-        delay(200.milliseconds)
-        "满 5000 减 400"
-    }
-}
-\`\`\`
-
-- **使用误区（假并发）**：避免刚 \`async\` 就立马 \`await\`，导致代码退化为串行阻塞。必须**先全部发起 \`async\`，最后再统一 \`await()\`**。
-
-\`\`\`kotlin
-// ❌ 错误写法（假并发：刚 async 就立马 await，退化为串行阻塞 500ms）
-val goods = async { fetchGoods(productId) }.await()     // ⏳ 等待 300ms 完成后才发下一个
-val coupons = async { fetchCoupons(productId) }.await() // ⏳ 再等待 200ms
-
-// ✅ 正确写法（真并发：先同时发起，最后统一 await 合并，总耗时仅需 max(300ms, 200ms) = 300ms）
-val goodsDeferred = async { fetchGoods(productId) }
-val couponDeferred = async { fetchCoupons(productId) }
-
-val goods = goodsDeferred.await()
-val coupons = couponDeferred.await()
-\`\`\`
-
-### 六、黑盒并发
-
-- **场景解释**：把第五点的并行从 ViewModel 收成 Repository 的一个挂起函数。\`suspend fun\` 不是 Scope，不能直接 \`async\`，所以用 \`coroutineScope\`：对内全成或全败，对外一次调用。
-
-\`\`\`kotlin
-data class ProductDetail(val goods: String, val coupons: String)
-
-class ProductRepository {
-    suspend fun getProductDetail(productId: String): ProductDetail = coroutineScope {
-        val goodsDeferred = async { fetchGoods(productId) }
-        val couponDeferred = async { fetchCoupons(productId) }
-
-        ProductDetail(
-            goods = goodsDeferred.await(),
-            coupons = couponDeferred.await()
-        )
-    }
-
-    private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
-        delay(300.milliseconds)
-        "iPhone 16"
-    }
-
-    private suspend fun fetchCoupons(id: String): String = withContext(Dispatchers.IO) {
-        delay(200.milliseconds)
-        "满 5000 减 400"
-    }
-}
-
-class ProductViewModel(private val repository: ProductRepository) : ViewModel() {
-    fun load(productId: String) {
-        viewModelScope.launch {
-            Log.d("Product", "开始加载商品详情...")
-            runSuspendCatching {
-                repository.getProductDetail(productId)
-            }.onSuccess { detail ->
-                Log.d("Product", "加载成功: $detail")
-            }.onFailure { error ->
-                Log.e("Product", "加载失败: \${error.message}")
-            }
-        }
-    }
-}
-\`\`\`
-
-- **使用误区**：要保住全成全败，异常必须漏出子 Job，交给 \`coroutineScope\` 抛给调用方。
-  1. **不要在 \`async\` 里接异常**：子 Job 会变成成功，兄弟不会取消，仓库对外也像成功返回。
-  2. **不要对 \`await\` 接异常**：子 Job 一失败，scope 已经在取消兄弟；catch 住 \`await\` 救不活这段 \`coroutineScope\`，也保不住另一路。
-
-\`\`\`kotlin
-// ❌ 在 async 里接住：子 Job 成功，没有熔断
-val couponDeferred = async {
-    runSuspendCatching { fetchCoupons(productId) }
-}
-
-// ❌ 对 await 接住：商品请求已被连坐取消，整段 scope 仍已失败
-val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
-
-// ✅ 直接抛，让 coroutineScope 交到仓库外面
-val goods = goodsDeferred.await()
-val coupons = couponDeferred.await()
-\`\`\`
-
-### 七、局部容灾
-
-- **场景解释**：优惠券是次要数据，失败应降级为 \`null\`，商品必须继续。第六点在 \`coroutineScope\` 里对 \`await\` 接异常救不了兄弟请求（子失败已经连坐取消）。换成 \`supervisorScope\` 后，子任务失败默认不取消兄弟，但块自己抛仍会整段取消，所以必须在次要路的 **\`couponDeferred.await()\`** 上接住。核心路 \`goodsDeferred.await()\` 仍直接抛，整页失败。
-
-\`\`\`kotlin
-data class ProductDetail(val goods: String, val coupons: String?)
-
-class ProductRepository {
-    suspend fun getProductDetail(productId: String): ProductDetail = supervisorScope {
-        val goodsDeferred = async { fetchGoods(productId) }
-        val couponDeferred = async { fetchCoupons(productId) }
-
-        val goods = goodsDeferred.await() // 核心路：直接抛，整页失败
-        val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull() // 次要路：只在 await 上接
-        ProductDetail(goods, coupons)
-    }
-
-    private suspend fun fetchGoods(id: String): String = withContext(Dispatchers.IO) {
-        delay(300.milliseconds)
-        "iPhone 16"
-    }
-
-    private suspend fun fetchCoupons(id: String): String = withContext(Dispatchers.IO) {
-        delay(200.milliseconds)
-        throw RuntimeException("优惠券接口 500 异常")
-    }
-}
-
-class ProductViewModel(private val repository: ProductRepository) : ViewModel() {
-    fun load(productId: String) {
-        viewModelScope.launch {
-            Log.d("Product", "开始加载商品详情...")
-            runSuspendCatching {
-                repository.getProductDetail(productId)
-            }.onSuccess { detail ->
-                Log.d("Product", "加载成功: $detail")
-            }.onFailure { error ->
-                Log.e("Product", "加载失败: \${error.message}")
-            }
-        }
-    }
-}
-\`\`\`
-
-- **使用误区**：不要在 \`async\` 里接异常。子 Job 会变成成功，\`supervisorScope\` 与 \`coroutineScope\` 对这条任务没有区别，监督白开。
-
-\`\`\`kotlin
-// ❌ 包进 async：子 Job 成功，两种 Scope 没区别
-val couponDeferred = async {
-    runSuspendCatching { fetchCoupons(productId) }
-}
-
-// ✅ 让 async 直接抛，只在次要路的 await 上接
-val couponDeferred = async { fetchCoupons(productId) }
-val coupons = runSuspendCatching { couponDeferred.await() }.getOrNull()
-\`\`\`
-
-### 八、对照收口
-
-- **场景解释**：第四到七点分别解决旁路、要返回值、全成全败、部分降级。这里把 \`launch\` / \`async\` / \`coroutineScope\` / \`supervisorScope\` 放回同一套判断：子 Job 是否把异常漏出去，以及异常接到哪。
-
-| 你要的 | 用什么 | 异常接到哪 |
-|---|---|---|
-| 不等结果、别耽误主任务 | 内层 \`launch\` | 写在这条 \`launch\` **体内** |
-| 并行且要返回值，失败变成 \`Result\` | \`async\` + \`await\` | 可以接在 \`async\` **体内**；此时 Scope 看不见失败 |
-| 并行、全成全败、对外一个 \`suspend\` | \`coroutineScope\` + \`async\` | 两边都不要接，让 scope 抛给调用方 |
-| 并行、次要路可失败 | \`supervisorScope\` + \`async\` | 不要接在 \`async\` 里；只接次要路的 \`await\`；核心路继续抛 |
-
-- 这四个看的都是 **lambda 有没有把异常漏出去**，不是 \`Result.success\`。
-- 单次 \`suspend\` 调用仍走官方默认：\`launch\` 里 \`try/catch\`（或 \`runSuspendCatching\`）包住仓库调用，不必上 Scope。
-
-- **使用误区**：
-  - 用 \`launch\` 去拼返回值：只有 \`Job\`，合并不了，要返回值用 \`async\`。
-  - 在 \`coroutineScope\` 里接 \`async\` 或 \`await\`：熔断没了，也救不活兄弟。
-  - 开了 \`supervisorScope\` 却在 \`async\` 里接，或次要路裸 \`await\`：监督无效，或块失败又全灭。
-
-### 九、冷流多次值
-
-- **场景解释**：搜索联想会连续出结果，不是算完一次就返回。第八点的 \`launch\` / \`async\` / 两种 Scope 都是一次性 Job，所以改用 \`flow { }\` 多次 \`emit\`。
-
-| 操作符 | 日常干什么 |
-|---|---|
-| \`map\` / \`filter\` | 变换、丢掉不需要的元素 |
-| \`onEach\` | 不改变数据，旁路打日志 / 副作用；再配合 \`collect()\` 让后面的 \`catch\` 能接到消费异常 |
-| \`catch\` | 只接它**上游**的失败，可 \`emit\` 降级 |
-| \`flowOn\` | 只切换**上游**调度器（如 \`Dispatchers.IO\`） |
-| \`debounce\` | 搜索框停一下再发，避免每个字打一次网 |
-| \`flatMapLatest\` | 新查询来了就取消上一次请求 |
-| \`combine\` | 搜索词 + Tab 等**持续状态**拼成一屏条件 |
-| \`stateIn\` | 冷流在 ViewModel 里收成 \`StateFlow\` 给 UI |
-| \`collect { }\` / \`collect()\` | 当前协程收到底；无参版给 \`onEach\` 链收尾 |
-| \`launchIn\` | 另开协程收集，当前函数不等（\`init\` 里订长流） |
-
-\`\`\`kotlin
-class SearchViewModel : ViewModel() {
-    private val queryFlow = MutableStateFlow("")
-    private val tabFlow = MutableStateFlow("综合")
-
-    val results: StateFlow<List<String>> = combine(queryFlow, tabFlow) { query, tab ->
-        query.trim() to tab
-    }
-        .debounce(300.milliseconds)
-        .filter { (query, _) -> query.isNotEmpty() }
-        .flatMapLatest { (query, tab) ->
-            flow {
-                emit(search(query, tab))
-            }.flowOn(Dispatchers.IO)
-        }
-        .map { list -> list.take(20) }
-        .catch { error ->
-            Log.e("Search", "搜索失败: \${error.message}")
-            emit(emptyList())
-        }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = emptyList(),
-        )
-
-    init {
-        results
-            .onEach { list -> Log.d("Search", "结果数: \${list.size}") }
-            .launchIn(viewModelScope)
-    }
-
-    fun onQuery(text: String) {
-        queryFlow.value = text
-    }
-
-    private suspend fun search(query: String, tab: String): List<String> {
-        delay(200.milliseconds)
-        return listOf("\$tab:\$query")
-    }
-}
-\`\`\`
-
-### 十、热流与队列
-
-- **场景解释**：第九点的 \`flow { }\` 是冷的，有人收集才生产，且每个收集者各跑一遍。界面「现在长什么样」用 \`StateFlow<T>\`；多处同时听一件事用 \`SharedFlow<T>\`；导航 / Toast 这类**副作用**不是状态，用 \`Channel<E>\` 排队，只被拿走一次。
-
-| | \`StateFlow<T>\` | \`SharedFlow<T>\` | \`Channel<E>\` |
-|---|---|---|---|
-| 是什么 | 带当前值的状态 | 广播事件 | 副作用队列 |
-| 一条值给谁 | 所有订阅者看同一份最新状态 | 当时所有 collector 各收一份 | 只有一个 receiver 拿走 |
-| 有没有「现在」 | 有，必须带初始值 | 默认没有；\`replay > 0\` 才补历史 | 没有当前值，只有还没被拿走的缓冲 |
-| 晚到的订阅者 | 立刻拿到最新一条 | \`replay = 0\` 则错过 | 还能拿缓冲里剩下的 |
-| 典型 | 整页 UiState、登录态 | 多处同时听「登录成功」 | 导航、Toast、支付结果（UiEffect） |
-
-\`\`\`diagram
-                    emit / send
-                         │
-         ┌───────────────┼───────────────┐
-         ▼               ▼               ▼
-   ┌───────────┐  ┌───────────┐  ┌───────────┐
-   │ StateFlow │  │SharedFlow │  │  Channel  │
-   │  当前状态  │  │   广播     │  │  副作用    │
-   └─────┬─────┘  └─────┬─────┘  └─────┬─────┘
-    ┌────┴────┐     ┌────┴────┐          │
-    ▼         ▼     ▼         ▼          ▼
-  订阅者A   订阅者B  订阅者A   订阅者B    唯一消费者
-\`\`\`
-
-\`\`\`kotlin
-class HomeViewModel : ViewModel() {
-    private val _uiState = MutableStateFlow("未登录")
-    val uiState: StateFlow<String> = _uiState.asStateFlow()
-
-    private val _loginEvent = MutableSharedFlow<String>(replay = 0)
-    val loginEvent: SharedFlow<String> = _loginEvent.asSharedFlow()
-
-    private val _effects = Channel<String>(Channel.BUFFERED)
-
-    fun login() {
-        viewModelScope.launch {
-            _uiState.value = "已登录"
-            _loginEvent.emit("登录成功")
-            _effects.send("去首页")
-        }
-    }
-
-    init {
-        uiState
-            .onEach { state -> Log.d("Home", "状态: \${state}") }
-            .launchIn(viewModelScope)
-        loginEvent
-            .onEach { event -> Log.d("Home", "广播: \${event}") }
-            .launchIn(viewModelScope)
-        _effects.receiveAsFlow()
-            .onEach { effect -> Log.d("Home", "副作用: \${effect}") }
-            .launchIn(viewModelScope)
-    }
-}
-\`\`\`
-`,
-      },
-      {
-        tag: '内存模型',
-        title: '可达性、引用类型与泄漏排查',
-        pipeline: [
-          { title: 'GC Roots 与可达性', subtitle: '从根出发能碰到的对象才算活着', category: 'theory' },
-          { title: '强引用与弱引用', subtitle: '握得住才泄漏；WeakReference 可被回收', category: 'theory' },
-          { title: 'ART 何时回收', subtitle: '分代堆上不可达对象才会被清掉', category: 'engineering' },
-          { title: '常见泄漏形态', subtitle: '单例、回调、Handler 抓住短命对象', category: 'engineering' },
-          { title: 'LeakCanary 探测', subtitle: '销毁后弱引用仍未入队即疑似泄漏', category: 'engineering' },
-          { title: '读链与拆链', subtitle: '沿最短强引用链找到该松开的那一环', category: 'engineering' },
-        ],
-        explanation: `### 1. GC Roots 与可达性
-- **通俗心智**：垃圾回收不问「你还想不想要」，只问「从根出发还能不能摸到你」。摸不到的对象才是垃圾。
-- **常见根**：线程栈上的局部变量、静态字段、JNI 全局引用等。Activity 被静态字段抓住，对 GC 来说它仍然可达。
-
-### 2. 强引用与弱引用
-- **强引用**：\`val activity = this\` 这种普通引用，可达则绝不因内存压力被回收。
-- **弱引用**：\`WeakReference(activity)\` 不阻止回收；GC 后 \`get()\` 可能为 \`null\`。软引用介于两者之间，Android 业务里更少用。
-- **工程直觉**：泄漏几乎都是「不该活这么久的对象，被更长命的强引用抓住」。
-
-### 3. ART 何时回收
-- **分代直觉**：新对象多在年轻代，活得久的晋升到老年代；不可达对象在一次 GC 后被清掉。
-- **不必死记算法名**：日常排查先确认「谁还握着强引用」，再考虑 GC 参数与版本差异。
-
-### 4. 常见泄漏形态
-- **单例 / 伴生对象** 持有 \`Activity\` / \`View\` / \`Context\`。
-- **Listener / 回调** 注册后未按生命周期注销。
-- **静态 \`Handler\` / 匿名内部类** 隐式持有外部 \`Activity\`，消息还在队列里时页面已销毁。
-
-### 5. LeakCanary 探测
-- **流程**：页面 \`onDestroy\` 后用弱引用盯住对象 → 等一段时间并触发 GC → 若弱引用仍未进入 \`ReferenceQueue\`，则导出 Hprof，算最短强引用链。
-- **结论**：它证明的是「销毁后仍可达」，并指出链路上每一环，而不是替你改代码。
-
-### 6. 读链与拆链
-- **读链**：从 GC Root 走到泄漏对象，每一跳都是一个字段或集合元素。
-- **拆链**：松开不该跨生命周期的那一环——\`null\` 掉引用、注销回调、改用 \`ApplicationContext\`、或让短命对象只被短命持有者引用。`,
-        extendedDeepDive: `### 第一层：可达性判定
-\`\`\`diagram
-GC Roots（静态字段 / 栈帧 / JNI…）
-    │ 强引用边
-    ▼
-可达对象图 ──▶ 存活
-摸不到的对象 ──▶ 可被回收
-\`\`\`
-
-### 第二层：引用强度（业务常用）
-\`\`\`diagram
-强引用 Strong ──▶ 可达则保留
-弱引用 Weak  ──▶ 不阻止回收，get() 可能为 null
-（软引用 Soft 介于两者，缓存场景偶用）
-\`\`\`
-
-### 第三层：LeakCanary 探测时序
-\`\`\`diagram
-Activity.onDestroy
-    │
-    ▼
-KeyedWeakReference(activity) + ReferenceQueue
-    │
-    ▼
-延迟一段时间 + 请求 GC
-    │
-    ├─ 弱引用已入队 ──▶ 对象已被回收，无泄漏
-    └─ 仍未入队 ──▶ 导出 Hprof，解析最短强引用链
-\`\`\``,
-        caseStudy: `### 一、伴生对象抓住 Activity
-
-- **场景解释**：工具类用伴生对象缓存「当前页面」，方便全局弹 Toast。页面销毁后静态字段仍握着 \`Activity\`，旋转或反复进出后旧页面无法回收。
-
-\`\`\`kotlin
-class LeakActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        CurrentPage.activity = this
-        Log.d("Leak", "已把 Activity 交给伴生对象")
-    }
-
-    override fun onDestroy() {
-        // 忘记 CurrentPage.activity = null
-        super.onDestroy()
-        Log.d("Leak", "onDestroy，但静态字段可能仍握着 this")
-    }
-}
-
-object CurrentPage {
-    var activity: Activity? = null
-}
-\`\`\`
-
-\`\`\`kotlin
-// ✅ 销毁时松开；或根本不要缓存 Activity，改传 ApplicationContext
-override fun onDestroy() {
-    if (CurrentPage.activity === this) {
-        CurrentPage.activity = null
-    }
-    super.onDestroy()
-}
-\`\`\`
-
-### 二、Listener 注册后未注销
-
-- **场景解释**：仓库是长生命周期单例，\`addListener\` 把页面回调放进列表。页面销毁后列表里仍有该回调，回调若捕获了页面，页面就泄漏。
-
-\`\`\`kotlin
-object LocationRepo {
-    private val listeners = mutableListOf<(String) -> Unit>()
-
-    fun addListener(listener: (String) -> Unit) {
-        listeners += listener
-    }
-
-    fun removeListener(listener: (String) -> Unit) {
-        listeners -= listener
-    }
-}
-
-class MapActivity : AppCompatActivity() {
-    private val onLocation: (String) -> Unit = { loc ->
-        Log.d("Leak", "页面还在收位置: \${loc}")
-    }
-
-    override fun onStart() {
-        super.onStart()
-        LocationRepo.addListener(onLocation)
-    }
-
-    override fun onStop() {
-        // ❌ 若漏掉 remove，单例继续握着 onLocation → 握着 Activity
-        LocationRepo.removeListener(onLocation)
-        super.onStop()
-    }
-}
-\`\`\`
-
-### 三、读 LeakCanary 最短链并拆掉
-
-- **场景解释**：报告给出从 GC Root 到 \`LeakActivity\` 的最短强引用链。要拆的是链上「跨生命周期」的那一环，而不是在业务里手动调 GC。
-
-\`\`\`diagram
-GcRoot: CurrentPage 的静态字段 activity
-    │
-    ▼
-LeakActivity instance
-\`\`\`
-
-- 链上是 \`CurrentPage.activity\` → 在 \`onDestroy\` 置 \`null\`，或改为不持有 \`Activity\`。
-- 链上是 \`LocationRepo.listeners\` → 在 \`onStop\` / \`onDestroy\` 对称 \`removeListener\`。
-- 链上是 \`Handler\` / \`Message.obj\` → 销毁时 \`removeCallbacksAndMessages(null)\`，或使用静态 \`Handler\` + 弱引用（并确认消息里不再强引用页面）。
-`,
       },
       {
         tag: '渲染底层',
@@ -921,32 +199,7 @@ actor SafeStore {
 }
 \`\`\``,
       },
-      {
-        tag: '内存模型',
-        title: 'Swift 内存布局、Copy-On-Write (COW) 与 ARC Side Table',
-        explanation: 'Swift 的 struct 值类型默认分配在栈 (Stack) 上，当赋值或传参时进行浅拷贝。Array/Dictionary/Set 等标准集合实现了 Copy-On-Write 机制：只有在发生写操作且 isKnownUniquelyReferenced(&buffer) 发现强引用计数大于 1 时，才在堆上真正执行深拷贝。class 引用对象使用 ARC 管理；当对象被 weak 弱引用引用或引用计数超过 255 时，Swift 会为该对象动态分配一个 Side Table（副表），将弱引用指针和溢出计数移入副表，防止僵尸对象野指针崩溃。',
-        codeSnippet: `// 自定义实现 Copy-on-Write 包装器
-final class RefBox<T> {
-    var value: T
-    init(_ value: T) { self.value = value }
-}
 
-struct COWWrapper<T> {
-    private var box: RefBox<T>
-    init(_ value: T) { self.box = RefBox(value) }
-
-    var value: T {
-        get { box.value }
-        set {
-            if !isKnownUniquelyReferenced(&box) {
-                box = RefBox(newValue) // 仅在多强引用且写入时深拷贝
-            } else {
-                box.value = newValue
-            }
-        }
-    }
-}`,
-      },
       {
         tag: '渲染底层',
         title: 'SwiftUI AttributeGraph 属性图与 @Observable 依赖追踪',
@@ -1097,6 +350,158 @@ baselineProfile {
 }`,
       },
       {
+        tag: '内存模型',
+        title: '可达性、引用类型与泄漏排查',
+        pipeline: [
+          { title: 'GC Roots 与可达性', subtitle: '从根出发能碰到的对象才算活着', category: 'theory' },
+          { title: '四种引用', subtitle: '强 / 软 / 弱 / 虚，泄漏几乎总是强引用', category: 'theory' },
+          { title: 'ART 何时回收', subtitle: '分代堆上不可达对象才会被清掉', category: 'engineering' },
+          { title: '常见泄漏形态', subtitle: '单例、回调、Handler 抓住短命对象', category: 'engineering' },
+          { title: 'LeakCanary 探测', subtitle: '销毁后弱引用仍未入队即疑似泄漏', category: 'engineering' },
+          { title: '读链与拆链', subtitle: '沿最短强引用链找到该松开的那一环', category: 'engineering' },
+        ],
+        explanation: `### 1. GC Roots 与可达性
+- **通俗心智**：垃圾回收不问「你还想不想要」，只问「从根出发还能不能摸到你」。摸不到的对象才是垃圾。
+- **常见根**：线程栈上的局部变量、静态字段、JNI 全局引用等。Activity 被静态字段抓住，对 GC 来说它仍然可达。
+
+### 2. 四种引用
+- **强引用**：普通 \`val a = obj\`，可达则不会因内存压力被回收。泄漏几乎都是短命对象被更长命的强引用抓住。
+- **软引用** \`SoftReference\`：内存还宽裕时尽量留着，紧张时可以收掉，适合图片等缓存。
+- **弱引用** \`WeakReference\`：不阻止回收，GC 后 \`get()\` 可能为 \`null\`。LeakCanary 用它盯销毁后的页面。
+- **虚引用** \`PhantomReference\`：不能通过 \`get()\` 取回对象，只在回收后入 \`ReferenceQueue\`，用来做堆外 / 原生资源清理。业务页面泄漏很少直接用它。
+
+### 3. ART 何时回收
+- **分代直觉**：新对象多在年轻代，活得久的晋升到老年代；不可达对象在一次 GC 后被清掉。
+- **不必死记算法名**：日常排查先确认「谁还握着强引用」，再考虑 GC 参数与版本差异。
+
+### 4. 常见泄漏形态
+- **单例 / 伴生对象** 持有 \`Activity\` / \`View\` / \`Context\`。
+- **Listener / 回调** 注册后未按生命周期注销。
+- **静态 \`Handler\` / 匿名内部类** 隐式持有外部 \`Activity\`，消息还在队列里时页面已销毁。
+
+### 5. LeakCanary 探测
+- **流程**：页面 \`onDestroy\` 后用弱引用盯住对象 → 等一段时间并触发 GC → 若弱引用仍未进入 \`ReferenceQueue\`，则导出 Hprof，算最短强引用链。
+- **结论**：它证明的是「销毁后仍可达」，并指出链路上每一环，而不是替你改代码。
+
+### 6. 读链与拆链
+- **读链**：从 GC Root 走到泄漏对象，每一跳都是一个字段或集合元素。
+- **拆链**：松开不该跨生命周期的那一环——\`null\` 掉引用、注销回调、改用 \`ApplicationContext\`、或让短命对象只被短命持有者引用。`,
+        extendedDeepDive: `### 第一层：可达性判定
+\`\`\`diagram
+GC Roots（静态字段 / 栈帧 / JNI…）
+    │ 强引用边
+    ▼
+可达对象图 ──▶ 存活
+摸不到的对象 ──▶ 可被回收
+\`\`\`
+
+### 第二层：四种引用
+\`\`\`diagram
+强引用 Strong ──▶ 可达则保留（泄漏主因）
+软引用 Soft   ──▶ 内存紧时才收（缓存）
+弱引用 Weak   ──▶ 不阻止回收，get() 可能为 null
+虚引用 Phantom ──▶ get() 恒为 null，回收后入队做清理
+\`\`\`
+
+### 第三层：LeakCanary 探测时序
+\`\`\`diagram
+Activity.onDestroy
+    │
+    ▼
+KeyedWeakReference(activity) + ReferenceQueue
+    │
+    ▼
+延迟一段时间 + 请求 GC
+    │
+    ├─ 弱引用已入队 ──▶ 对象已被回收，无泄漏
+    └─ 仍未入队 ──▶ 导出 Hprof，解析最短强引用链
+\`\`\``,
+        caseStudy: `### 一、伴生对象抓住 Activity
+
+- **场景解释**：工具类用伴生对象缓存「当前页面」，方便全局弹 Toast。页面销毁后静态字段仍握着 \`Activity\`，旋转或反复进出后旧页面无法回收。
+
+\`\`\`kotlin
+class LeakActivity : AppCompatActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        CurrentPage.activity = this
+        Log.d("Leak", "已把 Activity 交给伴生对象")
+    }
+
+    override fun onDestroy() {
+        // 忘记 CurrentPage.activity = null
+        super.onDestroy()
+        Log.d("Leak", "onDestroy，但静态字段可能仍握着 this")
+    }
+}
+
+object CurrentPage {
+    var activity: Activity? = null
+}
+\`\`\`
+
+\`\`\`kotlin
+// ✅ 销毁时松开；或根本不要缓存 Activity，改传 ApplicationContext
+override fun onDestroy() {
+    if (CurrentPage.activity === this) {
+        CurrentPage.activity = null
+    }
+    super.onDestroy()
+}
+\`\`\`
+
+### 二、Listener 注册后未注销
+
+- **场景解释**：仓库是长生命周期单例，\`addListener\` 把页面回调放进列表。页面销毁后列表里仍有该回调，回调若捕获了页面，页面就泄漏。
+
+\`\`\`kotlin
+object LocationRepo {
+    private val listeners = mutableListOf<(String) -> Unit>()
+
+    fun addListener(listener: (String) -> Unit) {
+        listeners += listener
+    }
+
+    fun removeListener(listener: (String) -> Unit) {
+        listeners -= listener
+    }
+}
+
+class MapActivity : AppCompatActivity() {
+    private val onLocation: (String) -> Unit = { loc ->
+        Log.d("Leak", "页面还在收位置: \${loc}")
+    }
+
+    override fun onStart() {
+        super.onStart()
+        LocationRepo.addListener(onLocation)
+    }
+
+    override fun onStop() {
+        // ❌ 若漏掉 remove，单例继续握着 onLocation → 握着 Activity
+        LocationRepo.removeListener(onLocation)
+        super.onStop()
+    }
+}
+\`\`\`
+
+### 三、读 LeakCanary 最短链并拆掉
+
+- **场景解释**：报告给出从 GC Root 到 \`LeakActivity\` 的最短强引用链。要拆的是链上「跨生命周期」的那一环，而不是在业务里手动调 GC。
+
+\`\`\`diagram
+GcRoot: CurrentPage 的静态字段 activity
+    │
+    ▼
+LeakActivity instance
+\`\`\`
+
+- 链上是 \`CurrentPage.activity\` → 在 \`onDestroy\` 置 \`null\`，或改为不持有 \`Activity\`。
+- 链上是 \`LocationRepo.listeners\` → 在 \`onStop\` / \`onDestroy\` 对称 \`removeListener\`。
+- 链上是 \`Handler\` / \`Message.obj\` → 销毁时 \`removeCallbacksAndMessages(null)\`，或使用静态 \`Handler\` + 弱引用（并确认消息里不再强引用页面）。
+`,
+      },
+      {
         tag: '故障攻坚',
         title: '线上 ANR 信号捕获机制与 Native 内存泄漏定位',
         explanation: '当主线程在处理 Broadcast (10s/60s)、Service (20s) 或 InputEvent (5s) 超时未返回时，系统 ActivityManagerService 会向目标进程发送 SIGQUIT (3) 信号，由 ART 信号处理器在 /data/anr/traces.txt 生成线程堆栈快照。排查 Native/堆外内存暴涨时，使用 Android Studio Profiler 的 Native Memory Record 或 AddressSanitizer (ASan) 排查 C/C++ 指针未释放及 Bitmap Hardware Buffer 泄漏。',
@@ -1126,6 +531,32 @@ final class PerformanceMetricsManager: NSObject, MXMetricManagerSubscriber {
         for payload in payloads {
             // 上报冷启动耗时与渲染丢帧指标到自建看板
             let launchTime = payload.applicationLaunchMetrics?.histogrammedTimeToFirstDraw
+        }
+    }
+}`,
+      },
+      {
+        tag: '内存模型',
+        title: 'Swift 内存布局、Copy-On-Write (COW) 与 ARC Side Table',
+        explanation: 'Swift 的 struct 值类型默认分配在栈 (Stack) 上，当赋值或传参时进行浅拷贝。Array/Dictionary/Set 等标准集合实现了 Copy-On-Write 机制：只有在发生写操作且 isKnownUniquelyReferenced(&buffer) 发现强引用计数大于 1 时，才在堆上真正执行深拷贝。class 引用对象使用 ARC 管理；当对象被 weak 弱引用引用或引用计数超过 255 时，Swift 会为该对象动态分配一个 Side Table（副表），将弱引用指针和溢出计数移入副表，防止僵尸对象野指针崩溃。',
+        codeSnippet: `// 自定义实现 Copy-on-Write 包装器
+final class RefBox<T> {
+    var value: T
+    init(_ value: T) { self.value = value }
+}
+
+struct COWWrapper<T> {
+    private var box: RefBox<T>
+    init(_ value: T) { self.box = RefBox(value) }
+
+    var value: T {
+        get { box.value }
+        set {
+            if !isKnownUniquelyReferenced(&box) {
+                box = RefBox(newValue) // 仅在多强引用且写入时深拷贝
+            } else {
+                box.value = newValue
+            }
         }
     }
 }`,
