@@ -634,8 +634,7 @@ class HomeViewModel : ViewModel() {
 - **DisposableEffect(key)**：需要成对的注册/注销（监听器、回调）时用 \`onDispose\`。
 
 ### 3. 生命周期
-- **对齐谁**：三个 API 跟 \`LocalLifecycleOwner\`（一般是当前页 NavBackStackEntry），不是组合槽。A→B 时 Activity 仍 \`RESUMED\`，A 的 Entry 会 pause/stop；按 Home 才是 Activity 自己 pause/stop，Entry 跟着掉。
-- **怎么选**：Flow → \`collectAsStateWithLifecycle\`；可见即可 → \`LifecycleStartEffect\`；必须在前台 → \`LifecycleResumeEffect\`。
+- **何时回调**：三个 API 跟当前页 Entry 的 \`onStart\` / \`onResume\` / \`onPause\` / \`onStop\`。A→B 时 Activity 仍 \`RESUMED\`，A 的 Entry 会 pause/stop；按 Home 才走 Activity 自己的 pause/stop，当前页跟着掉。
 
 ### 4. Lazy 列表
 - **通俗心智**：\`Column { items.forEach { Row() } }\` 会把所有行都组合进去。\`LazyColumn\` 只组合可见窗口附近的项。
@@ -711,29 +710,49 @@ fun UserDetail(userId: String, repo: UserRepo) {
 
 ### 三、生命周期：可见时才收集
 
-- **场景解释**：上一节 Effect 只保证组合还在，进后台仍可能 \`collect\`。本节三个 API 对齐 \`LifecycleOwner\`（Compose 里一般是 **当前页的 NavBackStackEntry**），不是组合槽，也不等于「只有 Activity 一份生命周期」。单 Activity 导航下，A→全屏 B：**Activity 不会** \`onPause\`/\`onStop\`，A 的 Entry 会；按 Home / 跳到别的 Activity：Activity 自己 pause/stop，当前页 Entry 跟着掉。对 A 的 \`LifecycleResumeEffect\` 来说，**跳到 B 再返回** 和 **Activity pause/resume** 都是进入/离开 \`RESUMED\`，分不清是哪一种。B 若是 Dialog 盖在 A 上，A 往往只 \`onPause\`、未必 \`onStop\`。
-- **怎么选**：Flow 转界面状态 → \`collectAsStateWithLifecycle()\`（默认低于 \`STARTED\` 停收；必须在前台再收则 \`minActiveState = RESUMED\`）。可见即可、不必在前台交互 → \`LifecycleStartEffect\`。定位、相机、停留曝光 → \`LifecycleResumeEffect\`，在 \`onPauseOrDispose\` 里停。
-- **边界**：离开组合也会 \`onPauseOrDispose\`。A→B 不等于 Activity 销毁。
+#### collectAsStateWithLifecycle
+
+- **场景解释**：信息流 / 详情的 \`StateFlow\` 要画在界面上。A→全屏 B 或按 Home：Owner 落到 \`STARTED\` 以下，停收；返回 A 或回到前台：\`onStart\` 后再收。默认跟 \`onStart\`/\`onStop\`；必须真正在前台才收时加 \`minActiveState = RESUMED\`（跟 \`onResume\`/\`onPause\`）。
 
 \`\`\`kotlin
 class FeedViewModel : ViewModel() {
     val items: StateFlow<List<FeedItem>> = repository.observeFeed()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-    fun onVisible() { /* 开始定位 / 记下停留起点 */ }
-    fun onHidden() { /* 停定位 / 上报停留时长 */ }
 }
 
 @Composable
 fun FeedRoute(vm: FeedViewModel = viewModel()) {
     val items by vm.items.collectAsStateWithLifecycle()
+    FeedList(items)
+}
+\`\`\`
 
+#### LifecycleStartEffect
+
+- **场景解释**：页面还看得见就要干（轻量连接、可见时轮询），不必等完全在前台。A→全屏 B 或 Activity \`onStop\`：\`onStopOrDispose\` 停。Dialog 盖在 A 上时 A 往往仍 \`STARTED\`，这段还在跑。
+
+\`\`\`kotlin
+@Composable
+fun InboxBadge(repo: InboxRepo) {
+    LifecycleStartEffect(Unit) {
+        val job = repo.startUnreadSync()
+        onStopOrDispose { job.cancel() }
+    }
+}
+\`\`\`
+
+#### LifecycleResumeEffect
+
+- **场景解释**：必须在前台：定位、相机、停留曝光。A→全屏 B（Activity 仍 \`RESUMED\`，A 的 Entry \`onPause\`）或 Activity 自己 \`onPause\`，都会 \`onPauseOrDispose\`；返回 A 或 Activity \`onResume\` 再开。Dialog 盖住时也会 \`onPause\`，定位应停。
+
+\`\`\`kotlin
+@Composable
+fun MapRoute(vm: MapViewModel = viewModel()) {
     LifecycleResumeEffect(Unit) {
         vm.onVisible()
         onPauseOrDispose { vm.onHidden() }
     }
-
-    FeedList(items)
+    MapScreen()
 }
 \`\`\`
 
