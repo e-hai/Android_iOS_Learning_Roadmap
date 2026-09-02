@@ -637,8 +637,8 @@ class HomeViewModel : ViewModel() {
 - **何时回调**：三个 API 跟当前页 Entry 的 \`onStart\` / \`onResume\` / \`onPause\` / \`onStop\`。A→B 时 Activity 仍 \`RESUMED\`，A 的 Entry 会 pause/stop；按 Home 才走 Activity 自己的 pause/stop，当前页跟着掉。
 
 ### 4. Lazy 列表
-- **通俗心智**：\`Column { items.forEach { Row() } }\` 会把所有行都组合进去。\`LazyColumn\` 只组合可见窗口附近的项。
-- **key**：同一行滑出再滑入，要靠稳定 \`key\` 把 \`remember\` 和滚动位置对回这一行，不能靠列表下标。
+- **通俗心智**：和 RecyclerView 一样只复用屏幕上那几块牌子。删数据不会把 ItemView 拆掉扔掉，牌子会拿去画下一条。
+- **key**：没 key 按位置对牌子（香蕉住进苹果的格子，展开状态可能跟错）；有 \`key = { it.id }\` 按 id 对，苹果删了苹果那格状态一起没，香蕉用自己的。
 
 ### 5. 动画
 - **通俗心智**：目标值放进 State，用 \`animate*AsState\` / \`Animatable\` / \`AnimatedVisibility\` 让框架按帧插值。不要自己 \`delay\` + 改 State 冒充动画。
@@ -758,7 +758,7 @@ fun MapRoute(vm: MapViewModel = viewModel()) {
 
 ### 四、列表：LazyColumn 与稳定 key
 
-- **场景解释**：\`Column { list.forEach { Item(it) } }\` 会把所有行都组合进去，长列表卡顿。改用 \`LazyColumn\` 后，若不用稳定 \`key\`，滑出再滑入会把行内 \`remember\` 对错人。
+- **场景解释**：和 RecyclerView 一样，屏幕上只有几块牌子（ViewHolder），删掉「苹果」不会把那块 ItemView 扔掉，下一帧拿去画「香蕉」。两边都复用。没有 \`key\` 时按第几名对牌子，行内 \`remember\`（展开、动画）像 \`onBind\` 没擦干净，会跟到香蕉上。\`key = { it.id }\` 相当于 stable id：苹果删了，苹果那格和格上的私货一起没；香蕉用自己的格。不要用下标当 key。
 
 \`\`\`kotlin
 @Composable
@@ -779,8 +779,6 @@ fun FeedRow(item: FeedItem) {
     )
 }
 \`\`\`
-
-\`key = { it.id }\` 让「展开」跟着这一条数据走，而不是跟着槽位下标走。
 
 ### 五、动画：目标值交给动画 API
 
