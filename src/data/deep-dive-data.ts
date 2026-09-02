@@ -685,7 +685,10 @@ fun SearchScreen() {
 
 ### 二、副作用：进页拉数、离开注销
 
-- **场景解释**：状态能驱动 UI 了，但 \`@Composable\` 会被反复执行。函数体里直接 \`viewModelScope.launch\` 或 \`addListener\` 会重复请求、重复注册。
+- **场景解释**：状态能驱动 UI 了，但函数体会反复执行，不能直接 \`launch\` / \`addListener\`。两者都跟组合进出走：能取消就停 → \`LaunchedEffect\`；必须 add/remove → \`DisposableEffect\`。A→B→A 会重新进树，两个 Effect 都会再跑；只一次的事放 ViewModel \`init\`，看见了 / 停留用生命周期。
+- **LaunchedEffect 业务**：详情按 id 拉数；会话 / 行情 \`Flow.collect\`；搜索关键字停 300ms 再请求（换字取消上一次）。
+- **DisposableEffect 业务**：地图定位 \`requestLocationUpdates\`；全屏弹层劫持返回键；传感器 / 蓝牙；三方支付 \`setListener\`。点收藏才请求用 ViewModel，不是这两种。
+- **不要两套都上**：仓库已是 Flow 只 \`collect\`；只有 SDK 逼你 \`register\` 时才 \`DisposableEffect\`。
 
 \`\`\`kotlin
 @Composable
@@ -705,7 +708,7 @@ fun UserDetail(userId: String, repo: UserRepo) {
 }
 \`\`\`
 
-\`userId\` 变了会取消旧协程、拆掉旧监听，再按新 id 来一遍。
+\`userId\` 变了会取消旧协程、拆掉旧监听，再按新 id 来一遍。仓库已是 Flow 时只 \`LaunchedEffect { collect }\`，不要再套一层 \`DisposableEffect\`。
 
 ### 三、生命周期：可见时才收集
 
