@@ -73,7 +73,7 @@ function renderSingleChapterView(
   // Pipeline & Explanation (Unified Principle Flow)
   if (mod.pipeline && mod.pipeline.length > 0) {
     container.appendChild(renderPipelineFlowCard(mod.pipeline, platform));
-    container.appendChild(renderTimelineExplanation(mod.explanation, platform));
+    container.appendChild(renderTimelineExplanation(mod.explanation, platform, mod.pipeline));
   } else {
     // Cognitive Metaphor & Formula Card (if present on traditional modules)
     if (mod.metaphor) {
@@ -546,7 +546,7 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
   card.className = `pipeline-flow-card ${platform === 'ios' ? 'pipeline-ios' : ''}`;
 
   const nodesHtml = pipeline.map((step, idx) => {
-    const isTheory = step.category === 'theory' || idx < 3;
+    const isTheory = step.category === 'theory';
     const nodeClass = isTheory ? 'node-theory' : 'node-engineering';
     const connector = idx < pipeline.length - 1 ? `
       <div class="pipeline-connector">
@@ -566,17 +566,21 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
     `;
   }).join('');
 
+  const hasTheory = pipeline.some((step) => step.category === 'theory');
+  const legendTheoryHtml = hasTheory ? `
+        <div class="legend-item">
+          <span class="legend-dot theory-dot"></span>
+          <span>理论与策略层</span>
+        </div>` : '';
+
   card.innerHTML = `
     <div class="pipeline-flow-header">
       <div class="pipeline-flow-title-wrap">
         <span class="pipeline-flow-badge">Roadmap</span>
-        <h3 class="pipeline-flow-title">理论 ➔ 工程演进全景链路</h3>
+        <h3 class="pipeline-flow-title">${hasTheory ? '理论 ➔ 工程演进全景链路' : '工程演进全景链路'}</h3>
       </div>
       <div class="pipeline-flow-legend">
-        <div class="legend-item">
-          <span class="legend-dot theory-dot"></span>
-          <span>理论与策略层</span>
-        </div>
+        ${legendTheoryHtml}
         <div class="legend-item">
           <span class="legend-dot eng-dot"></span>
           <span>工程与运行时层</span>
@@ -591,7 +595,7 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
   return card;
 }
 
-function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios'): HTMLElement {
+function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios', pipeline?: PipelineStep[]): HTMLElement {
   const container = document.createElement('div');
   container.className = `timeline-stream ${platform === 'ios' ? 'timeline-ios' : ''}`;
 
@@ -604,7 +608,7 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios')
     const title = titleLine.replace(/^###\s+/, '');
     const bodyLines = lines.slice(1);
 
-    const isTheory = idx < 3;
+    const isTheory = pipeline?.[idx]?.category === 'theory' || (!pipeline && idx < 3);
     const badgeNumber = String(idx + 1).padStart(2, '0');
     const tagText = isTheory ? '理论与策略' : '工程与运行时';
 

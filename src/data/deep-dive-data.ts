@@ -655,14 +655,9 @@ class HomeViewModel : ViewModel() {
 ### 8. AndroidView
 - **用途**：地图、WebView、只有 View SDK 的控件。\`factory\` 里创建一次，\`update\` 里用当前 Compose 状态改 View。
 - **列表**：\`Lazy\` 的 item 里塞 \`AndroidView\` 会按行持有真 View，只在没有 Compose 替代时用。`,
-        codeSnippet: `@Composable
-fun ProfileRoute(vm: ProfileViewModel = viewModel()) {
-    val ui by vm.ui.collectAsStateWithLifecycle()
-    ProfileScreen(ui = ui, onRetry = vm::retry)
-}`,
         caseStudy: `### 一、页面状态：remember 与提升
 
-- **场景解释**：输入框、开关、计数要在多次重组之间活下来。普通 \`var\` 写在 \`@Composable\` 里每次都重置。
+- **场景解释**：输入框、开关、计数要在多次重组之间活下来。普通 \`var\` 写在 \`@Composable\` 里每次都重置。\`remember\` / \`rememberSaveable\` 存的是控件自己的 UI 碎片，不是仓库里的业务源。两者都只在 **还在树上、同一个槽** 时抗重组；离开组合（关掉、换页）默认都丢。\`remember\` 只抗重组，适合动画进度、拖动手势的瞬时 offset。\`rememberSaveable\` 在此之上再扛转屏 / Activity 重建，适合输入框文字、Tab 下标、是否展开。列表、用户资料、加载结果仍走 ViewModel。
 
 \`\`\`kotlin
 @Composable
@@ -686,7 +681,7 @@ fun SearchScreen() {
 }
 \`\`\`
 
-控件内部状态用 \`remember\`；旋转后还要在的用 \`rememberSaveable\`；多个子组件共用时把状态放到父组合再往下传。
+多个子组件共用同一份数时，把状态放到父组合再往下传（\`SearchBar\` 自己不再 \`remember\` 一份）。
 
 ### 二、副作用：进页拉数、离开注销
 
