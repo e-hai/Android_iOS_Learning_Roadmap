@@ -789,12 +789,14 @@ fun UserListCard(group: UserGroup) {
 
 ### 四、副作用边界：LaunchedEffect 与 DisposableEffect
 
-- **场景解释**：Composable 会反复执行，外部操作必须绑定到组件的「进树」与「离树」生命周期，避免重复触发与内存泄漏。
-- **生命周期时序**：
-  - **进树 / Key 变化**：启动协程（\`LaunchedEffect\`）/ 注册监听（\`DisposableEffect\`）；
-  - **普通重组**：Key 未变则**完全跳过**，绝不重复执行；
-  - **离树（切页/条件隐藏）**：协程立即 **\`Cancel\`** 取消；立即调用 **\`onDispose\`** 释放资源。
-- **避坑提示**：从 B 页面返回 A 会重新进树，\`LaunchedEffect(Unit)\` **会再次触发**；一生一次的初始化放 ViewModel \`init\`。按 Home 切后台组件仍在树上，需切后台暂停请用第五点。
+- **核心使命**：副作用安全隔离仓。解决 Composable 函数因反复执行而导致的网络请求重发、数据死循环或监听重复注册。
+- **生命周期契约**：
+  - **启动 / 重启**：初次渲染进入界面、或绑定的 \`key\` 发生变化时执行（若有未完成的旧任务，先清理旧任务再启动新任务）；
+  - **跳过**：界面重组时，只要 \`key\` 保持不变，直接跳过不执行；
+  - **释放 / 取消**：组件从界面移除（销毁）时触发（\`LaunchedEffect\` 自动取消协程，\`DisposableEffect\` 执行 \`onDispose\`）。
+- **选型与避坑**：
+  - 异步挂起任务选 \`LaunchedEffect\`；成对借还的资源（注册/注销）选 \`DisposableEffect\`。
+  - 页面跳转返回（A ➔ B ➔ A）会经历组件的销毁与重建，Effect 会重新执行；全生命周期只执行一次的初始化，应放在 \`ViewModel.init\` 中。
 
 \`\`\`kotlin
 @Composable
