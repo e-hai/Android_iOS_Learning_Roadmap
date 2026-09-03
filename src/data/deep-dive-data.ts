@@ -6,47 +6,9 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
       {
         tag: '现代语言',
         title: 'Kotlin 核心特性：委托、扩展与内联具现化',
-        metaphor: {
-          title: '语法糖背后的编译期魔术',
-          formula: 'Kotlin = Java.Bytecode + Compiler.Metadata + InlineSpill',
-          metaphorDesc: 'Kotlin 的优雅并非源于 JVM 新增底层指令，而是编译器在 AST 语法树阶段施展的高阶重写魔术。委托是隐藏成员字段的自动转发，扩展是以接收者为首位的静态方法，内联是将 Lambda 函数体直接剪切粘贴到调用处，具现化更是借由内联击穿了 JVM 泛型类型擦除的铜墙铁壁。',
-        },
-        explanation: `### 一、委托体系（Delegation）：告别模板代码与继承
+        caseStudy: `### 一、属性委托与类委托：AutoClearedValue 与 Decorator 装饰器
 
-- **核心机制**：委托是 Kotlin 落实“组合优于继承”的利剑，分为属性委托与类委托。
-- **属性委托（Property Delegation）**：
-  1. \`by lazy\`：默认采用 \`LazyThreadSafetyMode.SYNCHRONIZED\`，底层通过双重检查锁（DCL）实现线程安全单例与延迟初始化；
-  2. \`by viewModels()\`：Android 官方扩展，底层利用属性委托将 ViewModel 绑定到宿主 Activity/Fragment 的 \`ViewModelStore\`；
-  3. 自定义委托：实现 \`ReadOnlyProperty<R, T>\` 或 \`ReadWriteProperty<R, T>\`，重写 \`getValue\` / \`setValue\`；
-  4. 字节码还原：编译器生成隐藏私有字段 \`\$\$delegate_0\`，对属性的读写被重定向为 \`\$\$delegate_0.getValue(this, ::prop)\`。
-- **类委托（Class Delegation）**：
-  - 语法：\`class AnalyticsList<T>(private val inner: List<T>) : List<T> by inner\`；
-  - 价值：无需手写几十个接口转发方法，零模板代码实现标准装饰器模式（Decorator），精准拦截目标方法。
-
-### 二、扩展体系（Extensions）：非侵入式装配与 DSL 基石
-
-- **静态分发机制（Static Dispatch）**：
-  1. 扩展函数并非真正修改了类的字节码，而是编译器生成了一个 \`public static final\` 方法，将“接收者类型（Receiver）”作为首个入参；
-  2. **无多态性**：扩展函数的调用由声明的静态类型决定，而非运行时具体子类实例；
-  3. **私有可见性壁垒**：扩展函数无法越权访问接收者内部的 \`private\` 或 \`protected\` 成员。
-- **带接收者的函数字面值（Function Literals with Receiver）**：
-  - 签名形式：\`T.() -> Unit\`；
-  - 核心魔力：在 Lambda 作用域内部隐式注入了接收者对象（作为 \`this\`），使得在函数体内无需前缀即可直接调用 \`T\` 的全部公共属性与方法；
-  - 架构支柱：这是 Compose 声明式组件树、Gradle KTS、以及现代流畅 DSL 构建器的绝对核心语法支柱。
-
-### 三、内联函数与泛型具现化（Inline & Reified）
-
-- **内联函数生态（Inline Ecosystem）**：
-  1. \`inline\`：将函数体与传入的 Lambda 表达式直接“复制粘贴”到调用点，消除高阶函数每次调用创建匿名内部类对象与调用栈帧的开销；
-  2. \`noinline\`：当某个 Lambda 需要被保存为对象引用（如存入集合或延迟异步触发）时，显式关闭其内联；
-  3. \`crossinline\`：禁止 Lambda 执行非局部返回（Non-local \`return\`），强制其只能从自身闭包退出，确保在跨线程、协程分发或异步回调中安全执行。
-- **泛型具现化（Reified Generics）**：
-  - **破解痛点**：JVM 泛型存在“类型擦除（Type Erasure）”，运行时无法执行 \`T::class.java\` 或 \`item is T\`；
-  - **实现原理**：只有在 \`inline\` 函数中才能使用 \`reified\`。因为函数在编译期被平铺展开，编译器在每个调用点已知具体的实参类型，因此能够直接将 \`T\` 替换为具体的字节码常量（如 \`String.class\`）；
-  - **Android 实战**：\`inline fun <reified T : Activity> Context.startActivity()\`，彻底告别繁冗的 \`Intent(context, DetailActivity::class.java)\`。`,
-        caseStudy: `### 一、自定义属性委托：AutoClearedValue 防生命周期内存泄漏
-
-- **场景解释**：在 Fragment 中使用 ViewBinding 时，View 的生命周期短于 Fragment 实例。若直接持有 Binding 引用，在切页或放入回退栈时旧 View 无法回收，引发严重内存泄漏。通过自定义生命周期感知属性委托，在 \`onDestroyView\` 时自动将引用置 \`null\`。
+- **属性委托场景**：在 Fragment 中使用 ViewBinding 时，View 的生命周期短于 Fragment 实例。若直接持有 Binding 引用，在切页或放入回退栈时旧 View 无法回收，引发严重内存泄漏。通过自定义生命周期感知属性委托，在 \`onDestroyView\` 时自动将引用置 \`null\`。
 
 \`\`\`kotlin
 class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment, T> {
@@ -75,6 +37,26 @@ class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment,
 
 // 扩展工厂函数：一行代码优雅声明
 fun <T : Any> Fragment.autoCleared() = AutoClearedValue<T>(this)
+\`\`\`
+
+- **类委托场景**：需要统计列表读取与修改耗时，传统继承需要覆写基类，极易破坏封装。利用类委托 \`by inner\` 零模板代码实现标准装饰器模式（Decorator），精准拦截目标方法。
+
+\`\`\`kotlin
+// ⚡ 类委托：无需手写数十个代理方法，直接代理 inner，仅覆写需要增强的成员
+class AnalyticsList<T>(
+    private val inner: MutableList<T>
+) : MutableList<T> by inner {
+
+    override fun add(element: T): Boolean {
+        Log.d("AnalyticsList", "埋点监控：新增元素 \$element")
+        return inner.add(element)
+    }
+
+    override fun removeAt(index: Int): T {
+        Log.d("AnalyticsList", "埋点监控：移除索引 \$index")
+        return inner.removeAt(index)
+    }
+}
 \`\`\`
 
 ### 二、带接收者的 Lambda：构建极简流畅 DSL 构建器
@@ -126,6 +108,32 @@ inline fun executeTask(
     Thread {
         asyncWork() // 安全在子线程中跑完自身闭包
     }.start()
+}
+\`\`\`
+
+### 四、reified 泛型具现化：突破 JVM 类型擦除实战
+
+- **场景解释**：JVM 泛型在编译后会被擦除为 \`Object\`，无法直接写 \`T::class.java\` 或 \`if (item is T)\`。结合 \`inline\` 函数，编译器在调用处内联展开，使得运行时保留真实类型元数据。
+
+\`\`\`kotlin
+// 1. 页面跳转极简语法糖
+inline fun <reified T : Activity> Context.startActivity(block: Intent.() -> Unit = {}) {
+    val intent = Intent(this, T::class.java) // ⚡ 直接获取 T 的 Class 实例
+    intent.block()
+    startActivity(intent)
+}
+
+// 业务调用：优雅干净，无需传 DetailActivity::class.java
+// context.startActivity<DetailActivity> { putExtra("id", "10086") }
+
+// 2. 异构集合精准过滤与安全类型转换
+inline fun <reified T> List<Any>.findFirstOf(): T? {
+    for (item in this) {
+        if (item is T) { // ⚡ 运行时精准类型判断
+            return item
+        }
+    }
+    return null
 }
 \`\`\``,
       },
@@ -1235,11 +1243,6 @@ fun NativeVideoPlayer(
       {
         tag: '表现逻辑',
         title: '逻辑层：ViewModel 机制与状态基座',
-        metaphor: {
-          title: '生命周期的避风港与单一事实状态机',
-          formula: 'ViewModel = NonConfigurationInstances + SavedStateHandle + StateFlow(5000)',
-          metaphorDesc: 'ViewModel 是承载 UI 状态的“不倒翁”。页面横竖屏旋转或配置变更时，Activity 会被销毁重建，但系统底层的 NonConfigurationInstances 握住 ViewModelStore 不放，确保状态在内存中安然无恙；即使进程因低内存被杀，SavedStateHandle 也能通过 Bundle 自动回填现场。',
-        },
         explanation: `### 一、ViewModel 跨配置存活源码机制
 
 - **配置变更痛点**：横竖屏旋转、深色模式切换或系统语言改变时，Activity 会经历完整的 \`onDestroy\` ➔ \`onCreate\` 销毁重建。普通局部变量或异步任务若绑定在 Activity 上会全部丢失或泄漏。
@@ -1345,11 +1348,6 @@ class CheckoutViewModel(
       {
         tag: '数据底座',
         title: '数据层：网络通信与 Room 关系/事务/迁移实战协同',
-        metaphor: {
-          title: '单一事实源与双轮驱动缓存总线',
-          formula: 'DataLayer = OkHttp.Interceptors + Room(Relations + Transactions + Migrations) ➔ SOT',
-          metaphorDesc: '数据层是应用最坚实的地下管网。OkHttp 拦截器链如同层层把关的水质净化站，负责鉴权与重试；Room 则如同坚固的地下蓄水库，通过严格的迁移保证结构演进，通过一对多/多对多拓扑关系清晰梳理数据，并以原子事务防范灾难。两相协同，构筑离线可用的单一可信数据源（SOT）。',
-        },
         explanation: `### 一、网络通信管线：OkHttp 连接池与责任链拦截器
 
 - **Socket 复用（ConnectionPool）**：

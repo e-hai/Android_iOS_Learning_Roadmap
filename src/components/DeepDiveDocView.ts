@@ -124,7 +124,8 @@ function renderSingleChapterView(
     }
   }
 
-  let nextSectionNumber = 2;
+  const hasFirstSection = Boolean((mod.explanation && mod.explanation.trim()) || (mod.pipeline && mod.pipeline.length > 0));
+  let nextSectionNumber = hasFirstSection ? 2 : 1;
   const numToChinese = ['一', '二', '三', '四', '五', '六'];
 
   // Section: Interactive Step-by-Step State Stepper (if present)
