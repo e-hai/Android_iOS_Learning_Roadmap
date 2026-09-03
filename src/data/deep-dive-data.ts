@@ -734,7 +734,8 @@ fun DeepProductCard(itemId: String) {
 
 ### 二、衍生状态：derivedStateOf 终结滚动重组风暴
 
-- **场景解释**：列表滚动时，\`firstVisibleItemIndex\` 每滚动几像素都会频繁改变。如果直接在重组阶段用 \`val showButton = listState.firstVisibleItemIndex > 0\`，会导致该组件在整个滑动过程中每帧疯狂重组。使用 \`derivedStateOf\` 建立衍生计算缓存，只有布尔值真正发生翻转时（从 false 变 true 或反之），才会触发重组。
+- **场景解释**：列表滑动时像素索引每几像素都会频繁改变。若直接在重组阶段计算布尔值，会导致组件在整个滑动过程中每秒疯狂重组 60~120 次。
+- **核心机制**：使用 \`derivedStateOf\` 建立衍生计算缓存，将**高频滚动的像素索引**收敛为**低频翻转的布尔状态**，只有布尔值真正发生状态翻转时，才触发下游重组！
 
 \`\`\`kotlin
 @Composable
@@ -758,7 +759,8 @@ fun ScrollTopBar(listState: LazyListState) {
 
 ### 三、稳定性避坑：不可变契约与 @Immutable 拯救重组
 
-- **场景解释**：Kotlin 标准库的 \`List<T>\` 属于接口，Compose 编译器默认判定其为 **Unstable（不稳定）**。即使父组件重组时传给子组件的列表内容完全一样，Compose 也无法跳过重组。通过给数据类标注 \`@Immutable\`（或使用 \`kotlinx.collections.immutable\`），向编译器承诺该类不可变，即可成功激活智能跳过（Smart Recomposition）。
+- **核心陷阱**：Kotlin 标准库 \`List<T>\` 属于接口，Compose 编译器悲观判定其为 **Unstable（不稳定）**，导致子组件入参即使完全未变，也无法享受跳过重组。
+- **破局关键**：在数据类上标注 \`@Immutable\`（或使用 \`PersistentList\`），向编译器立下绝对不可变契约，即可恢复 **Smart Recomposition（智能跳过）** 能力！
 
 \`\`\`kotlin
 // ❌ 陷阱：直接使用标准 List 会被判定为 Unstable，导致 UserListCard 每次被动重组
