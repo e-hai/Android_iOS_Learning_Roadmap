@@ -619,33 +619,86 @@ class HomeViewModel : ViewModel() {
           metaphorDesc: 'Compose 彻底摒弃了传统昂贵的命令式 View 树。Composable 函数每一次被执行，都是在平铺的插槽表（Slot Table）中存取参数与状态缓存。状态是自变量，UI 是因变量，状态变化时框架通过快照系统自动计算最小重组范围。',
         },
 
-        caseStudy: `### 一、状态提升：单一数据源与无状态组件
+        caseStudy: `### 一、状态提升：单一数据源与深层事件流转
 
-- **场景解释**：普通局部变量重组即丢失；组件内部私有状态难以被外部联动控制。通过将状态提升（State Hoisting）至父级或 ViewModel，子组件降级为无状态（Stateless）的纯展示组件，遵循「状态向下流、事件向上抛」的单向数据流原则。
+- **场景解释**：普通局部变量重组即丢失；组件私有状态难以被外部联动。通过状态提升（State Hoisting）将状态收拢到 ViewModel 的 \`StateFlow\`，子组件降级为无状态（Stateless）纯展示组件。
+- **深层嵌套痛点**：当层级嵌套极深（\`页面 ➔ 垂直流 ➔ 横向列表 ➔ 卡片 ➔ 按钮\`）时，若每层都手动声明 \`onClick\`，会导致严重的回调地狱（Callback Drilling）。为此业界演进出两大正统应对方案：
+
+#### 方案 ①：FeedAction 统一事件流 + 中间拦截（⭐ 80% 业务首选）
+
+- **通俗心智**：用一个密封接口收拢所有事件，中间所有层级**只占一个参数位 \`onAction: (FeedAction) -> Unit\`**。底层新增按钮中间层零改动；若存在“按钮 B 折叠爷组件”的局部联动，爷组件还可充当拦截器，就地消化局部事件，业务事件放行给 ViewModel。
 
 \`\`\`kotlin
-@Composable
-fun CounterScreen(viewModel: CounterViewModel = viewModel()) {
-    val count by viewModel.count.collectAsStateWithLifecycle()
-
-    CounterCard(
-        count = count,
-        onIncrement = { viewModel.increment() }
-    )
+// 1. 密封接口收拢整模块交互
+sealed interface FeedAction {
+    data class RequestData(val itemId: String) : FeedAction  // 业务请求 (给 ViewModel)
+    data object ToggleSection : FeedAction                   // 局部折叠 (给 爷组件)
 }
 
+// 2. 爷组件：持有本地折叠状态，在通道上设卡拦截
 @Composable
-fun CounterCard(
-    count: Int,
-    onIncrement: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Log.d("Compose", "CounterCard 重组, count=\$count")
-    Column(modifier = modifier) {
-        Text("当前点击计数: \$count")
-        Button(onClick = onIncrement) {
-            Text("增加计数")
+fun SectionCard(section: SectionData, onAction: (FeedAction) -> Unit) {
+    var isExpanded by rememberSaveable { mutableStateOf(true) }
+
+    Column {
+        Text("爷列表标题: \${section.title}")
+        if (isExpanded) {
+            FatherList(
+                items = section.items,
+                onAction = { action ->
+                    when (action) {
+                        // 🎯 拦截：属于自己的折叠事件就地消化，不惊扰上层！
+                        is FeedAction.ToggleSection -> isExpanded = !isExpanded
+                        // 🚀 放行：业务请求事件，继续向上冒泡给 ViewModel
+                        else -> onAction(action)
+                    }
+                }
+            )
         }
+    }
+}
+
+// 3. 最深层子组件：只有一个通道，无脑发 Action（显式契约，完美支持 Preview）
+@Composable
+fun LeafButtonRow(item: ProductItem, onAction: (FeedAction) -> Unit) {
+    Row {
+        Button(onClick = { onAction(FeedAction.RequestData(item.id)) }) {
+            Text("按钮 A：请求数据")
+        }
+        Button(onClick = { onAction(FeedAction.ToggleSection) }) {
+            Text("按钮 B：折叠爷列表")
+        }
+    }
+}
+\`\`\`
+
+#### 方案 ②：CompositionLocal 穿透（超深层级 / 全局基建）
+
+- **通俗心智**：在根部架设无线电基站（Provider），深层组件隔空拾取调度器，彻底解放中间所有层级（无需任何参数传递）。\`viewModel()\` 底层就是基于此机制实现。
+- **避坑红线**：适合全树同质的基础设施（全局导航、主题、埋点）；严禁在列表每个项内滥用覆写 Provider，否则会导致隐式依赖泛滥、作用域漂移与 Preview 瘫痪。
+
+\`\`\`kotlin
+// 1. 定义局部事件穿透器（提供默认空实现，方便 Preview 预览）
+val LocalFeedActionHandler = staticCompositionLocalOf<(FeedAction) -> Unit> {
+    { /* 默认空操作 */ }
+}
+
+// 2. 根页面：通过 Provider 向整棵子树下发事件调度器
+@Composable
+fun FeedScreen(viewModel: FeedViewModel = viewModel()) {
+    CompositionLocalProvider(LocalFeedActionHandler provides viewModel::dispatch) {
+        // ⚡ 中间所有层级彻底解放，参数列表干净，无需逐层透传 lambda
+        DeepVerticalFeedList()
+    }
+}
+
+// 3. 最深处的叶子节点：隔空穿透获取调度器
+@Composable
+fun DeepProductCard(itemId: String) {
+    val onAction = LocalFeedActionHandler.current
+
+    Button(onClick = { onAction(FeedAction.RequestData(itemId)) }) {
+        Text("隔空直连 ViewModel")
     }
 }
 \`\`\`
