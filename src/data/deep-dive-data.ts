@@ -4,6 +4,132 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
   domain_01_basics: {
     android: [
       {
+        tag: '现代语言',
+        title: 'Kotlin 核心特性：委托、扩展与内联具现化',
+        metaphor: {
+          title: '语法糖背后的编译期魔术',
+          formula: 'Kotlin = Java.Bytecode + Compiler.Metadata + InlineSpill',
+          metaphorDesc: 'Kotlin 的优雅并非源于 JVM 新增底层指令，而是编译器在 AST 语法树阶段施展的高阶重写魔术。委托是隐藏成员字段的自动转发，扩展是以接收者为首位的静态方法，内联是将 Lambda 函数体直接剪切粘贴到调用处，具现化更是借由内联击穿了 JVM 泛型类型擦除的铜墙铁壁。',
+        },
+        explanation: `### 一、委托体系（Delegation）：告别模板代码与继承
+
+- **核心机制**：委托是 Kotlin 落实“组合优于继承”的利剑，分为属性委托与类委托。
+- **属性委托（Property Delegation）**：
+  1. \`by lazy\`：默认采用 \`LazyThreadSafetyMode.SYNCHRONIZED\`，底层通过双重检查锁（DCL）实现线程安全单例与延迟初始化；
+  2. \`by viewModels()\`：Android 官方扩展，底层利用属性委托将 ViewModel 绑定到宿主 Activity/Fragment 的 \`ViewModelStore\`；
+  3. 自定义委托：实现 \`ReadOnlyProperty<R, T>\` 或 \`ReadWriteProperty<R, T>\`，重写 \`getValue\` / \`setValue\`；
+  4. 字节码还原：编译器生成隐藏私有字段 \`\$\$delegate_0\`，对属性的读写被重定向为 \`\$\$delegate_0.getValue(this, ::prop)\`。
+- **类委托（Class Delegation）**：
+  - 语法：\`class AnalyticsList<T>(private val inner: List<T>) : List<T> by inner\`；
+  - 价值：无需手写几十个接口转发方法，零模板代码实现标准装饰器模式（Decorator），精准拦截目标方法。
+
+### 二、扩展体系（Extensions）：非侵入式装配与 DSL 基石
+
+- **静态分发机制（Static Dispatch）**：
+  1. 扩展函数并非真正修改了类的字节码，而是编译器生成了一个 \`public static final\` 方法，将“接收者类型（Receiver）”作为首个入参；
+  2. **无多态性**：扩展函数的调用由声明的静态类型决定，而非运行时具体子类实例；
+  3. **私有可见性壁垒**：扩展函数无法越权访问接收者内部的 \`private\` 或 \`protected\` 成员。
+- **带接收者的函数字面值（Function Literals with Receiver）**：
+  - 签名形式：\`T.() -> Unit\`；
+  - 核心魔力：在 Lambda 作用域内部隐式注入了接收者对象（作为 \`this\`），使得在函数体内无需前缀即可直接调用 \`T\` 的全部公共属性与方法；
+  - 架构支柱：这是 Compose 声明式组件树、Gradle KTS、以及现代流畅 DSL 构建器的绝对核心语法支柱。
+
+### 三、内联函数与泛型具现化（Inline & Reified）
+
+- **内联函数生态（Inline Ecosystem）**：
+  1. \`inline\`：将函数体与传入的 Lambda 表达式直接“复制粘贴”到调用点，消除高阶函数每次调用创建匿名内部类对象与调用栈帧的开销；
+  2. \`noinline\`：当某个 Lambda 需要被保存为对象引用（如存入集合或延迟异步触发）时，显式关闭其内联；
+  3. \`crossinline\`：禁止 Lambda 执行非局部返回（Non-local \`return\`），强制其只能从自身闭包退出，确保在跨线程、协程分发或异步回调中安全执行。
+- **泛型具现化（Reified Generics）**：
+  - **破解痛点**：JVM 泛型存在“类型擦除（Type Erasure）”，运行时无法执行 \`T::class.java\` 或 \`item is T\`；
+  - **实现原理**：只有在 \`inline\` 函数中才能使用 \`reified\`。因为函数在编译期被平铺展开，编译器在每个调用点已知具体的实参类型，因此能够直接将 \`T\` 替换为具体的字节码常量（如 \`String.class\`）；
+  - **Android 实战**：\`inline fun <reified T : Activity> Context.startActivity()\`，彻底告别繁冗的 \`Intent(context, DetailActivity::class.java)\`。`,
+        caseStudy: `### 一、自定义属性委托：AutoClearedValue 防生命周期内存泄漏
+
+- **场景解释**：在 Fragment 中使用 ViewBinding 时，View 的生命周期短于 Fragment 实例。若直接持有 Binding 引用，在切页或放入回退栈时旧 View 无法回收，引发严重内存泄漏。通过自定义生命周期感知属性委托，在 \`onDestroyView\` 时自动将引用置 \`null\`。
+
+\`\`\`kotlin
+class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment, T> {
+    private var value: T? = null
+
+    init {
+        // ⚡ 监听 Fragment 视图生命周期，在销毁时自动清空引用
+        fragment.viewLifecycleOwnerLiveData.observe(fragment) { viewLifecycleOwner ->
+            viewLifecycleOwner?.lifecycle?.addObserver(object : DefaultLifecycleObserver {
+                override fun onDestroy(owner: LifecycleOwner) {
+                    value = null // 自动松开对 View 的强引用
+                    Log.d("AutoCleared", "View 已销毁，AutoClearedValue 自动释放强引用")
+                }
+            })
+        }
+    }
+
+    override fun getValue(thisRef: Fragment, property: KProperty<*>): T {
+        return value ?: throw IllegalStateException("不能在 onDestroyView 之后访问 Binding")
+    }
+
+    fun setValue(newValue: T) {
+        value = newValue
+    }
+}
+
+// 扩展工厂函数：一行代码优雅声明
+fun <T : Any> Fragment.autoCleared() = AutoClearedValue<T>(this)
+\`\`\`
+
+### 二、带接收者的 Lambda：构建极简流畅 DSL 构建器
+
+- **场景解释**：带接收者的 Lambda（\`T.() -> Unit\`）让调用方在极其清爽的代码块中配置对象。常用于构建路由树、网络请求流水线或动态表单。
+
+\`\`\`kotlin
+// 1. 声明构建器实体与子节点
+class RequestConfig {
+    var url: String = ""
+    var timeoutMs: Long = 3000
+    private val headers = mutableMapOf<String, String>()
+
+    fun header(key: String, value: String) {
+        headers[key] = value
+    }
+}
+
+// 2. 核心语法：init: RequestConfig.() -> Unit 将 RequestConfig 注入为 Lambda 内部的 this
+fun httpClient(block: RequestConfig.() -> Unit): RequestConfig {
+    val config = RequestConfig()
+    config.block() // ⚡ 在 config 作用域内执行用户闭包
+    return config
+}
+
+// 3. 业务调用：极简、无冗余前缀的 DSL 风格配置
+val request = httpClient {
+    url = "https://api.example.com/v1/feed"
+    timeoutMs = 5000
+    header("Authorization", "Bearer eyJhbGciOi...")
+    header("Accept", "application/json")
+}
+\`\`\`
+
+### 三、inline、noinline 与 crossinline 异步回调避坑实录
+
+- **场景解释**：给高阶函数加 \`inline\` 时，Lambda 默认允许非局部返回（\`return\` 会直接从外部封闭函数退出）。如果 Lambda 被提交到其他线程或异步挂起流中执行，非局部返回将引发致命的线程栈崩溃。
+
+\`\`\`kotlin
+// ⚡ 核心规约：跨异步线程分发时，必须使用 crossinline 禁止非局部 return
+inline fun executeTask(
+    noinline logAction: () -> Unit,      // 不需要内联，作为对象引用传递
+    crossinline asyncWork: () -> Unit   // 跨线程执行，必须限制禁止外部 return
+) {
+    // 1. noinline 变量可以安全传递给其他方法
+    Handler(Looper.getMainLooper()).post(logAction)
+
+    // 2. crossinline 确保在 Runnable 线程池中无法调用 return 逃逸
+    Thread {
+        asyncWork() // 安全在子线程中跑完自身闭包
+    }.start()
+}
+\`\`\``,
+      },
+      {
         tag: '并发底层',
         title: 'Kotlin 协程',
         pipeline: [
@@ -1107,32 +1233,283 @@ fun NativeVideoPlayer(
 \`\`\``,
       },
       {
-        tag: '网络底层',
-        title: 'OkHttp 连接池复用、Socket 保持与拦截器链分发',
-        explanation: 'OkHttp 采用责任链模式 (RealInterceptorChain) 依次分发请求：RetryAndFollowUpInterceptor（重试重定向）➔ BridgeInterceptor（注入 Header 与 Cookie）➔ CacheInterceptor（HTTP 缓存）➔ ConnectInterceptor（从 ConnectionPool 查找复用 Socket 或建立 TCP/TLS 握手）➔ CallServerInterceptor（向 Socket 写入 HTTP/2 帧并读取 Response）。ConnectionPool 默认保持 5 个空闲连接且闲置 5 分钟后由后台线程自动清理。',
-        codeSnippet: `// 全局单例 OkHttpClient 配置连接池与拦截器
-val okHttpClient = OkHttpClient.Builder()
-    .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
-    .addInterceptor(LoggingInterceptor()) // Application 拦截器: 拦截业务逻辑
-    .addNetworkInterceptor(StethoInterceptor()) // Network 拦截器: 监控真实网络字节
-    .retryOnConnectionFailure(true)
-    .build()`,
-      },
-      {
-        tag: '存储底层',
-        title: 'Room InvalidationTracker 源码机制与 SQLite WAL 模式',
-        explanation: 'Room 在开启 WAL (Write-Ahead Logging) 模式后，读写操作完全分离互不阻塞。当在 DAO 中声明返回 Flow<T> 时，Room 会通过 InvalidationTracker 在底层数据库建立 SQLite 触发器 (Trigger) 监听 target_table。每当发生 INSERT/UPDATE/DELETE，触发器向 room_table_modification_log 写入变更标记；InvalidationTracker 的后台观察者定时轮询该表，发现变动后重新执行查询并通过 Flow 发射最新数据集合。',
-        codeSnippet: `// Room 数据库配置 WAL 与响应式 Flow
-@Dao
-interface UserDao {
-    @Query("SELECT * FROM users WHERE status = 'active'")
-    fun observeActiveUsers(): Flow<List<UserEntity>> // 自动绑定 InvalidationTracker
+        tag: '表现逻辑',
+        title: '逻辑层：ViewModel 机制与状态基座',
+        metaphor: {
+          title: '生命周期的避风港与单一事实状态机',
+          formula: 'ViewModel = NonConfigurationInstances + SavedStateHandle + StateFlow(5000)',
+          metaphorDesc: 'ViewModel 是承载 UI 状态的“不倒翁”。页面横竖屏旋转或配置变更时，Activity 会被销毁重建，但系统底层的 NonConfigurationInstances 握住 ViewModelStore 不放，确保状态在内存中安然无恙；即使进程因低内存被杀，SavedStateHandle 也能通过 Bundle 自动回填现场。',
+        },
+        explanation: `### 一、ViewModel 跨配置存活源码机制
+
+- **配置变更痛点**：横竖屏旋转、深色模式切换或系统语言改变时，Activity 会经历完整的 \`onDestroy\` ➔ \`onCreate\` 销毁重建。普通局部变量或异步任务若绑定在 Activity 上会全部丢失或泄漏。
+- **存活底层原理**：
+  1. \`ViewModelStoreOwner\`：Activity / Fragment 实现了此接口，管理着一个 \`ViewModelStore\`（本质是 \`HashMap<String, ViewModel>\`）；
+  2. \`NonConfigurationInstances\`：在 Activity 销毁前，系统回调 \`onRetainNonConfigurationInstance()\`，将当前的 \`ViewModelStore\` 实例托管给底层的 \`ActivityClientRecord\`（由 AMS 和 ActivityThread 强持有，不受配置变更重建影响）；
+  3. 重建恢复：新 Activity 启动在 \`onCreate()\` 中，通过 \`getLastNonConfigurationInstance()\` 直接将旧的 \`ViewModelStore\` 原封不动取回，所有 ViewModel 实例及其内存状态完好如初。
+
+### 二、进程死亡恢复机制（SavedStateHandle）
+
+- **被杀与旋转的本质区别**：
+  - 横竖屏旋转属于**配置变更**，进程未死，内存还在；
+  - 用户按 Home 切后台，当系统内存紧张时，**整个应用进程会被操作系统彻底杀死（Low Memory Kill）**！此时 \`NonConfigurationInstances\` 在内存中灰飞烟灭，重新打开 App 时 ViewModel 必然重新初始化！
+- **SavedStateHandle 原理**：
+  - 依托系统底层的 \`onSaveInstanceState(Bundle)\` 机制；
+  - ViewModel 通过构造函数注入 \`SavedStateHandle\`，在进程被杀前将关键状态序列化进系统的持久化 Bundle；
+  - 进程重启冷启动时，框架自动将 Bundle 状态反序列化注入回新生成的 ViewModel 中，配合 \`getStateFlow()\` 实现全自动热恢复。
+
+### 三、状态冷热订阅与防抖：WhileSubscribed(5000)
+
+- **黄金 5 秒规则**：在 ViewModel 中将冷流转换为给 UI 订阅的 \`StateFlow\` 时，推荐使用：
+  \`flow.stateIn(scope, SharingStarted.WhileSubscribed(5_000), initialValue)\`
+- **为什么必须是 5000 毫秒？**
+  1. **配置变更保护**：横竖屏旋转时，旧 Activity 销毁（取消订阅）到新 Activity 重建（重新订阅）通常耗时数十毫秒。5000ms 缓冲期内上游流**不停止收集**，避免了旋转瞬间重复打网络请求；
+  2. **切后台节能**：用户按 Home 键切后台超过 5 秒后，订阅计数清零，上游网络/定位流自动停止，为手机省电省流量；
+  3. **重新切回前台**：UI 再次可见重新订阅，瞬间唤醒上游流继续发射数据。
+
+### 四、业务下沉 UseCase（避免上帝类）
+
+- **单一职责原则**：ViewModel 只负责“UI 状态持有”与“交互事件接收”，严禁在 ViewModel 里编写复杂业务算法、权限校验或多仓库数据编排。
+- **UseCase 契约**：每个 UseCase 只做一件事（通常重载 \`operator fun invoke(...)\` 作为纯函数调用），方便跨 ViewModel 复用，且可脱离 Android 运行时极速进行纯 JVM 单元测试。`,
+        caseStudy: `### 一、SavedStateHandle 复杂对象持久化与进程被杀热恢复
+
+- **场景解释**：电商搜索页中，用户输入了关键词并勾选了复杂的筛选器。当用户切去微信聊天导致 App 被系统后台杀死后，重新返回时必须无感恢复原有的搜索状态，绝不能白屏回滚。
+
+\`\`\`kotlin
+class SearchViewModel(
+    private val savedStateHandle: SavedStateHandle,
+    private val repository: ProductRepository
+) : ViewModel() {
+    companion object {
+        private const val KEY_QUERY = "saved_search_query"
+    }
+
+    // ⚡ 核心机制：将状态绑定到 SavedStateHandle，跨进程杀死依然存活
+    val queryState: StateFlow<String> = savedStateHandle.getStateFlow(KEY_QUERY, "")
+
+    // 结合 WhileSubscribed(5000) 构筑防抖搜索流
+    val searchResults: StateFlow<List<Product>> = queryState
+        .debounce(300.milliseconds)
+        .filter { it.isNotBlank() }
+        .flatMapLatest { query -> repository.searchProducts(query) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000), // ⚡ 旋转不重查，切后台省电
+            initialValue = emptyList()
+        )
+
+    fun onQueryChange(newQuery: String) {
+        // 自动序列化进 Bundle
+        savedStateHandle[KEY_QUERY] = newQuery
+    }
+}
+\`\`\`
+
+### 二、UseCase 领域层封装与并发共享调度实战
+
+- **场景解释**：用户下单一刻，需校验账户余额、扣减库存并上报风控埋点。若直接写在 ViewModel 中会导致逻辑与 UI 框架强耦合。将用例封装为独立的纯逻辑 \`CheckoutUseCase\`，支持高并发线程调度与无依赖单元测试。
+
+\`\`\`kotlin
+class CheckoutUseCase(
+    private val orderRepo: OrderRepository,
+    private val userRepo: UserRepository,
+    private val dispatcher: CoroutineDispatcher = Dispatchers.IO
+) {
+    // ⚡ 重载 invoke 操作符，使得 UseCase 可以像函数一样直接调用
+    suspend operator fun invoke(orderId: String, couponId: String?): Result<OrderReceipt> = withContext(dispatcher) {
+        runCatching {
+            val user = userRepo.getCurrentUser() ?: throw IllegalStateException("用户未登录")
+            // 并行执行校验与库存预占
+            orderRepo.submitOrder(orderId = orderId, userId = user.id, couponId = couponId)
+        }
+    }
 }
 
-@Database(entities = [UserEntity::class], version = 2)
-abstract class AppDatabase : RoomDatabase() {
-    abstract fun userDao(): UserDao
-}`,
+class CheckoutViewModel(
+    private val checkoutUseCase: CheckoutUseCase
+) : ViewModel() {
+    fun submit(orderId: String) {
+        viewModelScope.launch {
+            // 像普通函数一样调用 UseCase
+            val result = checkoutUseCase(orderId, couponId = null)
+            result.onSuccess { receipt ->
+                Log.d("Checkout", "下单成功: \${receipt.number}")
+            }.onFailure { err ->
+                Log.e("Checkout", "下单失败: \${err.message}")
+            }
+        }
+    }
+}
+\`\`\``,
+      },
+      {
+        tag: '数据底座',
+        title: '数据层：网络通信与 Room 关系/事务/迁移实战协同',
+        metaphor: {
+          title: '单一事实源与双轮驱动缓存总线',
+          formula: 'DataLayer = OkHttp.Interceptors + Room(Relations + Transactions + Migrations) ➔ SOT',
+          metaphorDesc: '数据层是应用最坚实的地下管网。OkHttp 拦截器链如同层层把关的水质净化站，负责鉴权与重试；Room 则如同坚固的地下蓄水库，通过严格的迁移保证结构演进，通过一对多/多对多拓扑关系清晰梳理数据，并以原子事务防范灾难。两相协同，构筑离线可用的单一可信数据源（SOT）。',
+        },
+        explanation: `### 一、网络通信管线：OkHttp 连接池与责任链拦截器
+
+- **Socket 复用（ConnectionPool）**：
+  1. TCP 三次握手与 TLS 握手开销极大（100~300ms）。OkHttp 维护一个连接池（默认最多保持 5 个空闲 Socket，存活 5 分钟），多路复用 HTTP/2 连接，后续请求直接复用已建连的物理通道；
+  2. 后台守护线程池定时清理过期与超额空闲 Socket，平衡内存占用与高并发吞吐。
+- **责任链模式（RealInterceptorChain）**：
+  - 核心思想：每个拦截器只需关注自身切面逻辑，调用 \`chain.proceed(request)\` 将请求交给下一棒，并对拿到的响应执行后置加工；
+  - 拦截器顺序：重试重定向（RetryAndFollowUp）➔ 注入公共标头（Bridge）➔ 本地缓存策略（Cache）➔ 寻址与复用 Socket（Connect）➔ 写入网络字节帧（CallServer）。
+
+### 二、数据库安全升级与迁移（Migrations）
+
+- **手动迁移（Manual Migration）**：
+  - 当数据库结构变动（增加表、修改列）时，递增 \`version\` 并编写 \`Migration(startVersion, endVersion)\`；
+  - 执行精细 SQL：\`ALTER TABLE users ADD COLUMN age INTEGER NOT NULL DEFAULT 0\`；
+  - **复杂表重构三步法**：SQLite 无法直接删除或重命名旧列时，必须“① 创建新临时表 ➔ ② 将旧表数据复制到新表 ➔ ③ 删除旧表并重命名新表”。
+- **自动迁移（AutoMigration）**：
+  - Room 2.4+ 支持通过注解声明 \`@AutoMigration(from = 1, to = 2)\`，编译器自动比对 Schema JSON 差量；
+  - 重命名列或删除列存在歧义时，需配合 \`@RenameColumn\` / \`@DeleteColumn\` 提供辅助迁移声明规范。
+- **避坑红线**：严禁在线上版本配置 \`fallbackToDestructiveMigration()\`，否则升级失败时会瞬间抹除用户所有本地离线数据！
+
+### 三、复杂关系模型映射（Relations）
+
+- **一对多关系（One-to-Many）**：
+  - 场景：一个用户（User）拥有多个订单（Order）；
+  - 方案：通过 \`@Embedded\` 嵌套主表 Entity，并在子表字段上标注 \`@Relation(parentColumn = "userId", entityColumn = "ownerId")\`；
+  - 价值：Room 自动执行分步查询并拼装为嵌套对象，彻底告别手动拼接 SQL 与实体映射。
+- **多对多关系（Many-to-Many）**：
+  - 场景：学生（Student）与课程（Course）相互多对多关联；
+  - 方案：引入中间交叉关联表（Junction Table），在数据类中配置 \`@Relation(associateBy = Junction(StudentCourseCrossRef::class))\`。
+
+### 四、事务控制与原子回滚（Transactions）
+
+- **DAO 声明式事务（@Transaction）**：
+  - 在 DAO 方法上标注 \`@Transaction\`，确保该方法内的多次数据库读写（如查询主表 + 批量查询子表，或清空旧表 + 插入新表）在单一 SQLite 事务内原子执行，杜绝数据半写入。
+- **Repository 编程式挂起事务（withTransaction）**：
+  - 跨多个 DAO 或结合网络业务编排时，在协程中调用 \`roomDatabase.withTransaction { ... }\`；
+  - 块内任何步骤抛出异常，整个事务全量自动回滚，保障本地数据绝对强一致。`,
+        caseStudy: `### 一、OkHttp Token 无感自动刷新拦截器实战
+
+- **场景解释**：API 采用双 Token 机制（短期 AccessToken + 长期 RefreshToken）。当多个并发网络请求同时遇到 401 Unauthorized 时，必须确保**只发起一次 RefreshToken 换票请求**，换到新 Token 后唤醒所有等待的请求重新发起，避免并发换票死锁或重复失效。
+
+\`\`\`kotlin
+class TokenAuthenticator(
+    private val tokenRepo: TokenRepository
+) : Authenticator {
+    private val lock = Any()
+
+    override fun authenticate(route: Route?, response: Response): Request? {
+        // ⚡ 1. 超过 3 次重试判定彻底失败，跳出死循环
+        if (responseCount(response) >= 3) return null
+
+        synchronized(lock) {
+            val currentToken = tokenRepo.getAccessToken()
+            val requestToken = response.request.header("Authorization")?.removePrefix("Bearer ")
+
+            // ⚡ 2. 双重检查：如果其他并发请求已经先刷新了 Token，直接用新 Token 重试
+            if (currentToken != requestToken && currentToken != null) {
+                return response.request.newBuilder()
+                    .header("Authorization", "Bearer $currentToken")
+                    .build()
+            }
+
+            // ⚡ 3. 阻塞式执行刷新 Token（仅第 1 个 401 请求发起刷新）
+            val refreshSuccess = tokenRepo.refreshAccessTokenSync()
+            if (!refreshSuccess) {
+                tokenRepo.logout() // 刷新失败，强制登出
+                return null
+            }
+
+            // ⚡ 4. 拿到最新 Token，带新 Header 重新发起该请求
+            val newToken = tokenRepo.getAccessToken()
+            return response.request.newBuilder()
+                .header("Authorization", "Bearer $newToken")
+                .build()
+        }
+    }
+
+    private fun responseCount(response: Response): Int {
+        var count = 1
+        var prior = response.priorResponse
+        while (prior != null) {
+            count++
+            prior = prior.priorResponse
+        }
+        return count
+    }
+}
+\`\`\`
+
+### 二、Room 一对多 / 多对多嵌套关联与事务写入实战
+
+- **场景解释**：电商业务中，一个订单详情包含：订单基本信息（一对一）、买家信息（一对一）、关联商品列表（多对多），要求一次性查询并组装为完整的领域对象。
+
+\`\`\`kotlin
+// 1. 实体定义
+@Entity(tableName = "orders")
+data class OrderEntity(@PrimaryKey val orderId: String, val createTime: Long)
+
+@Entity(tableName = "products")
+data class ProductEntity(@PrimaryKey val productId: String, val title: String, val price: Long)
+
+// 中间交叉表：声明订单与多商品的多对多关联
+@Entity(tableName = "order_product_cross_ref", primaryKeys = ["orderId", "productId"])
+data class OrderProductCrossRef(val orderId: String, val productId: String)
+
+// 2. 嵌套数据关系模型
+data class OrderWithProducts(
+    @Embedded val order: OrderEntity,
+    @Relation(
+        parentColumn = "orderId",
+        entityColumn = "productId",
+        associateBy = Junction(OrderProductCrossRef::class) // ⚡ 声明多对多交叉表关联
+    )
+    val products: List<ProductEntity>
+)
+
+// 3. DAO 声明式事务操作
+@Dao
+interface OrderDao {
+    // 自动在单一事务中分步查询并组装出完整图谱
+    @Transaction
+    @Query("SELECT * FROM orders WHERE orderId = :orderId")
+    fun getOrderWithProducts(orderId: String): Flow<OrderWithProducts>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrder(order: OrderEntity)
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertProducts(products: List<ProductEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCrossRefs(refs: List<OrderProductCrossRef>)
+}
+\`\`\`
+
+### 三、离线优先 Repository 协同流水线
+
+- **场景解释**：现代工业级应用核心原则——“页面优先展示本地缓存（秒开），后台静默发起网络拉取，利用 \`withTransaction\` 批量更新数据库，自动触发上层 Flow 刷新”，构建不可破败的单一可信数据源（SOT）。
+
+\`\`\`kotlin
+class FeedRepository(
+    private val db: AppDatabase,
+    private val api: FeedApiService
+) {
+    // ⚡ 单一事实源：向 UI 暴露本地数据库 Flow，上层永远只认本地数据库
+    fun getFeedStream(): Flow<List<FeedItem>> = db.feedDao().observeFeeds()
+
+    // 后台静默刷新：网络数据原子写入数据库，自动触发上方的 Flow 刷新！
+    suspend fun refreshFeed(): Result<Unit> = runCatching {
+        val remoteData = api.fetchLatestFeeds()
+
+        // ⚡ 编程式挂起事务：多表原子清空与替换，失败自动全量回滚
+        db.withTransaction {
+            db.feedDao().clearAll()
+            db.feedDao().insertAll(remoteData.map { it.toEntity() })
+            db.syncLogDao().recordSyncTime(System.currentTimeMillis())
+        }
+    }
+}
+\`\`\``,
       },
     ],
     ios: [
