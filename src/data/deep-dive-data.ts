@@ -6,34 +6,34 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
       {
         tag: '现代语言',
         title: 'Kotlin 核心特性：委托、扩展与内联具现化',
-        caseStudy: `### 一、委托（Delegation）：是什么与怎么用
+        caseStudy: `### 一、属性委托：懒加载、变动监听与生命周期安全托管
 
-#### 1. 属性委托（Property Delegation）
-- **是什么**：把属性的读写（\`get/set\`）操作交给另一个对象代管。当你在属性后写上 \`by delegate\`，外部访问属性时会自动调用委托对象的 \`getValue()\` 和 \`setValue()\`，省去重复的样板逻辑。
-- **怎么用：延迟加载 \`by lazy\`**（首次访问才初始化，支持线程安全双重检查锁）：
+- **解决痛点与机制**：避免在每个类中重复编写状态读写、线程同步或缓存样板代码。通过 \`by delegate\` 将属性的 \`get()\` 和 \`set()\` 转发给专门的托管对象，由委托者统一管控属性的读写生命周期。
+- **高频场景与工程实战**：
+  1. **延迟初始化 \`by lazy\`**：默认采用 \`LazyThreadSafetyMode.SYNCHRONIZED\` 双检锁，仅在首次被访问时才触发初始化并缓存结果，非常适合耗时管理类或数据库实例的创建；
+  2. **属性变动监听 \`by Delegates.observable\`**：值变化时自动触发回调，常用于 UI 自动刷新或数据埋点；
+  3. **生命周期自动解绑（自定义委托）**：针对 Fragment 中 ViewBinding 生命周期短于 Fragment 实例的痛点，打造自动置空的委托，离开视图时自动释放强引用防内存泄漏。
+
 \`\`\`kotlin
-// 只有在第一次调用 heavyManager 时才会执行花括号代码并缓存结果
-val heavyManager: HeavyManager by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-    HeavyManager().apply { initDatabase() }
+// 1. 耗时实例懒加载：首次使用时才初始化，线程安全
+val databaseHelper: DatabaseHelper by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+    DatabaseHelper().apply { initTables() }
 }
-\`\`\`
-- **怎么用：属性变动监听 \`by Delegates.observable\`**（值变动自动触发回调，做数据埋点/UI刷新）：
-\`\`\`kotlin
-var pageTitle: String by Delegates.observable("首页") { prop, oldTitle, newTitle ->
-    Log.d("Page", "标题从 \$oldTitle 变更为 \$newTitle")
+
+// 2. 状态监听：标题变动自动同步给 UI 状态栏
+var currentTitle: String by Delegates.observable("首页") { _, oldTitle, newTitle ->
+    Log.d("NavBar", "标题从 \$oldTitle 切换为 \$newTitle")
     updateTitleBar(newTitle)
 }
-\`\`\`
-- **怎么用：自定义属性委托（Fragment ViewBinding 自动释放）**：
-\`\`\`kotlin
-// 解决 Fragment 视图销毁后 Binding 强引用导致的内存泄漏
+
+// 3. 自定义委托实战：Fragment ViewBinding 离开页面自动解绑
 class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment, T> {
     private var value: T? = null
     init {
         fragment.viewLifecycleOwnerLiveData.observe(fragment) { owner ->
             owner?.lifecycle?.addObserver(object : DefaultLifecycleObserver {
                 override fun onDestroy(owner: LifecycleOwner) {
-                    value = null // ⚡ 视图销毁时自动置空释放
+                    value = null // ⚡ onDestroyView 时自动将引用置空，杜绝内存泄漏
                 }
             })
         }
@@ -43,63 +43,67 @@ class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment,
     fun setValue(newValue: T) { value = newValue }
 }
 
-// 业务调用：一行代码优雅声明
+// 声明用法：离开视图自动安全释放
 // private var binding: FragmentHomeBinding by autoCleared()
 \`\`\`
 
-#### 2. 类委托（Class Delegation）
-- **是什么**：不用继承基类，通过 \`by\` 关键字将接口的全部方法直接转发给已有的实例对象，**一行代码实现标准的“装饰器模式（Decorator）”**，严格落实“组合优于继承”。
-- **怎么用：零样板代理监控**（只需重写需要增强的方法，其余几十个接口方法自动委托转发）：
+### 二、类委托：基于 by 接口代理的无样板装饰器模式
+
+- **解决痛点与机制**：传统面向对象中若要为既有类增强能力，若使用继承极易破坏封装且受限于单继承；若使用装饰器模式，则必须手动手写几十个空转发方法。Kotlin 的类委托允许通过 \`class Xxx : Interface by inner\`，由编译器在底层自动生成所有转发代码，真正践行“组合优于继承”。
+- **工程实战**：例如我们需要为现有的 \`MutableList\` 增加耗时监测或埋点拦截，只需覆写关心的动作，其余所有集合接口方法自动转发给 \`inner\`。
+
 \`\`\`kotlin
-// 无需手写数十个代理方法，直接代理 inner，仅覆写需要拦截增强的成员
-class AnalyticsList<T>(
+// ⚡ 仅覆写需要增强拦截的方法，其余数十个集合方法全部由编译器自动代理转发
+class TrackedList<T>(
     private val inner: MutableList<T>
 ) : MutableList<T> by inner {
 
     override fun add(element: T): Boolean {
-        Log.d("AnalyticsList", "埋点监控：新增元素 \$element")
+        Log.d("TrackedList", "数据埋点上报：新增元素 \$element")
         return inner.add(element)
     }
 
     override fun removeAt(index: Int): T {
-        Log.d("AnalyticsList", "埋点监控：移除索引 \$index")
+        Log.d("TrackedList", "数据埋点上报：移除索引 \$index")
         return inner.removeAt(index)
     }
 }
 \`\`\`
 
-### 二、扩展（Extensions）：是什么与怎么用
+### 三、扩展函数与属性：对既有类的非侵入式能力装配
 
-#### 1. 扩展函数与扩展属性
-- **是什么**：在不继承类、也不修改类源码的前提下，直接给现有的类“凭空追加”新的方法或计算属性，调用体验和原生类成员一模一样。
-- **怎么用：日常高频工具扩展**：
+- **解决痛点与机制**：不再需要编写死板难用的 \`ViewUtils.setVisibility(view, ...)\` 静态工具类。扩展机制允许在不修改类源码、不继承子类的情况下，直接为 Android 原生控件或第三方类型注入符合业务语意的成员方法与计算属性，调用体验如同原生 API。
+- **工程实战**：常用的视图显隐切换、上下文极简 Toast、屏幕宽高计算属性。
+
 \`\`\`kotlin
-// 1. 扩展函数：给系统 View 追加快速显隐切换
+// 1. 扩展函数：语义化控制 View 显隐，消除到处手写的 View.VISIBLE / View.GONE
 fun View.visibleOrGone(visible: Boolean) {
     visibility = if (visible) View.VISIBLE else View.GONE
 }
 
-// 2. 扩展函数：给 Context 追加极简 Toast
+// 2. 扩展函数：Context 极简提示，免去 Toast.makeText 冗长构造
 fun Context.toast(message: CharSequence) {
     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }
 
-// 3. 扩展属性：给 Context 追加屏幕宽度只读属性
+// 3. 扩展计算属性：随手获取屏幕像素宽度
 val Context.screenWidth: Int
     get() = resources.displayMetrics.widthPixels
 
-// 业务调用：
-// myButton.visibleOrGone(user.isVip)
-// context.toast("登录成功，屏幕宽: \${context.screenWidth}")
+// 业务调用体验：清爽直观
+// loginButton.visibleOrGone(user.isLoggedIn)
+// context.toast("操作成功，当前屏幕宽: \${context.screenWidth}px")
 \`\`\`
 
-#### 2. 带接收者的 Lambda（Lambda with Receiver）
-- **是什么**：普通 Lambda 是 \`() -> Unit\`，而带接收者的 Lambda 是 \`T.() -> Unit\`。它为闭包注入了一个“宿主对象（\`this\`）”，在闭包的大括号内无需前缀即可直接调用该宿主的所有公开成员，如同写在类定义内部。
-- **怎么用：构建极简流畅的 DSL**（Compose、Gradle KTS 与网络构建器基石）：
+### 四、带接收者的 Lambda：打造类型安全的流畅领域 DSL
+
+- **解决痛点与机制**：普通闭包 \`() -> Unit\` 无法直接访问调用方上下文。带接收者的闭包 \`T.() -> Unit\` 将对象实例隐式注入为闭包内部的 \`this\`，使得在花括号作用域内可以直接调用该对象的所有公开属性与方法。这是 Jetpack Compose 声明式组件树、Gradle 构建脚本以及现代流畅配置 DSL 的底层母体语法。
+- **工程实战**：构建极简优雅的网络客户端配置器。
+
 \`\`\`kotlin
-// 1. 声明构建配置类
-class RequestConfig {
-    var url: String = ""
+// 1. 领域配置实体
+class HttpClientConfig {
+    var baseUrl: String = ""
     var timeoutMs: Long = 3000
     private val headers = mutableMapOf<String, String>()
 
@@ -108,33 +112,31 @@ class RequestConfig {
     }
 }
 
-// 2. 核心语法：block 签名是 RequestConfig.() -> Unit
-fun httpClient(block: RequestConfig.() -> Unit): RequestConfig {
-    val config = RequestConfig()
-    config.block() // ⚡ 在 config 作用域内执行用户闭包，this 就是 config
+// 2. 核心语法：入参为 block: HttpClientConfig.() -> Unit
+fun setupHttpClient(block: HttpClientConfig.() -> Unit): HttpClientConfig {
+    val config = HttpClientConfig()
+    config.block() // ⚡ 在 config 作用域内执行用户代码，此时闭包内部的 this 就是 config
     return config
 }
 
-// 3. 业务调用：极简、无冗余前缀的 DSL 风格
-val request = httpClient {
-    url = "https://api.example.com/v1/feed"
+// 3. 业务调用：极简、无冗余前缀的声明式 DSL 风格
+val client = setupHttpClient {
+    baseUrl = "https://api.example.com"
     timeoutMs = 5000
     header("Authorization", "Bearer token_xyz")
     header("Accept", "application/json")
 }
 \`\`\`
 
-### 三、内联与泛型具现化（Inline & Reified）：是什么与怎么用
+### 五、内联函数生态：inline / noinline / crossinline 的性能优化与安全避坑
 
-#### 1. 内联函数（inline / noinline / crossinline）
-- **是什么**：
-  - Kotlin 中每次给高阶函数传 Lambda，底层都会在堆上新建一个匿名内部类对象，引发频繁 GC 与调用栈开销；
-  - \`inline\`：通知编译器**“别建对象，直接把 Lambda 函数体代码完整复制粘贴到调用处”**，消除开销；
-  - \`noinline\`：函数有多个 Lambda 入参时，排除某一个不进行内联（以便当作普通对象引用保存或传递）；
-  - \`crossinline\`：当 Lambda 必须交给子线程、协程池或异步 Runnable 执行时，强制禁止局部 \`return\` 逃逸，保证异步安全。
-- **怎么用：高频计时与异步安全回调**：
+- **解决痛点与机制**：
+  - 在高阶函数中每次传递 Lambda，底层都会在堆内存新建匿名内部类对象，高频调用时引发频繁 GC；\`inline\` 告诉编译器**直接把 Lambda 代码复制平铺到调用处**，彻底消除对象分配与虚方法栈帧开销；
+  - **避坑红线**：内联函数的 Lambda 默认支持非局部返回（Non-local \`return\` 会直接跳出外层封闭函数）。若将 Lambda 传递到子线程、协程池或异步任务中执行，非局部返回会导致致命的线程栈崩溃。此时必须使用 \`crossinline\` 构筑安全防线。
+- **工程实战**：高频执行耗时监控工具，与跨线程异步安全调度。
+
 \`\`\`kotlin
-// 1. inline 消除高阶函数开销（耗时监控）
+// 1. inline 消除高阶闭包分配开销（耗时性能打点）
 inline fun <T> measureDuration(tag: String, block: () -> T): T {
     val start = System.currentTimeMillis()
     val result = block()
@@ -142,38 +144,40 @@ inline fun <T> measureDuration(tag: String, block: () -> T): T {
     return result
 }
 
-// 2. crossinline 禁止非局部 return，防止多线程栈崩溃
-inline fun executeTask(
-    noinline logAction: () -> Unit,      // 需作为引用传给 Handler，使用 noinline
-    crossinline asyncWork: () -> Unit   // 跨线程执行，使用 crossinline 限制不能在此直接 return 逃逸
+// 2. crossinline 确保在异步回调中禁止非局部 return，防止多线程崩溃
+inline fun runAsyncTask(
+    noinline onLog: () -> Unit,       // 不需要内联，作为对象引用传给 Handler
+    crossinline onExecute: () -> Unit // 跨线程执行，使用 crossinline 限制闭包不能在此直接 return 逃逸
 ) {
-    Handler(Looper.getMainLooper()).post(logAction)
+    Handler(Looper.getMainLooper()).post(onLog)
     Thread {
-        asyncWork() // 安全在子线程中跑完自身闭包
+        onExecute() // ⚡ 安全在子线程中跑完自身闭包
     }.start()
 }
 \`\`\`
 
-#### 2. 泛型具现化（reified）
-- **是什么**：
-  - JVM 泛型在编译后会经历“类型擦除”，运行时所有泛型都变成 \`Object\`，因此代码里不能写 \`T::class.java\` 或 \`item is T\`；
-  - 只有在 \`inline\` 函数中才能使用 \`reified\`。因为函数在编译期被内联平铺展开，编译器在每个调用点都已知具体的实参类型，因此**能够直接将 \`T\` 替换为真实的字节码 Class 常量**，彻底击穿类型擦除！
-- **怎么用：免传 .class 与异构集合安全类型过滤**：
+### 六、泛型具现化 reified：击穿 JVM 编译期类型擦除
+
+- **解决痛点与机制**：Java 泛型采用类型擦除（Type Erasure），编译后泛型信息全部变成 \`Object\`，无法在运行时直接通过 \`T::class.java\` 获取类元数据，也无法使用 \`item is T\` 进行类型判断。在 \`inline\` 函数中为泛型加上 \`reified\`，编译器由于在调用点将函数展开，**能够直接将 \`T\` 替换为调用处的真实 Class 常量**，使运行时重新具备类型感知能力。
+- **工程实战**：页面极简跳转语法糖，以及异构数据集合安全类型过滤。
+
 \`\`\`kotlin
-// 1. Activity 跳转免传 DetailActivity::class.java
+// 1. 页面跳转免传 TargetActivity::class.java 冗长语法
 inline fun <reified T : Activity> Context.startActivity(block: Intent.() -> Unit = {}) {
-    val intent = Intent(this, T::class.java) // ⚡ 运行时精准获取真实 Class 实例
+    val intent = Intent(this, T::class.java) // ⚡ 运行时精准获取真实 Class 对象
     intent.block()
     startActivity(intent)
 }
 
 // 业务调用：优雅干净
-// context.startActivity<DetailActivity> { putExtra("order_id", "10086") }
+// context.startActivity<DetailActivity> {
+//     putExtra("order_id", "20260903")
+// }
 
-// 2. 异构集合精准过滤与安全类型转换
-inline fun <reified T> List<Any>.findFirstOf(): T? {
+// 2. 异构集合安全类型过滤与提取
+inline fun <reified T> List<Any>.findFirstInstance(): T? {
     for (item in this) {
-        if (item is T) { // ⚡ 运行时精准执行 is 类型判断
+        if (item is T) { // ⚡ 运行时精准执行 is 类型判定
             return item
         }
     }
