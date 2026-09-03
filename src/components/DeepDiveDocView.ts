@@ -252,18 +252,6 @@ function renderSingleChapterView(
       </div>
     `;
 
-    caseSection.querySelectorAll<HTMLButtonElement>('.case-study-toc-pill').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const targetId = btn.getAttribute('data-target');
-        if (targetId) {
-          const el = caseSection.querySelector(`#${targetId}`);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }
-      });
-    });
-
     container.appendChild(caseSection);
   }
 
@@ -736,41 +724,6 @@ function formatCaseStudyHtml(rawText: string): string {
   let inTable = false;
   let tableHeader: string[] = [];
   let tableRows: string[][] = [];
-  let headingIndex = 0;
-
-  // First pass: extract ### headings for TOC if >= 3 headings
-  const tocItems: { id: string; title: string; shortTitle: string }[] = [];
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('### ')) {
-      const fullTitle = trimmed.replace(/^###\s+/, '');
-      const shortTitle = fullTitle.includes('：') ? fullTitle.split('：')[0] : (fullTitle.includes(':') ? fullTitle.split(':')[0] : fullTitle);
-      const id = `cs-sec-${tocItems.length}`;
-      tocItems.push({ id, title: fullTitle, shortTitle });
-    }
-  }
-
-  // If there are at least 3 sections, render TOC bar
-  if (tocItems.length >= 3) {
-    html += `
-      <div class="case-study-toc-bar">
-        <div class="case-study-toc-label">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6"></line>
-            <line x1="8" y1="12" x2="21" y2="12"></line>
-            <line x1="8" y1="18" x2="21" y2="18"></line>
-            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-          </svg>
-          <span>实战全景索引 (${tocItems.length})</span>
-        </div>
-        <div class="case-study-toc-pills">
-          ${tocItems.map((item) => `<button type="button" class="case-study-toc-pill" data-target="${item.id}" title="${escapeHtml(item.title)}">${formatInlineText(item.shortTitle)}</button>`).join('')}
-        </div>
-      </div>
-    `;
-  }
 
   const flushTable = () => {
     if (!inTable) return;
@@ -834,8 +787,7 @@ function formatCaseStudyHtml(rawText: string): string {
     // Headings & formatting
     if (trimmed.startsWith('### ')) {
       // Top heading
-      const id = `cs-sec-${headingIndex++}`;
-      html += `<div class="case-study-intro-banner" id="${id}"><h3 class="case-study-banner-title">${formatInlineText(trimmed.replace(/^###\s+/, ''))}</h3></div>`;
+      html += `<div class="case-study-intro-banner"><h3 class="case-study-banner-title">${formatInlineText(trimmed.replace(/^###\s+/, ''))}</h3></div>`;
     } else if (trimmed.startsWith('#### ')) {
       html += `<h4 class="case-study-h4">${formatInlineText(trimmed.replace(/^####\s+/, ''))}</h4>`;
     } else if (trimmed.startsWith('##### ')) {
