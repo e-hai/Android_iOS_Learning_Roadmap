@@ -658,51 +658,44 @@ fun CounterCard(
 
 #### 2. 深层嵌套场景与两大解法对比
 
-- **深层痛点**：当页面嵌套极深（\`页面 ➔ 垂直流 ➔ 横向列表 ➔ 卡片 ➔ 按钮\`）时，若每层都手动声明 \`onClick\`，会导致严重的回调地狱（Callback Drilling）。甚至更复杂的是：深层可能同时存在**业务请求（Button A 触发拉网）**与**局部 UI 联动（Button B 触发折叠爷组件）**。为此业界演进出两大经典方案：
+- **深层痛点**：当页面嵌套极深（\`页面 ➔ 垂直流 ➔ 横向列表 ➔ 卡片 ➔ 按钮\`）时，若每层都手动声明并逐层透传 \`onClick\`，会导致严重的回调地狱（Callback Drilling）。为此业界演进出两大经典方案：
 
-##### 方案 ①：FeedAction 统一事件流 + 中间拦截（⭐ 80% 业务首选）
+##### 方案 ①：FeedAction 统一事件流（⭐ 80% 业务首选）
 
-- **核心机制**：用一个密封接口收拢所有事件，中间所有层级**只占一个参数位 \`onAction: (FeedAction) -> Unit\`**。底层新增按钮中间层零改动；若存在“按钮 B 折叠爷组件”的局部联动，爷组件还可充当拦截器，就地消化局部事件，业务事件放行给 ViewModel。
+- 用密封接口收拢所有事件，中间所有层级**只占一个参数位 \`onAction: (FeedAction) -> Unit\`**。底层新增按钮或业务事件时，中间所有父组件参数零改动；通道透明、显式契约，完美支持独立单测与 \`@Preview\`。
 
 \`\`\`kotlin
 // 1. 密封接口收拢整模块交互
 sealed interface FeedAction {
-    data class RequestData(val itemId: String) : FeedAction  // 业务请求 (给 ViewModel)
-    data object ToggleSection : FeedAction                   // 局部折叠 (给 爷组件)
+    data class Like(val itemId: String) : FeedAction
+    data class Bookmark(val itemId: String) : FeedAction
 }
 
-// 2. 爷组件：持有本地折叠状态，在通道上设卡拦截
+// 2. 中间所有层级：只占一个参数位，透明向下透传 onAction
 @Composable
-fun SectionCard(section: SectionData, onAction: (FeedAction) -> Unit) {
-    var isExpanded by rememberSaveable { mutableStateOf(true) }
-
-    Column {
-        Text("爷列表标题: \${section.title}")
-        if (isExpanded) {
-            FatherList(
-                items = section.items,
-                onAction = { action ->
-                    when (action) {
-                        // 🎯 拦截：属于自己的折叠事件就地消化，不惊扰上层！
-                        is FeedAction.ToggleSection -> isExpanded = !isExpanded
-                        // 🚀 放行：业务请求事件，继续向上冒泡给 ViewModel
-                        else -> onAction(action)
-                    }
-                }
-            )
+fun SectionList(
+    items: List<ProductItem>,
+    onAction: (FeedAction) -> Unit
+) {
+    LazyRow {
+        items(items) { item ->
+            LeafItemCard(item = item, onAction = onAction)
         }
     }
 }
 
 // 3. 最深层子组件：只有一个通道，无脑发 Action（显式契约，完美支持 Preview）
 @Composable
-fun LeafButtonRow(item: ProductItem, onAction: (FeedAction) -> Unit) {
+fun LeafItemCard(
+    item: ProductItem,
+    onAction: (FeedAction) -> Unit
+) {
     Row {
-        Button(onClick = { onAction(FeedAction.RequestData(item.id)) }) {
-            Text("按钮 A：请求数据")
+        Button(onClick = { onAction(FeedAction.Like(item.id)) }) {
+            Text("点赞")
         }
-        Button(onClick = { onAction(FeedAction.ToggleSection) }) {
-            Text("按钮 B：折叠爷列表")
+        Button(onClick = { onAction(FeedAction.Bookmark(item.id)) }) {
+            Text("收藏")
         }
     }
 }
@@ -710,7 +703,7 @@ fun LeafButtonRow(item: ProductItem, onAction: (FeedAction) -> Unit) {
 
 ##### 方案 ②：CompositionLocal 穿透（超深层级 / 全局基建）
 
-- **核心机制**：在根部架设无线电基站（Provider），深层组件隔空拾取调度器，彻底解放中间所有层级（无需任何参数传递）。\`viewModel()\` 底层就是基于此机制实现。
+- 在根部架设无线电基站（Provider），深层组件隔空拾取调度器，彻底解放中间所有层级（无需任何参数传递）。\`viewModel()\` 底层就是基于此机制实现。
 - **避坑红线**：适合全树同质的基础设施（全局导航、主题、埋点）；严禁在列表每个项内滥用覆写 Provider，否则会导致隐式依赖泛滥、作用域漂移与 Preview 瘫痪。
 
 \`\`\`kotlin
@@ -733,7 +726,7 @@ fun FeedScreen(viewModel: FeedViewModel = viewModel()) {
 fun DeepProductCard(itemId: String) {
     val onAction = LocalFeedActionHandler.current
 
-    Button(onClick = { onAction(FeedAction.RequestData(itemId)) }) {
+    Button(onClick = { onAction(FeedAction.Like(itemId)) }) {
         Text("隔空直连 ViewModel")
     }
 }
