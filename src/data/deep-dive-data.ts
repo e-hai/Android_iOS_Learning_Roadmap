@@ -619,35 +619,36 @@ class HomeViewModel : ViewModel() {
           metaphorDesc: 'Compose 彻底摒弃了传统昂贵的命令式 View 树。Composable 函数每一次被执行，都是在平铺的插槽表（Slot Table）中存取参数与状态缓存。状态是自变量，UI 是因变量，状态变化时框架通过快照系统自动计算最小重组范围。',
         },
         explanation: `### 1. 状态与读取追踪（State & Snapshot）
-- **通俗心智**：\`@Composable\` 会被反复执行，局部普通变量每次都会重置。要跨重组保住的值放进 \`remember\`；一屏业务状态放 ViewModel 的 \`StateFlow\`。
-- **读取阶段决定重组范围**：Compose 分为三个阶段（组合 Composition ➔ 布局 Layout ➔ 绘制 Draw）。在组合阶段读 State 会触发重组；推迟到布局或绘制阶段读（如 \`Modifier.offset { ... }\`、\`drawBehind { ... }\`）可直接跳过重组，只重排或重绘。
-- **单向数据流（UDF）**：状态向下传递，事件向上传递。子组件只做无状态（Stateless）展示，状态由顶层单一数据源（Single Source of Truth）管控。
+- **通俗心智**：Composable 是反复执行的“粉刷工”，局部变量每次重置。要跨重组保住的值放进 \`remember\`；整屏业务状态放 ViewModel 的 \`StateFlow\`。
+- **读取阶段定重组**：在哪一步读 \`State\`，哪一步才重跑。在组合期读会触发全组件重组；推迟到布局或绘制期读（如 \`Modifier.offset { ... }\`、\`drawBehind\`）只重排重绘，直接跳过重组。
+- **单向数据流**：状态向下流（纯参数）、事件向上抛（Lambda 回调）。子组件全做无状态（Stateless）纯展示，单一数据源掌控全局。
 
-### 2. 衍生状态与计算缓存（derivedStateOf）
-- **通俗心智**：当某个状态频繁变化（如滚动像素偏移），但 UI 只关心它的复合结果（如 \`offset > 100\` 或滚动方向）时，必须用 \`derivedStateOf\`。
-- **核心价值**：将**高频变化的状态输入**转换为**低频变化的布尔或阈值输出**。只有当衍生出的计算结果真正改变时，才通知下游重组，彻底杜绝滚动过程中的“重组风暴”。
-- **防坑准则**：\`derivedStateOf\` 必须依赖至少一个 Compose \`State\` 对象。若只依赖普通变量，或每次结果都不同，则失去缓存意义。
+### 2. 衍生状态（derivedStateOf）
+- **通俗心智**：高频波动的“减震器”。当某个状态每毫秒都在变（如列表滚动像素偏移），但 UI 只关心复合结果（如“是否滚过半屏”）时必用。
+- **核心机制**：将**高频输入**转化为**低频输出**。计算结果发生实质改变时才触发下游重组，彻底杜绝滑动时的“重组风暴”。
+- **避坑准则**：内部必须至少读取一个 Compose \`State\`；若只是普通无状态变量计算，直接算即可，加它反成累赘。
 
-### 3. 稳定性协议与智能跳过（Stability & Smart Recomposition）
-- **智能跳过（Smart Recomposition）**：当父组件重组时，如果子组件的所有入参都被编译器判定为“稳定（Stable）”且 \`equals\` 相等，Compose 会直接跳过该子组件的执行。
-- **不稳定的根源（Unstable）**：Kotlin 标准库的 \`List<T>\`、\`Set<T>\` 是接口，编译器无法保证运行时不会被强转为可变的 \`MutableList\`，因此默认判为 Unstable，导致每次父级重组时子组件无条件跟着重组！
-- **解法契约**：使用 \`@Immutable\` / \`@Stable\` 为数据类显式背书，或使用 kotlinx 不可变集合（\`ImmutableList\`），让组件彻底具备跳过重组的能力。
+### 3. 稳定性与智能跳过（Stability）
+- **通俗心智**：Compose 的“偷懒机制（Smart Recomposition）”。父组件重组时，子组件入参如果都“稳定（Stable）”且没变，子组件直接跳过不执行。
+- **背刺元凶**：Kotlin 标准库的 \`List<T>\` 是接口，编译器无法断言它会不会被转成 \`MutableList\`，默认判为 Unstable，导致子组件每次被动陪跑重组！
+- **避坑准则**：给数据类标注 \`@Immutable\` / \`@Stable\` 立下不可变契约，或使用不可变集合库，彻底激活跳过重组能力。
 
-### 4. 副作用生命周期与调度隔离（Side Effects）
-- **纯函数约束**：Composable 函数体必须保持纯粹，禁止在函数体中直接发起网络请求、写数据库或打点（否则每次重组都会重复执行）。
-- **LaunchedEffect(key)**：进入组合时启动协程，离开组合或 key 变化时自动取消并重启协程。
-- **DisposableEffect(key)**：用于必须成对注册与注销的回调（传感器、广播监听、第三方 SDK 回调），离开组合时在 \`onDispose\` 中安全清理。
-- **rememberCoroutineScope**：在 Composable 外部（如按钮 \`onClick\` 点击事件、手势回调）中安全启动依附于当前组合生命周期的协程。
+### 4. 副作用边界（Side Effects）
+- **通俗心智**：函数体是纯计算“图纸”，禁止在里面做网络请求、弹窗、打点等“脏活”（否则每次重组都会重复干）。
+- **核心选型**：
+  - **异步挂起** ➔ \`LaunchedEffect(key)\`：进入组合开协程，离开或 key 变自动取消重启。
+  - **成对注销** ➔ \`DisposableEffect(key)\`：在 \`onDispose\` 里安全解绑传感器、监听器。
+  - **手势/点击回调** ➔ \`rememberCoroutineScope()\`：在普通函数作用域安全借用协程。
 
-### 5. 视图生命周期与宿主解耦（Lifecycle Alignment）
-- **Owner 归属**：Compose 中的生命周期对齐的是 \`LocalLifecycleOwner\`（通常是当前导航页的 \`NavBackStackEntry\`），而非整个单 Activity。
-- **collectAsStateWithLifecycle**：UI 收集 Flow 的黄金标准。低于 \`Lifecycle.State.STARTED\`（进后台或跳全屏新页）时自动停止收集，回前台自动恢复，避免后台空耗 CPU 与电量。
-- **LifecycleResumeEffect**：定位、相机预览、停留曝光等强前台业务使用，离开 \`RESUMED\`（如被 Dialog 遮挡或跳下一页）立即在 \`onPauseOrDispose\` 中暂停。
+### 5. 生命周期对齐（Lifecycle）
+- **通俗心智**：生命周期跟的是**当前页的 NavBackStackEntry**，而非整个 Activity。A 页跳到 B 页，Activity 没停，但 A 已经退到后台了。
+- **核心选型**：
+  - **界面流收集** ➔ \`collectAsStateWithLifecycle()\`：低于 \`STARTED\`（进后台/跳下页）自动停收省电，回前台自动恢复。
+  - **强前台业务** ➔ \`LifecycleResumeEffect()\`：离开 \`RESUMED\`（如弹窗遮挡、跳下一页）立即在 \`onPauseOrDispose\` 停掉定位与相机。
 
-### 6. 高性能列表与项级重组隔离（LazyColumn & Keys）
-- **视口动态装配**：\`LazyColumn\` 不会一次性组合全量列表，只为进入屏幕视口的项分配组合插槽。
-- **稳定 Key 的本质**：类似于 RecyclerView 的 Stable ID。没有 key 时按位置复用格子，删除项会导致后续项的内部局部状态（如展开、输入）错位附着；配置 \`key = { it.id }\` 后，数据与插槽状态强绑定，删除项时状态同步销毁。
-- **局部重组边界**：把频繁变化的项拆为独立 Composable，配合稳定入参，使单个列表项的状态变化不波及整个 LazyColumn。`,
+### 6. 高性能列表（LazyColumn & Keys）
+- **通俗心智**：像 RecyclerView 一样复用屏幕上那几块“物理看板”。划出屏幕的 View 不会被销毁，拿去给新项涂色。
+- **稳定 key 本质**：没 key 时按“行号”对格子（苹果删了，香蕉住进苹果格子，展开等局部 remember 状态错套到香蕉头上）；\`key = { it.id }\` 相当于 Stable ID，苹果删了苹果那格状态一起销毁，香蕉用自己的。`,
         caseStudy: `### 一、状态提升：单一数据源与无状态组件
 
 - **场景解释**：普通局部变量重组即丢失；组件内部私有状态难以被外部联动控制。通过将状态提升（State Hoisting）至父级或 ViewModel，子组件降级为无状态（Stateless）的纯展示组件，遵循「状态向下流、事件向上抛」的单向数据流原则。
