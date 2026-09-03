@@ -21,7 +21,8 @@ val databaseHelper: DatabaseHelper by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
 \`\`\`
 
   - **第二步：自定义约定规则（零接口继承，纯靠 \`operator\` 固定函数名）**：
-    - 属性委托**绝非基于接口继承，而是基于操作符重载约定**！任何普通类（甚至扩展函数），只要提供了编译器死认的固定名称 \`operator fun getValue\`（只读）或 \`operator fun setValue\`（读写），无需实现任何接口就能直接充当委托：
+    - 属性委托**绝非基于接口继承，而是基于操作符重载约定**！任何普通类（甚至扩展函数），只要提供了编译器死认的固定名称，无需实现任何接口就能直接充当委托；
+    - **编译器死认的固定名称**：属性委托专属仅认 \`getValue\`（读）、\`setValue\`（写）、\`provideDelegate\`（委托创建拦截）；其它常见操作符如 \`invoke\`（对象调用）、\`get\`/\`set\`（下标索引）、\`contains\`（in 判断）；
 
 \`\`\`kotlin
 // ⚡ 第二步：零接口继承的纯普通类！函数名受语言规范硬编码约束，必须是 getValue / setValue
