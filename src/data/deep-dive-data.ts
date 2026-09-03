@@ -867,7 +867,8 @@ fun OrderTrackingRoute(
 
 ### 六、高性能列表：LazyColumn 稳定 key 的复用防串位
 
-- **场景解释**：\`LazyColumn\` 只渲染可视区域内的列表项。如果未指定稳定的 \`key\`，Compose 默认按**位置索引（Index）**来识别和复用项内部的 \`remember\` 状态。一旦列表发生增删或排序，上一项的展开折叠、选中勾选等状态就会“张冠李戴”错配给新项。配置 \`key = { it.id }\` 可确保状态与数据唯一 ID 强绑定，增删项时状态精准跟随。
+- **场景解释**：\`LazyColumn\` 只渲染可视区域。若未指定稳定 \`key\`，Compose 默认按**位置索引**复用状态——增删项时，新项的数据虽然更新了，但旧项残留的 \`remember\` 状态（展开、勾选等）仍被原地继承，产生“张冠李戴”的严重串位。
+- **底层机制**：指定 \`key = { it.id }\` 后，数据被删时其对应的 UI 节点与内部 \`remember\` 状态会被**一同连根销毁（Dispose）**，后续项各自携带独立状态位移，数据与状态永远精准对齐。
 
 \`\`\`kotlin
 data class MessageItem(val id: String, val text: String)
@@ -875,24 +876,27 @@ data class MessageItem(val id: String, val text: String)
 @Composable
 fun MessageFeed(messages: List<MessageItem>) {
     LazyColumn {
-        // ⚡ 核心避坑：必须使用全局稳定唯一 key，严禁使用 index 索引当 key！
+        // ⚡ 核心避坑：必须绑定全局唯一稳定 key，严禁使用 index 索引！
         items(
             items = messages,
             key = { item -> item.id }
         ) { item ->
-            MessageRow(item = item)
+            MessageRow(
+                item = item,
+                modifier = Modifier.animateItem() // 配合 key 自动获得丝滑位移与淡出动画
+            )
         }
     }
 }
 
 @Composable
-fun MessageRow(item: MessageItem) {
+fun MessageRow(item: MessageItem, modifier: Modifier = Modifier) {
     var isExpanded by remember { mutableStateOf(false) }
 
     Log.d("Compose", "MessageRow 绘制: \${item.id}, isExpanded=\$isExpanded")
 
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .clickable { isExpanded = !isExpanded }
     ) {
