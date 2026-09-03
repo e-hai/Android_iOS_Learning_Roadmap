@@ -613,282 +613,216 @@ class HomeViewModel : ViewModel() {
       {
         tag: '声明式 UI',
         title: 'Jetpack Compose',
-        pipeline: [
-          { title: '界面状态', subtitle: 'remember / ViewModel；读到的 State 驱动重组', category: 'engineering' },
-          { title: '副作用', subtitle: 'LaunchedEffect / DisposableEffect 对齐组合寿命', category: 'engineering' },
-          { title: '生命周期', subtitle: '组合在树上 ≠ Activity RESUMED', category: 'engineering' },
-          { title: 'Lazy 列表', subtitle: '只组合可见项；用稳定 key 保住行状态', category: 'engineering' },
-          { title: '动画', subtitle: '动画打在 State 上，不要 delay 循环赋值', category: 'engineering' },
-          { title: '指针事件', subtitle: 'clickable / pointerInput；修饰顺序决定谁先吃', category: 'engineering' },
-          { title: '自定义绘制', subtitle: 'drawBehind / Canvas / Layout 拆开职责', category: 'engineering' },
-          { title: 'AndroidView', subtitle: 'factory 建一次，update 里同步 Compose 状态', category: 'engineering' },
-        ],
-        explanation: `### 1. 界面状态
-- **通俗心智**：\`@Composable\` 会被反复调用，局部变量每次都是新的。要跨重组保住的值，放进 \`remember\` / \`mutableStateOf\`；一屏业务状态放 ViewModel 的 \`StateFlow\`。
-- **订阅规则**：组合时读到的 \`State\` 会把当前组合登记为观察者，值变了只重跑这些组合。没读到的不会重组。
-- **提升**：多个子组件要共用同一份数，状态放到它们共同的父组合，通过参数往下传、事件往上抛。
+        metaphor: {
+          title: '纯函数视图映射与插槽表记忆',
+          formula: 'UI = f(State) + SlotTable.GapBuffer',
+          metaphorDesc: 'Compose 彻底摒弃了传统昂贵的命令式 View 树。Composable 函数每一次被执行，都是在平铺的插槽表（Slot Table）中存取参数与状态缓存。状态是自变量，UI 是因变量，状态变化时框架通过快照系统自动计算最小重组范围。',
+        },
+        explanation: `### 1. 状态与读取追踪（State & Snapshot）
+- **通俗心智**：\`@Composable\` 会被反复执行，局部普通变量每次都会重置。要跨重组保住的值放进 \`remember\`；一屏业务状态放 ViewModel 的 \`StateFlow\`。
+- **读取阶段决定重组范围**：Compose 分为三个阶段（组合 Composition ➔ 布局 Layout ➔ 绘制 Draw）。在组合阶段读 State 会触发重组；推迟到布局或绘制阶段读（如 \`Modifier.offset { ... }\`、\`drawBehind { ... }\`）可直接跳过重组，只重排或重绘。
+- **单向数据流（UDF）**：状态向下传递，事件向上传递。子组件只做无状态（Stateless）展示，状态由顶层单一数据源（Single Source of Truth）管控。
 
-### 2. 副作用
-- **通俗心智**：函数体只描述「现在 UI 长什么样」。网络、监听、弹窗、写磁盘会在重组时被跑多次，必须放进 Effect。
-- **LaunchedEffect(key)**：进入组合时启动协程，离开或 key 变化时取消再开。
-- **DisposableEffect(key)**：需要成对的注册/注销（监听器、回调）时用 \`onDispose\`。
+### 2. 衍生状态与计算缓存（derivedStateOf）
+- **通俗心智**：当某个状态频繁变化（如滚动像素偏移），但 UI 只关心它的复合结果（如 \`offset > 100\` 或滚动方向）时，必须用 \`derivedStateOf\`。
+- **核心价值**：将**高频变化的状态输入**转换为**低频变化的布尔或阈值输出**。只有当衍生出的计算结果真正改变时，才通知下游重组，彻底杜绝滚动过程中的“重组风暴”。
+- **防坑准则**：\`derivedStateOf\` 必须依赖至少一个 Compose \`State\` 对象。若只依赖普通变量，或每次结果都不同，则失去缓存意义。
 
-### 3. 生命周期
-- **何时回调**：三个 API 跟当前页 Entry 的 \`onStart\` / \`onResume\` / \`onPause\` / \`onStop\`。A→B 时 Activity 仍 \`RESUMED\`，A 的 Entry 会 pause/stop；按 Home 才走 Activity 自己的 pause/stop，当前页跟着掉。
+### 3. 稳定性协议与智能跳过（Stability & Smart Recomposition）
+- **智能跳过（Smart Recomposition）**：当父组件重组时，如果子组件的所有入参都被编译器判定为“稳定（Stable）”且 \`equals\` 相等，Compose 会直接跳过该子组件的执行。
+- **不稳定的根源（Unstable）**：Kotlin 标准库的 \`List<T>\`、\`Set<T>\` 是接口，编译器无法保证运行时不会被强转为可变的 \`MutableList\`，因此默认判为 Unstable，导致每次父级重组时子组件无条件跟着重组！
+- **解法契约**：使用 \`@Immutable\` / \`@Stable\` 为数据类显式背书，或使用 kotlinx 不可变集合（\`ImmutableList\`），让组件彻底具备跳过重组的能力。
 
-### 4. Lazy 列表
-- **通俗心智**：和 RecyclerView 一样只复用屏幕上那几块牌子。删数据不会把 ItemView 拆掉扔掉，牌子会拿去画下一条。
-- **key**：没 key 按位置对牌子（香蕉住进苹果的格子，展开状态可能跟错）；有 \`key = { it.id }\` 按 id 对，苹果删了苹果那格状态一起没，香蕉用自己的。
+### 4. 副作用生命周期与调度隔离（Side Effects）
+- **纯函数约束**：Composable 函数体必须保持纯粹，禁止在函数体中直接发起网络请求、写数据库或打点（否则每次重组都会重复执行）。
+- **LaunchedEffect(key)**：进入组合时启动协程，离开组合或 key 变化时自动取消并重启协程。
+- **DisposableEffect(key)**：用于必须成对注册与注销的回调（传感器、广播监听、第三方 SDK 回调），离开组合时在 \`onDispose\` 中安全清理。
+- **rememberCoroutineScope**：在 Composable 外部（如按钮 \`onClick\` 点击事件、手势回调）中安全启动依附于当前组合生命周期的协程。
 
-### 5. 动画
-- **通俗心智**：目标值放进 State，用 \`animate*AsState\` / \`Animatable\` / \`AnimatedVisibility\` 让框架按帧插值。不要自己 \`delay\` + 改 State 冒充动画。
+### 5. 视图生命周期与宿主解耦（Lifecycle Alignment）
+- **Owner 归属**：Compose 中的生命周期对齐的是 \`LocalLifecycleOwner\`（通常是当前导航页的 \`NavBackStackEntry\`），而非整个单 Activity。
+- **collectAsStateWithLifecycle**：UI 收集 Flow 的黄金标准。低于 \`Lifecycle.State.STARTED\`（进后台或跳全屏新页）时自动停止收集，回前台自动恢复，避免后台空耗 CPU 与电量。
+- **LifecycleResumeEffect**：定位、相机预览、停留曝光等强前台业务使用，离开 \`RESUMED\`（如被 Dialog 遮挡或跳下一页）立即在 \`onPauseOrDispose\` 中暂停。
 
-### 6. 指针事件
-- **点击**：\`Modifier.clickable\` / \`Button(onClick)\`。需要拖、双击、长按再用 \`pointerInput { detectTapGestures / detectDragGestures }\`。
-- **修饰顺序**：先写的 Modifier 更靠外；\`clickable\` 和 \`pointerInput\` 叠在一起时，谁先消费由顺序和 \`awaitPointerEventScope\` 的消费策略决定。
+### 6. 高性能列表与项级重组隔离（LazyColumn & Keys）
+- **视口动态装配**：\`LazyColumn\` 不会一次性组合全量列表，只为进入屏幕视口的项分配组合插槽。
+- **稳定 Key 的本质**：类似于 RecyclerView 的 Stable ID。没有 key 时按位置复用格子，删除项会导致后续项的内部局部状态（如展开、输入）错位附着；配置 \`key = { it.id }\` 后，数据与插槽状态强绑定，删除项时状态同步销毁。
+- **局部重组边界**：把频繁变化的项拆为独立 Composable，配合稳定入参，使单个列表项的状态变化不波及整个 LazyColumn。`,
+        caseStudy: `### 一、状态提升：单一数据源与无状态组件
 
-### 7. 自定义绘制
-- **画**：已有节点上叠加用 \`Modifier.drawBehind\` / \`drawWithContent\`；独立画布用 \`Canvas { }\`。
-- **量与摆**：自定义排布用 \`Layout { measurables, constraints -> }\` 或 \`Modifier.layout\`。绘制里不要做分配很重的对象。
-
-### 8. AndroidView
-- **用途**：地图、WebView、只有 View SDK 的控件。\`factory\` 里创建一次，\`update\` 里用当前 Compose 状态改 View。
-- **列表**：\`Lazy\` 的 item 里塞 \`AndroidView\` 会按行持有真 View，只在没有 Compose 替代时用。`,
-        caseStudy: `### 一、页面状态：remember 与提升
-
-- **场景解释**：普通 \`var\` 重组即丢。\`remember\` 抗同槽重组（动画进度、瞬时偏移）；\`rememberSaveable\` 再扛转屏（输入框文字）。离开组合两者都丢；业务数据走 ViewModel。
+- **场景解释**：普通局部变量重组即丢失；组件内部私有状态难以被外部联动控制。通过将状态提升（State Hoisting）至父级或 ViewModel，子组件降级为无状态（Stateless）的纯展示组件，遵循「状态向下流、事件向上抛」的单向数据流原则。
 
 \`\`\`kotlin
 @Composable
-fun CounterCard() {
-    var count by remember { mutableStateOf(0) }
-    Column {
-        Text("点击次数: \$count")
-        Button(onClick = { count++ }) { Text("加一") }
-    }
-}
+fun CounterScreen(viewModel: CounterViewModel = viewModel()) {
+    val count by viewModel.count.collectAsStateWithLifecycle()
 
-@Composable
-fun SearchBar(query: String, onQueryChange: (String) -> Unit) {
-    TextField(value = query, onValueChange = onQueryChange)
-}
-
-@Composable
-fun SearchScreen() {
-    var query by rememberSaveable { mutableStateOf("") }
-    SearchBar(query = query, onQueryChange = { query = it })
-}
-\`\`\`
-
-多个子组件共用同一份数时，把状态放到父组合再往下传（\`SearchBar\` 自己不再 \`remember\` 一份）。
-
-### 二、副作用：进页拉数、离开注销
-
-- **场景解释**：\`@Composable\` 会反复执行，请求 / 监听不能写在函数体里。\`LaunchedEffect\` 与 \`DisposableEffect\` 都对齐 **组合进出**（离开树或 key 变 → 旧的结束、新的再来）；A→B→A 会重新进树，两者都会再跑。
-- **怎么选**：能挂起、取消即停 → \`LaunchedEffect\`（详情按 id 拉数、会话 / 行情 \`collect\`、搜索防抖）。必须成对 add/remove → \`DisposableEffect\`（定位回调、返回键、传感器、三方 \`setListener\`）。
-- **边界**：点按钮才请求 → ViewModel / \`rememberCoroutineScope\`。这个页面实例只做一次（首包、首次进入打点）→ ViewModel \`init\`。用户看见了 / 停留曝光 → 生命周期，不是这两种。
-
-\`\`\`kotlin
-@Composable
-fun UserDetail(userId: String, repo: UserRepo) {
-    var user by remember { mutableStateOf<User?>(null) }
-
-    LaunchedEffect(userId) {
-        user = repo.fetch(userId)
-    }
-
-    DisposableEffect(userId) {
-        val listener = repo.observe(userId) { user = it }
-        onDispose { repo.remove(listener) }
-    }
-
-    Text(user?.name ?: "加载中")
-}
-\`\`\`
-
-\`userId\` 变了会取消旧协程、拆掉旧监听，再按新 id 来一遍。
-
-### 三、生命周期：可见时才收集
-
-#### collectAsStateWithLifecycle
-
-- **场景解释**：信息流 / 详情的 \`StateFlow\` 要画在界面上。A→全屏 B 或按 Home：Owner 落到 \`STARTED\` 以下，停收；返回 A 或回到前台：\`onStart\` 后再收。默认跟 \`onStart\`/\`onStop\`；必须真正在前台才收时加 \`minActiveState = RESUMED\`（跟 \`onResume\`/\`onPause\`）。
-
-\`\`\`kotlin
-class FeedViewModel : ViewModel() {
-    val items: StateFlow<List<FeedItem>> = repository.observeFeed()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-}
-
-@Composable
-fun FeedRoute(vm: FeedViewModel = viewModel()) {
-    val items by vm.items.collectAsStateWithLifecycle()
-    FeedList(items)
-}
-\`\`\`
-
-#### LifecycleStartEffect
-
-- **场景解释**：页面还看得见就要干（轻量连接、可见时轮询），不必等完全在前台。A→全屏 B 或 Activity \`onStop\`：\`onStopOrDispose\` 停。Dialog 盖在 A 上时 A 往往仍 \`STARTED\`，这段还在跑。
-
-\`\`\`kotlin
-@Composable
-fun InboxBadge(repo: InboxRepo) {
-    LifecycleStartEffect(Unit) {
-        val job = repo.startUnreadSync()
-        onStopOrDispose { job.cancel() }
-    }
-}
-\`\`\`
-
-#### LifecycleResumeEffect
-
-- **场景解释**：必须在前台：定位、相机、停留曝光。A→全屏 B（Activity 仍 \`RESUMED\`，A 的 Entry \`onPause\`）或 Activity 自己 \`onPause\`，都会 \`onPauseOrDispose\`；返回 A 或 Activity \`onResume\` 再开。Dialog 盖住时也会 \`onPause\`，定位应停。
-
-\`\`\`kotlin
-@Composable
-fun MapRoute(vm: MapViewModel = viewModel()) {
-    LifecycleResumeEffect(Unit) {
-        vm.onVisible()
-        onPauseOrDispose { vm.onHidden() }
-    }
-    MapScreen()
-}
-\`\`\`
-
-### 四、列表：LazyColumn 与稳定 key
-
-- **场景解释**：和 RecyclerView 一样，屏幕上只有几块牌子（ViewHolder），删掉「苹果」不会把那块 ItemView 扔掉，下一帧拿去画「香蕉」。两边都复用。没有 \`key\` 时按第几名对牌子，行内 \`remember\`（展开、动画）像 \`onBind\` 没擦干净，会跟到香蕉上。\`key = { it.id }\` 相当于 stable id：苹果删了，苹果那格和格上的私货一起没；香蕉用自己的格。不要用下标当 key。
-
-\`\`\`kotlin
-@Composable
-fun FeedList(items: List<FeedItem>) {
-    LazyColumn {
-        items(items, key = { it.id }) { item ->
-            FeedRow(item)
-        }
-    }
-}
-
-@Composable
-fun FeedRow(item: FeedItem) {
-    var expanded by remember { mutableStateOf(false) }
-    Text(
-        text = if (expanded) item.body else item.title,
-        modifier = Modifier.clickable { expanded = !expanded },
-    )
-}
-\`\`\`
-
-### 五、动画：目标值交给动画 API
-
-- **场景解释**：列表和状态会瞬间切换。用 \`delay\` 循环改 State 会每帧重组。动画 API 按帧插值，打断时也对着新目标走。
-
-\`\`\`kotlin
-@Composable
-fun FavoriteIcon(selected: Boolean) {
-    val scale by animateFloatAsState(if (selected) 1.2f else 1f, label = "fav")
-    Icon(
-        imageVector = Icons.Filled.Favorite,
-        contentDescription = null,
-        modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
+    CounterCard(
+        count = count,
+        onIncrement = { viewModel.increment() }
     )
 }
 
 @Composable
-fun Panel(open: Boolean) {
-    AnimatedVisibility(visible = open) {
-        Text("面板内容")
-    }
-}
-\`\`\`
-
-连续手势拖动再用 \`Animatable\` + \`pointerInput\` 里 \`snapTo\` / \`animateTo\`。
-
-### 六、事件：点击与手势
-
-- **场景解释**：动画和点击只要 \`clickable\` 就够。拖动、长按、自己决定谁消费事件时，要用 \`pointerInput\`。
-
-\`\`\`kotlin
-@Composable
-fun CardActions(onOpen: () -> Unit, onOffset: (Float) -> Unit) {
-    Box(
-        Modifier
-            .clickable(onClick = onOpen)
-            .pointerInput(Unit) {
-                detectHorizontalDragGestures { _, dragAmount ->
-                    onOffset(dragAmount)
-                }
-            },
-    ) {
-        Text("左右拖，点按打开")
-    }
-}
-\`\`\`
-
-需要嵌套滚动（列表在 BottomSheet 里）时，用系统自带的 nested scroll，而不是自己在 \`pointerInput\` 里把 delta 吃光。
-
-### 七、自定义绘制：画与布局分开
-
-- **场景解释**：手势能拿到位移了，系统组件画不出进度环、刻度。在已有组件上叠加用 draw Modifier；完全自己量孩子用 \`Layout\`。
-
-\`\`\`kotlin
-@Composable
-fun ProgressRing(progress: Float, modifier: Modifier = Modifier) {
-    Canvas(modifier.size(48.dp)) {
-        drawArc(
-            color = Color.Gray,
-            startAngle = -90f,
-            sweepAngle = 360f * progress,
-            useCenter = false,
-            style = Stroke(width = 4.dp.toPx()),
-        )
-    }
-}
-
-@Composable
-fun HorizontalSplit(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
+fun CounterCard(
+    count: Int,
+    onIncrement: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Layout(content, modifier) { measurables, constraints ->
-        val half = constraints.maxWidth / 2
-        val placeables = measurables.map {
-            it.measure(constraints.copy(minWidth = half, maxWidth = half))
-        }
-        layout(constraints.maxWidth, placeables.maxOf { it.height }) {
-            var x = 0
-            placeables.forEach {
-                it.placeRelative(x, 0)
-                x += half
-            }
+    Log.d("Compose", "CounterCard 重组, count=\$count")
+    Column(modifier = modifier) {
+        Text("当前点击计数: \$count")
+        Button(onClick = onIncrement) {
+            Text("增加计数")
         }
     }
 }
 \`\`\`
 
-### 八、AndroidView：包一层传统控件
+### 二、衍生状态：derivedStateOf 终结滚动重组风暴
 
-- **场景解释**：绘制和 Lazy 解决不了 WebView、地图这类只有 View SDK 的控件。用 \`AndroidView\` 嵌进去，但不要每次重组都 \`factory\` 里 new。
+- **场景解释**：列表滚动时，\`firstVisibleItemIndex\` 每滚动几像素都会频繁改变。如果直接在重组阶段用 \`val showButton = listState.firstVisibleItemIndex > 0\`，会导致该组件在整个滑动过程中每帧疯狂重组。使用 \`derivedStateOf\` 建立衍生计算缓存，只有布尔值真正发生翻转时（从 false 变 true 或反之），才会触发重组。
 
 \`\`\`kotlin
 @Composable
-fun WebPane(url: String, modifier: Modifier = Modifier) {
-    AndroidView(
-        modifier = modifier,
-        factory = { context ->
-            WebView(context).apply {
-                settings.javaScriptEnabled = true
-            }
-        },
-        update = { web ->
-            if (web.url != url) web.loadUrl(url)
-        },
-    )
+fun ScrollTopBar(listState: LazyListState) {
+    // ⚡ 核心避坑：将高频滚动的像素索引，收敛为低频翻转的布尔状态
+    val showScrollToTop by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0
+        }
+    }
+
+    Log.d("Compose", "ScrollTopBar 重组, showScrollToTop=\$showScrollToTop")
+
+    if (showScrollToTop) {
+        FloatingActionButton(onClick = { /* 滚动到顶部 */ }) {
+            Text("Top")
+        }
+    }
 }
 \`\`\`
 
-Compose 状态当唯一数据源，只在 \`update\` 里写 View。Activity 的 \`onResume\`/\`onPause\`（地图）仍要在宿主里自己调。`,
+### 三、稳定性避坑：不可变契约与 @Immutable 拯救重组
+
+- **场景解释**：Kotlin 标准库的 \`List<T>\` 属于接口，Compose 编译器默认判定其为 **Unstable（不稳定）**。即使父组件重组时传给子组件的列表内容完全一样，Compose 也无法跳过重组。通过给数据类标注 \`@Immutable\`（或使用 \`kotlinx.collections.immutable\`），向编译器承诺该类不可变，即可成功激活智能跳过（Smart Recomposition）。
+
+\`\`\`kotlin
+// ❌ 陷阱：直接使用标准 List 会被判定为 Unstable，导致 UserListCard 每次被动重组
+// data class UserGroup(val name: String, val users: List<String>)
+
+// ✅ 破局：显式标注 @Immutable，向 Compose 编译器立下“绝对不可变”契约
+@Immutable
+data class UserGroup(
+    val name: String,
+    val users: List<String>
+)
+
+@Composable
+fun UserGroupScreen(group: UserGroup) {
+    Log.d("Compose", "UserGroupScreen 根重组")
+    UserListCard(group = group)
+}
+
+@Composable
+fun UserListCard(group: UserGroup) {
+    // ⚡ 命中 Smart Recomposition：当 group 引用或 equals 未变时，此 Log 绝不会重复触发！
+    Log.d("Compose", "UserListCard 重组: \${group.name}")
+    Text("分组名称: \${group.name}, 成员数: \${group.users.size}")
+}
+\`\`\`
+
+### 四、副作用边界：LaunchedEffect 与 DisposableEffect
+
+- **场景解释**：Composable 会反复执行，网络请求或注册监听绝不能写在函数体中。异步挂起任务用 \`LaunchedEffect\`（key 变则重启协程）；成对注册与解绑用 \`DisposableEffect\`（离开树在 \`onDispose\` 中释放资源）。
+
+\`\`\`kotlin
+@Composable
+fun UserProfileRoute(userId: String, repository: UserRepository) {
+    // ⚡ 1. 异步副作用：userId 变化时自动取消前一个请求，启动新协程拉取
+    LaunchedEffect(userId) {
+        Log.d("Compose", "LaunchedEffect 启动: 开始加载用户 \$userId")
+        repository.loadUser(userId)
+    }
+
+    // ⚡ 2. 注册/清理成对副作用：离开组合树时在 onDispose 里安全反注册
+    DisposableEffect(userId) {
+        Log.d("Compose", "DisposableEffect 注册监听: \$userId")
+        val listener = repository.registerUserListener(userId) { data ->
+            Log.d("Compose", "收到推送更新: \$data")
+        }
+
+        onDispose {
+            Log.d("Compose", "DisposableEffect 清理: 注销 \$userId 监听")
+            repository.unregisterUserListener(listener)
+        }
+    }
+}
+\`\`\`
+
+### 五、生命周期：可见才收集与前台独占
+
+- **场景解释**：页面切到后台、或者被全屏新页面遮挡时，UI 收集 Flow 会白白消耗 CPU 和电量。\`collectAsStateWithLifecycle\` 在低于 \`STARTED\` 时自动暂停收集；定位、相机等强前台任务使用 \`LifecycleResumeEffect\`，离开 \`RESUMED\` 时立即在 \`onPauseOrDispose\` 中暂停。
+
+\`\`\`kotlin
+@Composable
+fun OrderTrackingRoute(viewModel: OrderViewModel = viewModel()) {
+    // ⚡ 1. 界面状态：离开前台时自动停止收集 Flow，回到前台自动恢复
+    val orderStatus by viewModel.orderStatus.collectAsStateWithLifecycle()
+
+    // ⚡ 2. 强前台事件：仅在处于 RESUMED 状态时开启高精度定位与轮询
+    LifecycleResumeEffect(Unit) {
+        Log.d("Compose", "处于 RESUMED 前台: 开启高精度定位")
+        viewModel.startHighAccuracyLocation()
+
+        onPauseOrDispose {
+            Log.d("Compose", "离开 RESUMED: 停止高精度定位以省电")
+            viewModel.stopLocation()
+        }
+    }
+
+    Text("订单状态: \$orderStatus")
+}
+\`\`\`
+
+### 六、高性能列表：LazyColumn 稳定 key 的复用防串位
+
+- **场景解释**：\`LazyColumn\` 与 RecyclerView 类似，屏幕上只有有限的几个插槽卡片。如果未指定稳定的 \`key\`，列表在增删项时会默认按“位置索引”复用插槽，导致行内的展开、动画等局部 \`remember\` 状态发生错位。配置 \`key = { it.id }\` 可以确保数据与插槽状态强绑定，删除项时局部状态同步清除。
+
+\`\`\`kotlin
+data class MessageItem(val id: String, val text: String)
+
+@Composable
+fun MessageFeed(messages: List<MessageItem>) {
+    LazyColumn {
+        // ⚡ 核心避坑：必须使用全局稳定唯一 key，严禁使用 index 索引当 key！
+        items(
+            items = messages,
+            key = { item -> item.id }
+        ) { item ->
+            MessageRow(item = item)
+        }
+    }
+}
+
+@Composable
+fun MessageRow(item: MessageItem) {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    Log.d("Compose", "MessageRow 绘制: \${item.id}, isExpanded=\$isExpanded")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { isExpanded = !isExpanded }
+    ) {
+        Text("消息: \${item.text}")
+        if (isExpanded) {
+            Text("详情: 展开完整消息内容...", color = Color.Gray)
+        }
+    }
+}
+\`\`\``,
       },
       {
         tag: '网络底层',
