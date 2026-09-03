@@ -907,10 +907,12 @@ fun MessageRow(item: MessageItem, modifier: Modifier = Modifier) {
 
 - **场景解释**：Compose 摒弃了传统 View 繁琐的 \`dispatchTouchEvent\` / \`onInterceptTouchEvent\`。通过 \`pointerInput\` 的三阶段传递（\`Initial\` 优先拦截 ➔ \`Main\` 正常消费 ➔ \`Final\` 兜底结果），配合 \`Modifier.nestedScroll\` 解决内外层滑动冲突（如可折叠吸顶标题、横向轮播与纵向列表手势争夺）。
 - **嵌套滚动核心机制**：
-  - \`onPreScroll\`：父级抢在子列表滑动**前**预先消费（如：向上滑时父级优先收起折叠 Header，Header 收拢后剩余距离才交由子列表滚动）；
-  - \`onPostScroll\`：子列表滚到边界**后**父级消费剩余距离（如：列表滚到底部后触发外层的弹性阻尼或加载更多）。
+  1. \`onPreScroll\`：父级抢在子列表滑动**前**预先消费（如：向上滑时父级优先收起折叠 Header，Header 收拢后剩余距离才交由子列表滚动）；
+  2. \`onPostScroll\`：子列表滚到边界**后**父级消费剩余距离（如：列表滚到底部后触发外层的弹性阻尼或加载更多）。
+- **多指操作与防冲突**：双指缩放/平移使用高层 \`detectTransformGestures\`，配合 \`graphicsLayer\` 走 GPU 硬件变换（零重组、零重新测量）；在图片放大状态下拦截手势消费，防止误滑外层列表。
 
 \`\`\`kotlin
+// 1. 嵌套滚动：父级抢先消费 (PreScroll) 实现折叠 Header
 @Composable
 fun CollapsibleHeaderList() {
     val headerHeightPx = with(LocalDensity.current) { 200.dp.toPx() }
@@ -950,6 +952,31 @@ fun CollapsibleHeaderList() {
                 .offset { IntOffset(x = 0, y = headerOffsetPx.roundToInt()) }
         )
     }
+}
+
+// 2. 多指操作：双指缩放/平移（配合 graphicsLayer 走 GPU 变换，零重组、零重测）
+@Composable
+fun ZoomableBox() {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationX = offset.x
+                translationY = offset.y
+            }
+            .pointerInput(Unit) {
+                // ⚡ 官方多指检测器：自动计算双指中心点、缩放倍率与平移向量
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 5f)
+                    offset += pan
+                }
+            }
+    )
 }
 \`\`\`
 
