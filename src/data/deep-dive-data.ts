@@ -794,26 +794,43 @@ fun UserListCard(group: UserGroup) {
 
 ### 四、副作用边界：LaunchedEffect 与 DisposableEffect
 
-- **场景解释**：Composable 会反复执行，网络请求或注册监听绝不能写在函数体中。异步挂起任务用 \`LaunchedEffect\`（key 变则重启协程）；成对注册与解绑用 \`DisposableEffect\`（离开树在 \`onDispose\` 中释放资源）。
+- **场景解释**：Composable 会反复执行，网络请求或注册监听绝不能裸写在函数体中。副作用 API 将外部操作的生命周期**精准对齐在「进入组合树」与「离开组合树」之间**。
+- **触发与生命周期完整闭环**：
+  1. **初次进入组合树**：\`LaunchedEffect\` 自动启动后台协程；\`DisposableEffect\` 执行注册逻辑；
+  2. **普通重组（Recomposition）**：只要 \`key\` 没变，**两者纹丝不动，绝不重复执行**；
+  3. **Key 发生变化**：\`LaunchedEffect\` 取消旧协程并重启新协程；\`DisposableEffect\` 先执行 \`onDispose\` 清理旧监听，再按新 key 重新注册；
+  4. **离开组合树（页面跳到 B 页、if 条件隐藏、列表项滑出）**：
+     - \`LaunchedEffect\` 的协程被**立即取消（Cancelled）**；
+     - \`DisposableEffect\` 的 \`onDispose\` 被**立即调用（Disposed）**，安全防泄漏！
+- **🚨 经典跳转避坑（A ➔ B ➔ A）**：
+  - **返回重跑陷阱**：单 Activity 导航中，A 跳到 B 时 A 离开组合树；当用户按返回键从 B 回到 A 时，A **重新进入组合树**，\`LaunchedEffect(Unit)\` **会再次触发！** 因此“页面实例一生只做一次”的初始化（如首登打点、预加载），必须放在 ViewModel \`init\` 中，绝不能放在 \`LaunchedEffect(Unit)\`！
+  - **切后台不等于离开树**：按 Home 键或锁屏时，组合树并未脱离，\`LaunchedEffect\` 默认在后台继续执行！若要切后台暂停、回前台恢复，必须交给第五点的 \`LifecycleResumeEffect\`。
 
 \`\`\`kotlin
 @Composable
 fun UserProfileRoute(userId: String, repository: UserRepository) {
-    // ⚡ 1. 异步副作用：userId 变化时自动取消前一个请求，启动新协程拉取
+    // ⚡ 1. 异步挂起副作用：
+    // • 进树 / userId 变化：启动协程拉取
+    // • 普通重组：完全跳过，不重复请求
+    // • 跳到别的页面（离开树）：协程被自动 Cancelled 掐断，绝不泄露！
+    // • 从别的页面返回（重新进树）：协程重新启动，自动刷新！
     LaunchedEffect(userId) {
-        Log.d("Compose", "LaunchedEffect 启动: 开始加载用户 \$userId")
+        Log.d("Compose", "LaunchedEffect 启动: 加载用户 \$userId")
         repository.loadUser(userId)
     }
 
-    // ⚡ 2. 注册/清理成对副作用：离开组合树时在 onDispose 里安全反注册
+    // ⚡ 2. 注册/注销成对副作用：
+    // • 进树 / userId 变化：注册监听
+    // • 跳到别的页面（离开树）：立刻触发 onDispose，安全解绑传感器/回调！
+    // • 从别的页面返回（重新进树）：重新注册监听
     DisposableEffect(userId) {
-        Log.d("Compose", "DisposableEffect 注册监听: \$userId")
+        Log.d("Compose", "DisposableEffect: 注册 \$userId 监听")
         val listener = repository.registerUserListener(userId) { data ->
-            Log.d("Compose", "收到推送更新: \$data")
+            Log.d("Compose", "收到推送: \$data")
         }
 
         onDispose {
-            Log.d("Compose", "DisposableEffect 清理: 注销 \$userId 监听")
+            Log.d("Compose", "onDispose: 离开组合树，安全注销 \$userId 监听")
             repository.unregisterUserListener(listener)
         }
     }
