@@ -658,8 +658,6 @@ fun CounterCard(
 
 ##### 方案 ①：FeedAction 统一事件流（⭐ 80% 业务首选）
 
-- 用密封接口收拢所有事件，中间所有层级**只占一个参数位 \`onAction: (FeedAction) -> Unit\`**。底层新增按钮或业务事件时，中间所有父组件参数零改动；通道透明、显式契约，完美支持独立单测与 \`@Preview\`。
-
 \`\`\`kotlin
 // 1. 密封接口收拢整模块交互
 sealed interface FeedAction {
@@ -698,9 +696,6 @@ fun LeafItemCard(
 \`\`\`
 
 ##### 方案 ②：CompositionLocal 穿透（超深层级 / 全局基建）
-
-- 在根部架设无线电基站（Provider），深层组件隔空拾取调度器，彻底解放中间所有层级（无需任何参数传递）。\`viewModel()\` 底层就是基于此机制实现。
-- **避坑红线**：适合全树同质的基础设施（全局导航、主题、埋点）；严禁在列表每个项内滥用覆写 Provider，否则会导致隐式依赖泛滥、作用域漂移与 Preview 瘫痪。
 
 \`\`\`kotlin
 // 1. 定义局部事件穿透器（提供默认空实现，方便 Preview 预览）
