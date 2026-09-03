@@ -6,13 +6,11 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
       {
         tag: '现代语言',
         title: 'Kotlin 核心特性：委托、扩展与内联具现化',
-        caseStudy: `### 一、属性委托：懒加载、变动监听与生命周期安全托管
+        caseStudy: `### 一、委托：属性委托与类委托（状态托管与无样板装饰器）
 
-- **解决痛点与机制**：避免在每个类中重复编写状态读写、线程同步或缓存样板代码。通过 \`by delegate\` 将属性的 \`get()\` 和 \`set()\` 转发给专门的托管对象，由委托者统一管控属性的读写生命周期。
-- **高频场景与工程实战**：
-  1. **延迟初始化 \`by lazy\`**：默认采用 \`LazyThreadSafetyMode.SYNCHRONIZED\` 双检锁，仅在首次被访问时才触发初始化并缓存结果，非常适合耗时管理类或数据库实例的创建；
-  2. **属性变动监听 \`by Delegates.observable\`**：值变化时自动触发回调，常用于 UI 自动刷新或数据埋点；
-  3. **生命周期自动解绑（自定义委托）**：针对 Fragment 中 ViewBinding 生命周期短于 Fragment 实例的痛点，打造自动置空的委托，离开视图时自动释放强引用防内存泄漏。
+- **1. 属性委托（Property Delegation）**：
+  - **解决痛点与机制**：避免在每个类中重复编写状态读写、线程同步或缓存样板代码。通过 \`by delegate\` 将属性的 \`get()\` 和 \`set()\` 转发给专门的托管对象，由委托者统一管控属性的读写生命周期；
+  - **高频实战**：\`by lazy\` 双检锁懒加载、\`by Delegates.observable\` 状态监听更新 UI、自定义 \`AutoClearedValue\` 自动释放 Fragment ViewBinding 防泄漏。
 
 \`\`\`kotlin
 // 1. 耗时实例懒加载：首次使用时才初始化，线程安全
@@ -47,10 +45,9 @@ class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment,
 // private var binding: FragmentHomeBinding by autoCleared()
 \`\`\`
 
-### 二、类委托：基于 by 接口代理的无样板装饰器模式
-
-- **解决痛点与机制**：传统面向对象中若要为既有类增强能力，若使用继承极易破坏封装且受限于单继承；若使用装饰器模式，则必须手动手写几十个空转发方法。Kotlin 的类委托允许通过 \`class Xxx : Interface by inner\`，由编译器在底层自动生成所有转发代码，真正践行“组合优于继承”。
-- **工程实战**：例如我们需要为现有的 \`MutableList\` 增加耗时监测或埋点拦截，只需覆写关心的动作，其余所有集合接口方法自动转发给 \`inner\`。
+- **2. 类委托（Class Delegation）**：
+  - **解决痛点与机制**：传统面向对象中若要为既有类增强能力，若使用继承极易破坏封装且受限于单继承；若使用装饰器模式，则必须手写几十个空转发方法。Kotlin 的类委托允许通过 \`class Xxx : Interface by inner\`，由编译器在底层自动生成所有转发代码，真正践行“组合优于继承”；
+  - **高频实战**：无需手写数十个代理方法，直接代理 inner，仅覆写需要拦截增强的成员。
 
 \`\`\`kotlin
 // ⚡ 仅覆写需要增强拦截的方法，其余数十个集合方法全部由编译器自动代理转发
@@ -70,7 +67,7 @@ class TrackedList<T>(
 }
 \`\`\`
 
-### 三、扩展函数与属性：对既有类的非侵入式能力装配
+### 二、扩展函数与属性：对既有类的非侵入式能力装配
 
 - **解决痛点与机制**：不再需要编写死板难用的 \`ViewUtils.setVisibility(view, ...)\` 静态工具类。扩展机制允许在不修改类源码、不继承子类的情况下，直接为 Android 原生控件或第三方类型注入符合业务语意的成员方法与计算属性，调用体验如同原生 API。
 - **高频场景与工程实战**：
@@ -109,7 +106,7 @@ public final class UserExtKt {
 }
 \`\`\`
 
-### 四、带接收者的 Lambda：打造类型安全的流畅领域 DSL
+### 三、带接收者的 Lambda：打造类型安全的流畅领域 DSL
 
 - **解决痛点与机制**：普通闭包 \`() -> Unit\` 无法直接访问调用方上下文。带接收者的闭包 \`T.() -> Unit\` 将对象实例隐式注入为闭包内部的 \`this\`，使得在花括号作用域内可以直接调用该对象的所有公开属性与方法。这是 Jetpack Compose 声明式组件树、Gradle 构建脚本以及现代流畅配置 DSL 的底层母体语法。
 - **工程实战**：构建极简优雅的网络客户端配置器。
@@ -142,7 +139,7 @@ val client = setupHttpClient {
 }
 \`\`\`
 
-### 五、内联函数生态：inline / noinline / crossinline 的性能优化与安全避坑
+### 四、内联函数生态：inline / noinline / crossinline 的性能优化与安全避坑
 
 - **解决痛点与机制**：
   - 在高阶函数中每次传递 Lambda，底层都会在堆内存新建匿名内部类对象，高频调用时引发频繁 GC；\`inline\` 告诉编译器**直接把 Lambda 代码复制平铺到调用处**，彻底消除对象分配与虚方法栈帧开销；
@@ -170,7 +167,7 @@ inline fun runAsyncTask(
 }
 \`\`\`
 
-### 六、泛型具现化 reified：击穿 JVM 编译期类型擦除
+### 五、泛型具现化 reified：击穿 JVM 编译期类型擦除
 
 - **解决痛点与机制**：Java 泛型采用类型擦除（Type Erasure），编译后泛型信息全部变成 \`Object\`，无法在运行时直接通过 \`T::class.java\` 获取类元数据，也无法使用 \`item is T\` 进行类型判断。在 \`inline\` 函数中为泛型加上 \`reified\`，编译器由于在调用点将函数展开，**能够直接将 \`T\` 替换为调用处的真实 Class 常量**，使运行时重新具备类型感知能力。
 - **工程实战**：页面极简跳转语法糖，以及异构数据集合安全类型过滤。
