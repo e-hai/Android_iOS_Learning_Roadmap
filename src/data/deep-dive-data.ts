@@ -906,6 +906,146 @@ fun MessageRow(item: MessageItem, modifier: Modifier = Modifier) {
         }
     }
 }
+\`\`\`
+
+### 七、手势与嵌套滚动：PointerInput 传递链与 NestedScroll 冲突解决
+
+- **场景解释**：Compose 摒弃了传统 View 繁琐的 \`dispatchTouchEvent\` / \`onInterceptTouchEvent\`。通过 \`pointerInput\` 的三阶段传递（\`Initial\` 优先拦截 ➔ \`Main\` 正常消费 ➔ \`Final\` 兜底结果），配合 \`Modifier.nestedScroll\` 解决内外层滑动冲突（如可折叠吸顶标题、横向轮播与纵向列表手势争夺）。
+- **嵌套滚动核心机制**：
+  - \`onPreScroll\`：父级抢在子列表滑动**前**预先消费（如：向上滑时父级优先收起折叠 Header，Header 收拢后剩余距离才交由子列表滚动）；
+  - \`onPostScroll\`：子列表滚到边界**后**父级消费剩余距离（如：列表滚到底部后触发外层的弹性阻尼或加载更多）。
+
+\`\`\`kotlin
+@Composable
+fun CollapsibleHeaderList() {
+    val headerHeightPx = with(LocalDensity.current) { 200.dp.toPx() }
+    var headerOffsetPx by remember { mutableFloatStateOf(0f) }
+
+    // ⚡ 核心机制：定义嵌套滑动连接器，处理父子协同与冲突
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                // 向上滑 (delta < 0)：父组件优先吃掉滑动距离，折叠 Header
+                val delta = available.y
+                val newOffset = headerOffsetPx + delta
+                val consumedY = newOffset.coerceIn(-headerHeightPx, 0f) - headerOffsetPx
+                headerOffsetPx += consumedY
+                Log.d("NestedScroll", "onPreScroll 父级消费: \$consumedY, 剩余给子列表: \${available.y - consumedY}")
+                return Offset(0f, consumedY) // 返回父级已消费的偏移量
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection)
+    ) {
+        // 子列表正常滚动，剩余未被父级消费的距离由 LazyColumn 消化
+        LazyColumn(contentPadding = PaddingValues(top = 200.dp)) {
+            items(50) { index ->
+                Text("列表项 #\$index", modifier = Modifier.padding(16.dp))
+            }
+        }
+
+        // Header 随 headerOffsetPx 平移折叠
+        TopHeader(
+            modifier = Modifier
+                .height(200.dp)
+                .offset { IntOffset(x = 0, y = headerOffsetPx.roundToInt()) }
+        )
+    }
+}
+\`\`\`
+
+### 八、自定义组件：Canvas 免重组重绘与 Layout 测量管线
+
+- **场景解释**：传统自定义 View 需重写 \`onMeasure\` / \`onLayout\` / \`onDraw\`。在 Compose 中，轻量图形绘制使用 \`Canvas\` / \`drawBehind\`；自定义排版布局使用 \`Layout\`。
+- **免重组重绘（60/120fps 性能神技）**：在 \`Canvas\` 或 \`drawBehind\` 的绘制块内部直接读取状态时，Compose **只会触发 Draw（重绘）阶段，完全跳过 Recomposition（重组）与 Layout（测量布局）阶段**，实现极致丝滑的高频动画！
+
+\`\`\`kotlin
+@Composable
+fun SmoothPulsingCircle(progress: State<Float>) {
+    // ⚡ 核心避坑：在 drawBehind 作用域内部读取 progress.value
+    // 状态频繁变化时（如 120fps 动画），跳过重组与测量，仅触发纯粹的 GPU 重绘！
+    Spacer(
+        modifier = Modifier
+            .size(100.dp)
+            .drawBehind {
+                val animatedRadius = size.minDimension / 2 * progress.value
+                drawCircle(
+                    color = Color.Blue.copy(alpha = 1f - progress.value),
+                    radius = animatedRadius
+                )
+            }
+    )
+}
+
+// 自定义单次测量布局：实现纵向堆叠
+@Composable
+fun SimpleCustomColumn(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Layout(
+        content = content,
+        modifier = modifier
+    ) { measurables, constraints ->
+        // 1. 测量所有子项（单次测量，禁止多次测量以保障 O(N) 性能）
+        val placeables = measurables.map { measurable ->
+            measurable.measure(constraints)
+        }
+        val totalHeight = placeables.sumOf { it.height }
+        val maxWidth = placeables.maxOfOrNull { it.width } ?: 0
+
+        // 2. 布局排版
+        layout(maxWidth, totalHeight) {
+            var yPosition = 0
+            placeables.forEach { placeable ->
+                placeable.placeRelative(x = 0, y = yPosition)
+                yPosition += placeable.height
+            }
+        }
+    }
+}
+\`\`\`
+
+### 九、新旧混编互操作：AndroidView 生命周期与资源防泄漏
+
+- **场景解释**：现实项目中不可避免要嵌入原生复杂控件（如高德/Google 地图 \`MapView\`、\`WebView\`、ExoPlayer \`PlayerView\`）。
+- **核心规约**：
+  1. \`factory\`：仅在**初次进树**执行一次，用于创建原生 View 实例；
+  2. \`update\`：状态更新导致重组时反复调用，负责将 Compose 最新状态同步赋给原生 View；
+  3. \`onRelease\`：**离开组合树时触发**，在此必须安全注销与销毁底层重资源（如 \`player.release()\`），彻底杜绝内存泄漏！
+
+\`\`\`kotlin
+@Composable
+fun NativeVideoPlayer(
+    videoUrl: String,
+    isPlaying: Boolean,
+    modifier: Modifier = Modifier
+) {
+    AndroidView(
+        modifier = modifier,
+        // ⚡ 1. 创建工厂：仅在进树初次执行一次，创建原生 View 并初始化资源
+        factory = { ctx ->
+            Log.d("AndroidView", "factory: 创建原生 PlayerView")
+            CustomVideoView(ctx).apply {
+                initPlayer()
+            }
+        },
+        // ⚡ 2. 状态更新通道：外部状态 (videoUrl/isPlaying) 变动时触发，同步原生控件
+        update = { playerView ->
+            Log.d("AndroidView", "update: 同步状态 isPlaying=\$isPlaying")
+            if (isPlaying) playerView.play(videoUrl) else playerView.pause()
+        },
+        // ⚡ 3. 释放通道：离开组合树时自动回调，必须彻底释放原生内核资源，防止内存泄漏！
+        onRelease = { playerView ->
+            Log.d("AndroidView", "onRelease: 离开组合树，释放播放器内核")
+            playerView.releasePlayer()
+        }
+    )
+}
 \`\`\``,
       },
       {
