@@ -982,52 +982,88 @@ fun ZoomableBox() {
 
 ### 八、自定义组件：Canvas 免重组重绘与 Layout 测量管线
 
-- **场景解释**：传统自定义 View 需重写 \`onMeasure\` / \`onLayout\` / \`onDraw\`。在 Compose 中，轻量图形绘制使用 \`Canvas\` / \`drawBehind\`；自定义排版布局使用 \`Layout\`。
-- **免重组重绘（60/120fps 性能神技）**：在 \`Canvas\` 或 \`drawBehind\` 的绘制块内部直接读取状态时，Compose **只会触发 Draw（重绘）阶段，完全跳过 Recomposition（重组）与 Layout（测量布局）阶段**，实现极致丝滑的高频动画！
+- **场景解释**：传统自定义 View 需重写 \`onMeasure\` / \`onLayout\` / \`onDraw\`。在 Compose 中，轻量图形绘制使用 \`Canvas\` / \`drawBehind\`；复杂的规则排版（如 **iScreen / Colorful Widget 的 DIY 拼图壁纸**）使用自定义 \`Layout\`。
+- **免重组重绘（60/120fps 性能神技）**：在 \`Canvas\` 或 \`graphicsLayer\` 内部直接读取手势状态时，Compose **只会触发 Draw（重绘）阶段，完全跳过 Recomposition（重组）与 Layout（测量布局）阶段**，实现极致丝滑的高频动画！
 
 \`\`\`kotlin
-@Composable
-fun SmoothPulsingCircle(progress: State<Float>) {
-    // ⚡ 核心避坑：在 drawBehind 作用域内部读取 progress.value
-    // 状态频繁变化时（如 120fps 动画），跳过重组与测量，仅触发纯粹的 GPU 重绘！
-    Spacer(
-        modifier = Modifier
-            .size(100.dp)
-            .drawBehind {
-                val animatedRadius = size.minDimension / 2 * progress.value
-                drawCircle(
-                    color = Color.Blue.copy(alpha = 1f - progress.value),
-                    radius = animatedRadius
-                )
-            }
-    )
+// 1. 归一化槽位定义：0f~1f 相对坐标系（确保手机预览与 4K 导出分辨率 1:1 等比复用）
+data class WallpaperSlot(val left: Float, val top: Float, val width: Float, val height: Float)
+
+enum class DiyTemplate(val slots: List<WallpaperSlot>) {
+    // 经典拍立得/主副图模版：上方 1 张海报主图，下方 2 张细节图
+    Poster(listOf(
+        WallpaperSlot(0.0f, 0.00f, 1.0f, 0.62f),
+        WallpaperSlot(0.0f, 0.62f, 0.5f, 0.38f),
+        WallpaperSlot(0.5f, 0.62f, 0.5f, 0.38f)
+    )),
+    // 电影台词胶片条：纵向三等分
+    FilmStrip(listOf(
+        WallpaperSlot(0f, 0.000f, 1f, 0.333f),
+        WallpaperSlot(0f, 0.333f, 1f, 0.333f),
+        WallpaperSlot(0f, 0.666f, 1f, 0.334f)
+    ))
 }
 
-// 自定义单次测量布局：实现纵向堆叠
+// 2. 自定义 DIY 壁纸测量管线（单次测量，切换模版与间隙时零重新加载）
 @Composable
-fun SimpleCustomColumn(
+fun DiyWallpaperCollage(
+    template: DiyTemplate,
+    gap: Dp = 4.dp,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
     Layout(
         content = content,
-        modifier = modifier
+        modifier = modifier.aspectRatio(9f / 16f) // 锁定手机壁纸黄金画幅
     ) { measurables, constraints ->
-        // 1. 测量所有子项（单次测量，禁止多次测量以保障 O(N) 性能）
-        val placeables = measurables.map { measurable ->
-            measurable.measure(constraints)
-        }
-        val totalHeight = placeables.sumOf { it.height }
-        val maxWidth = placeables.maxOfOrNull { it.width } ?: 0
+        val totalW = constraints.maxWidth
+        val totalH = constraints.maxHeight
+        val gapPx = gap.roundToPx()
 
-        // 2. 布局排版
-        layout(maxWidth, totalHeight) {
-            var yPosition = 0
-            placeables.forEach { placeable ->
-                placeable.placeRelative(x = 0, y = yPosition)
-                yPosition += placeable.height
+        // ⚡ 单次测量管线：依据模版比例，毫秒级为各槽位派发固定像素约束
+        val placeables = measurables.mapIndexed { index, measurable ->
+            val slot = template.slots.getOrNull(index) ?: WallpaperSlot(0f, 0f, 1f, 1f)
+            val w = (totalW * slot.width).toInt() - gapPx
+            val h = (totalH * slot.height).toInt() - gapPx
+            measurable.measure(Constraints.fixed(w.coerceAtLeast(0), h.coerceAtLeast(0)))
+        }
+
+        // ⚡ 精准定位摆放
+        layout(totalW, totalH) {
+            placeables.forEachIndexed { index, placeable ->
+                val slot = template.slots.getOrNull(index) ?: return@forEachIndexed
+                val x = (totalW * slot.left).toInt() + gapPx / 2
+                val y = (totalH * slot.top).toInt() + gapPx / 2
+                placeable.placeRelative(x, y)
             }
         }
+    }
+}
+
+// 3. 单槽位独立交互与裁切（双指缩放/平移，手势在 draw 阶段硬件加速，绝不触发全屏重组）
+@Composable
+fun WallpaperSlotImage(bitmap: ImageBitmap) {
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clipToBounds() // 裁切在各自格子里
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+                translationX = offset.x
+                translationY = offset.y
+            }
+            .pointerInput(Unit) {
+                detectTransformGestures { _, pan, zoom, _ ->
+                    scale = (scale * zoom).coerceIn(1f, 4f)
+                    offset += pan
+                }
+            }
+    ) {
+        Image(bitmap = bitmap, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
     }
 }
 \`\`\`
