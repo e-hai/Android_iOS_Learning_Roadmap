@@ -623,10 +623,6 @@ class HomeViewModel : ViewModel() {
 
 - **场景解释**：普通局部变量重组即丢；组件私有状态难以被外部联动控制。通过**状态提升（State Hoisting）**，将状态收拢到父级或 ViewModel 的 \`StateFlow\`，子组件降级为无状态（Stateless）纯展示组件，遵循声明式 UI 核心宪法：**「状态向下传递（数据参数），事件向上传递（Lambda 回调）」**。
 
-#### 1. 基础范例：什么是“状态向下，事件向上”
-
-- **核心机制**：顶层组件持有数据源并向下分发；子组件不存任何内部状态，只做纯展示并在交互时向外抛出事件，状态流向永远单向闭环。
-
 \`\`\`kotlin
 @Composable
 fun CounterScreen(viewModel: CounterViewModel = viewModel()) {
@@ -656,7 +652,7 @@ fun CounterCard(
 }
 \`\`\`
 
-#### 2. 深层嵌套场景与两大解法对比
+#### 深层嵌套场景与两大解法对比
 
 - **深层痛点**：当页面嵌套极深（\`页面 ➔ 垂直流 ➔ 横向列表 ➔ 卡片 ➔ 按钮\`）时，若每层都手动声明并逐层透传 \`onClick\`，会导致严重的回调地狱（Callback Drilling）。为此业界演进出两大经典方案：
 
