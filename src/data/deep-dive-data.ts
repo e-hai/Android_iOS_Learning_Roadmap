@@ -867,7 +867,7 @@ fun OrderTrackingRoute(
 
 ### 六、高性能列表：LazyColumn 稳定 key 的复用防串位
 
-- **场景解释**：\`LazyColumn\` 与 RecyclerView 类似，屏幕上只有有限的几个插槽卡片。如果未指定稳定的 \`key\`，列表在增删项时会默认按“位置索引”复用插槽，导致行内的展开、动画等局部 \`remember\` 状态发生错位。配置 \`key = { it.id }\` 可以确保数据与插槽状态强绑定，删除项时局部状态同步清除。
+- **场景解释**：\`LazyColumn\` 只渲染可视区域内的列表项。如果未指定稳定的 \`key\`，Compose 默认按**位置索引（Index）**来识别和复用项内部的 \`remember\` 状态。一旦列表发生增删或排序，上一项的展开折叠、选中勾选等状态就会“张冠李戴”错配给新项。配置 \`key = { it.id }\` 可确保状态与数据唯一 ID 强绑定，增删项时状态精准跟随。
 
 \`\`\`kotlin
 data class MessageItem(val id: String, val text: String)
