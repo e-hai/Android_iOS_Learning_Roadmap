@@ -15,11 +15,11 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
           { title: 'Job + Dispatcher', subtitle: '协程身份与调度，两条独立的轴', category: 'engineering' },
         ],
         explanation: `### 1. 协程概念（Conway 1963）：对称让出控制权
-- **通俗心智**：普通函数是“主从关系”（调用后死等返回，单向压栈）；协程是“对等伙伴”（双方平起平坐，可以随时暂停让出执行权，稍后从暂停处恢复）。
+- **核心机制**：普通函数是“主从关系”（调用后死等返回，单向压栈）；协程是“对等伙伴”（双方平起平坐，可以随时暂停让出执行权，稍后从暂停处恢复）。
 - **工程价值**：避免传统线程阻塞（\`Thread.sleep\` / 同步 I/O）带来的 1MB+ 内存常驻与内核态 CPU 切换损耗。
 
 ### 2. 续延理论 CPS（Reynolds / Scheme）：形式化续体
-- **通俗心智**：函数不再通过隐式硬件寄存器 \`return\`，而是把“接下来要做的所有剩余计算”打包成一个显式参数——**续体（Continuation）**。
+- **核心机制**：函数不再通过隐式硬件寄存器 \`return\`，而是把“接下来要做的所有剩余计算”打包成一个显式参数——**续体（Continuation）**。
 - **编译器改写**：\`suspend fun fetch(): User\` 编译期被重写为 \`fun fetch(cont: Continuation<User>): Any?\`。
 
 ### 3. 无栈实现策略（Stackless）：栈帧堆化
@@ -31,7 +31,7 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
 - **Switch-Case 切片**：以挂起点切分代码。挂起时返回 \`COROUTINE_SUSPENDED\` 释放线程栈；异步完成后通过 \`resumeWith()\` 推进 \`label\` 恢复执行。
 
 ### 5. Completion 链：堆上单向链表替代调用栈
-- **通俗心智**：当函数 A 调用挂起函数 B，B 调用挂起函数 C 时，在堆上自动形成 \`C ➔ B ➔ A\` 的 \`completion\` 单向引用链表。
+- **核心机制**：当函数 A 调用挂起函数 B，B 调用挂起函数 C 时，在堆上自动形成 \`C ➔ B ➔ A\` 的 \`completion\` 单向引用链表。
 - **堆上调用栈**：最底层的 C 完成后，通过 \`completion.resumeWith()\` 逐层向上回溯唤醒 B 和 A，用堆内存完美复刻了函数调用栈。
 
 ### 6. Job + Dispatcher：身份与调度的两条正交轴
@@ -625,7 +625,7 @@ class HomeViewModel : ViewModel() {
 
 #### 1. 基础范例：什么是“状态向下，事件向上”
 
-- **通俗心智**：顶层组件持有数据源并向下分发；子组件不存任何内部状态，只做纯展示并在交互时向外抛出事件，状态流向永远单向闭环。
+- **核心机制**：顶层组件持有数据源并向下分发；子组件不存任何内部状态，只做纯展示并在交互时向外抛出事件，状态流向永远单向闭环。
 
 \`\`\`kotlin
 @Composable
@@ -662,7 +662,7 @@ fun CounterCard(
 
 ##### 方案 ①：FeedAction 统一事件流 + 中间拦截（⭐ 80% 业务首选）
 
-- **通俗心智**：用一个密封接口收拢所有事件，中间所有层级**只占一个参数位 \`onAction: (FeedAction) -> Unit\`**。底层新增按钮中间层零改动；若存在“按钮 B 折叠爷组件”的局部联动，爷组件还可充当拦截器，就地消化局部事件，业务事件放行给 ViewModel。
+- **核心机制**：用一个密封接口收拢所有事件，中间所有层级**只占一个参数位 \`onAction: (FeedAction) -> Unit\`**。底层新增按钮中间层零改动；若存在“按钮 B 折叠爷组件”的局部联动，爷组件还可充当拦截器，就地消化局部事件，业务事件放行给 ViewModel。
 
 \`\`\`kotlin
 // 1. 密封接口收拢整模块交互
@@ -710,7 +710,7 @@ fun LeafButtonRow(item: ProductItem, onAction: (FeedAction) -> Unit) {
 
 ##### 方案 ②：CompositionLocal 穿透（超深层级 / 全局基建）
 
-- **通俗心智**：在根部架设无线电基站（Provider），深层组件隔空拾取调度器，彻底解放中间所有层级（无需任何参数传递）。\`viewModel()\` 底层就是基于此机制实现。
+- **核心机制**：在根部架设无线电基站（Provider），深层组件隔空拾取调度器，彻底解放中间所有层级（无需任何参数传递）。\`viewModel()\` 底层就是基于此机制实现。
 - **避坑红线**：适合全树同质的基础设施（全局导航、主题、埋点）；严禁在列表每个项内滥用覆写 Provider，否则会导致隐式依赖泛滥、作用域漂移与 Preview 瘫痪。
 
 \`\`\`kotlin
@@ -926,10 +926,10 @@ abstract class AppDatabase : RoomDatabase() {
           { title: 'Actor + 协作线程池', subtitle: '数据隔离与 CPU 核心数绑定调度', category: 'engineering' },
         ],
         explanation: `### 1. 协程概念（Conway 1963）：协作式让权
-- **通俗心智**：消除传统 GCD (\`DispatchQueue.global().async\`) 无节制创建线程导致的“线程爆炸”；协程在遇到 I/O 时主动让出执行线程。
+- **核心机制**：消除传统 GCD (\`DispatchQueue.global().async\`) 无节制创建线程导致的“线程爆炸”；协程在遇到 I/O 时主动让出执行线程。
 
 ### 2. 续延语义 async/await（Lattner 2021）：挂起点改写
-- **通俗心智**：\`await\` 标注了潜在的挂起点。当遇到挂起时，当前 Task 的后续逻辑被封装为续体，底层 Worker 线程立即去执行其他就绪任务。
+- **核心机制**：\`await\` 标注了潜在的挂起点。当遇到挂起时，当前 Task 的后续逻辑被封装为续体，底层 Worker 线程立即去执行其他就绪任务。
 
 ### 3. 无栈异步栈帧（Async Frame）：堆上生命周期
 - **核心策略**：Swift 编译器将跨挂起点的局部变量打包存入堆上的 **Async Frame**，当前线程立即返回；异步 I/O 完成后，调度器分配空闲 Worker 从 Async Frame 恢复执行。
@@ -1190,7 +1190,7 @@ baselineProfile {
           { title: '读链与拆链', subtitle: '沿最短强引用链找到该松开的那一环', category: 'engineering' },
         ],
         explanation: `### 1. GC Roots 与可达性
-- **通俗心智**：垃圾回收不问「你还想不想要」，只问「从根出发还能不能摸到你」。摸不到的对象才是垃圾。
+- **核心机制**：垃圾回收不问「你还想不想要」，只问「从根出发还能不能摸到你」。摸不到的对象才是垃圾。
 - **常见根**：线程栈上的局部变量、静态字段、JNI 全局引用等。Activity 被静态字段抓住，对 GC 来说它仍然可达。
 
 ### 2. 四种引用
