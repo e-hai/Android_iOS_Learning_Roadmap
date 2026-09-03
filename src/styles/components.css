@@ -2866,6 +2866,12 @@ input:focus-visible,
   margin: 3px 0;
 }
 
+.case-study-bullet.is-sub {
+  margin-left: 20px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
 .case-bullet-dot {
   width: 6px;
   height: 6px;
@@ -2877,6 +2883,42 @@ input:focus-visible,
 
 .case-study-card.deepdive-ios .case-bullet-dot {
   background: var(--color-ios);
+}
+
+.case-bullet-subdot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-accent);
+  background: transparent;
+  flex-shrink: 0;
+  margin-top: 8px;
+}
+
+.case-study-card.deepdive-ios .case-bullet-subdot {
+  border-color: var(--color-ios);
+}
+
+.case-bullet-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-ring);
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.case-study-card.deepdive-ios .case-bullet-num {
+  background: var(--color-ios-soft);
+  color: var(--color-ios);
+  border-color: var(--color-ios-border);
 }
 
 .case-study-table-wrap {

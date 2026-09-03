@@ -842,10 +842,23 @@ function formatCaseStudyHtml(rawText: string): string {
       html += `<h5 class="case-study-h5">${formatInlineText(trimmed.replace(/^#####\s+/, ''))}</h5>`;
     } else if (trimmed.startsWith('> ')) {
       html += `<div class="case-study-callout">${formatInlineText(trimmed.replace(/^>\s+/, ''))}</div>`;
-    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      html += `<div class="case-study-bullet"><span class="case-bullet-dot"></span><span>${formatInlineText(trimmed.replace(/^[-*]\s+/, ''))}</span></div>`;
     } else {
-      html += `<p class="case-study-p">${formatInlineText(trimmed)}</p>`;
+      // Match indentation (2 spaces or 1 tab counts as a sub-item)
+      const indentMatch = line.match(/^(\s+)/);
+      const isSub = !!indentMatch && indentMatch[1].replace(/\t/g, '  ').length >= 2;
+
+      // Match ordered list item: "1. " or "2. "
+      const numMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+      if (numMatch) {
+        const num = numMatch[1];
+        const text = numMatch[2];
+        html += `<div class="case-study-bullet ${isSub ? 'is-sub' : ''} is-num"><span class="case-bullet-num">${num}</span><span>${formatInlineText(text)}</span></div>`;
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        const text = trimmed.replace(/^[-*]\s+/, '');
+        html += `<div class="case-study-bullet ${isSub ? 'is-sub' : ''}"><span class="${isSub ? 'case-bullet-subdot' : 'case-bullet-dot'}"></span><span>${formatInlineText(text)}</span></div>`;
+      } else {
+        html += `<p class="case-study-p">${formatInlineText(trimmed)}</p>`;
+      }
     }
   }
 
