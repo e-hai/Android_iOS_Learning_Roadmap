@@ -72,8 +72,19 @@ function renderSingleChapterView(
 
   // Pipeline & Explanation (Unified Principle Flow)
   if (mod.pipeline && mod.pipeline.length > 0) {
-    container.appendChild(renderPipelineFlowCard(mod.pipeline, platform));
-    container.appendChild(renderTimelineExplanation(mod.explanation || '', platform, mod.pipeline));
+    const principleSection = document.createElement('section');
+    principleSection.className = 'chapter-content-section pipeline-stage-section';
+    const hasTheory = mod.pipeline.some((step) => step.category === 'theory');
+    const sectionTitle = hasTheory ? '一、核心理论与工程演进全景' : '一、核心机制与工程演进全景';
+    principleSection.innerHTML = `
+      <div class="section-header">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">${sectionTitle}</h2>
+      </div>
+    `;
+    principleSection.appendChild(renderPipelineFlowCard(mod.pipeline, platform));
+    principleSection.appendChild(renderTimelineExplanation(mod.explanation || '', platform, mod.pipeline));
+    container.appendChild(principleSection);
   } else {
     // Cognitive Metaphor & Formula Card (if present on traditional modules)
     if (mod.metaphor) {
@@ -103,7 +114,7 @@ function renderSingleChapterView(
       principleSection.innerHTML = `
         <div class="section-header">
           <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-          <h2 class="section-header-title">核心原理解析与底层机制</h2>
+          <h2 class="section-header-title">一、核心原理解析与底层机制</h2>
         </div>
         <div class="chapter-card-box">
           ${formatExplanationHtml(mod.explanation)}
@@ -601,6 +612,14 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
 function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios', pipeline?: PipelineStep[]): HTMLElement {
   const container = document.createElement('div');
   container.className = `timeline-stream ${platform === 'ios' ? 'timeline-ios' : ''}`;
+  const bridge = document.createElement('div');
+  bridge.className = 'timeline-stream-bridge';
+  bridge.innerHTML = `
+    <div class="timeline-bridge-line"></div>
+    <span class="timeline-bridge-tag">各阶段底层原理与代码演进分步详述</span>
+    <div class="timeline-bridge-line"></div>
+  `;
+  container.appendChild(bridge);
 
   // Split by markdown H3 heading
   const sections = rawText.split(/(?=###\s+)/g).map((s) => s.trim()).filter(Boolean);
