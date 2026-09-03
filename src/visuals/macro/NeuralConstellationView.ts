@@ -395,7 +395,7 @@ export function renderNeuralConstellationView(
           title: `【${mod.tag}】${mod.title}`,
           subtitle: `${platformName} 底层专题`,
           noteTag: mod.tag,
-          explanation: mod.explanation,
+          explanation: mod.explanation || mod.metaphor?.metaphorDesc || '',
           codeSnippet: mod.codeSnippet,
           pos: mPos,
         });

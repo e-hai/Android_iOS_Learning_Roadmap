@@ -73,7 +73,7 @@ function renderSingleChapterView(
   // Pipeline & Explanation (Unified Principle Flow)
   if (mod.pipeline && mod.pipeline.length > 0) {
     container.appendChild(renderPipelineFlowCard(mod.pipeline, platform));
-    container.appendChild(renderTimelineExplanation(mod.explanation, platform, mod.pipeline));
+    container.appendChild(renderTimelineExplanation(mod.explanation || '', platform, mod.pipeline));
   } else {
     // Cognitive Metaphor & Formula Card (if present on traditional modules)
     if (mod.metaphor) {
@@ -97,18 +97,20 @@ function renderSingleChapterView(
     }
 
     // Traditional Module Principle Section
-    const principleSection = document.createElement('section');
-    principleSection.className = 'chapter-content-section';
-    principleSection.innerHTML = `
-      <div class="section-header">
-        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">核心原理解析与底层机制</h2>
-      </div>
-      <div class="chapter-card-box">
-        ${formatExplanationHtml(mod.explanation)}
-      </div>
-    `;
-    container.appendChild(principleSection);
+    if (mod.explanation && mod.explanation.trim()) {
+      const principleSection = document.createElement('section');
+      principleSection.className = 'chapter-content-section';
+      principleSection.innerHTML = `
+        <div class="section-header">
+          <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+          <h2 class="section-header-title">核心原理解析与底层机制</h2>
+        </div>
+        <div class="chapter-card-box">
+          ${formatExplanationHtml(mod.explanation)}
+        </div>
+      `;
+      container.appendChild(principleSection);
+    }
   }
 
   let nextSectionNumber = 2;
@@ -383,7 +385,7 @@ function renderPlatformOverview(
           <span class="compact-card-tag" style="color:${platformColor};">${mod.tag}</span>
         </div>
         <div class="compact-card-title">${mod.title}</div>
-        <div class="compact-card-desc">${truncateText(mod.explanation, 52)}</div>
+        <div class="compact-card-desc">${truncateText(mod.explanation || mod.metaphor?.metaphorDesc || '', 52)}</div>
         <div class="compact-card-footer">
           <span class="compact-card-action">研读章节</span>
           <span class="compact-card-arrow">→</span>

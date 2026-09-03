@@ -37,7 +37,7 @@ export interface DeepDiveModule {
   title: string;         // Module title
   pipeline?: PipelineStep[];   // Optional Theory-to-Engineering pipeline chain diagram
   metaphor?: DeepDiveMetaphor; // Optional cognitive metaphor & golden memory formula
-  explanation: string;   // Deep dive explanation (supports rich structured paragraphs)
+  explanation?: string;  // Optional deep dive explanation (supports rich structured paragraphs)
   extendedDeepDive?: string; // Optional extended top-down deep dive analysis
   caseStudy?: string;    // Optional in-depth case study & reflection
   stepper?: StepperStep[]; // Optional interactive step-by-step state machine runner
