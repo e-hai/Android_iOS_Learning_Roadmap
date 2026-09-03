@@ -621,10 +621,46 @@ class HomeViewModel : ViewModel() {
 
         caseStudy: `### 一、状态提升：单一数据源与深层事件流转
 
-- **场景解释**：普通局部变量重组即丢失；组件私有状态难以被外部联动。通过状态提升（State Hoisting）将状态收拢到 ViewModel 的 \`StateFlow\`，子组件降级为无状态（Stateless）纯展示组件。
-- **深层嵌套痛点**：当层级嵌套极深（\`页面 ➔ 垂直流 ➔ 横向列表 ➔ 卡片 ➔ 按钮\`）时，若每层都手动声明 \`onClick\`，会导致严重的回调地狱（Callback Drilling）。为此业界演进出两大正统应对方案：
+- **场景解释**：普通局部变量重组即丢；组件私有状态难以被外部联动控制。通过**状态提升（State Hoisting）**，将状态收拢到父级或 ViewModel 的 \`StateFlow\`，子组件降级为无状态（Stateless）纯展示组件，遵循声明式 UI 核心宪法：**「状态向下传递（数据参数），事件向上传递（Lambda 回调）」**。
 
-#### 方案 ①：FeedAction 统一事件流 + 中间拦截（⭐ 80% 业务首选）
+#### 1. 基础范例：什么是“状态向下，事件向上”
+
+- **通俗心智**：顶层组件持有数据源并向下分发；子组件不存任何内部状态，只做纯展示并在交互时向外抛出事件，状态流向永远单向闭环。
+
+\`\`\`kotlin
+@Composable
+fun CounterScreen(viewModel: CounterViewModel = viewModel()) {
+    // 1. 顶层收集唯一数据源
+    val count by viewModel.count.collectAsStateWithLifecycle()
+
+    // 2. 状态向下流 (count)，事件向上抛 (onIncrement)
+    CounterCard(
+        count = count,
+        onIncrement = { viewModel.increment() }
+    )
+}
+
+// ⚡ 纯粹的无状态组件（复用性极高，易于单测与 Preview）
+@Composable
+fun CounterCard(
+    count: Int,
+    onIncrement: () -> Unit
+) {
+    Log.d("Compose", "CounterCard 重组: count=\$count")
+    Column {
+        Text("当前计数: \$count")
+        Button(onClick = onIncrement) {
+            Text("增加计数")
+        }
+    }
+}
+\`\`\`
+
+#### 2. 深层嵌套场景与两大解法对比
+
+- **深层痛点**：当页面嵌套极深（\`页面 ➔ 垂直流 ➔ 横向列表 ➔ 卡片 ➔ 按钮\`）时，若每层都手动声明 \`onClick\`，会导致严重的回调地狱（Callback Drilling）。甚至更复杂的是：深层可能同时存在**业务请求（Button A 触发拉网）**与**局部 UI 联动（Button B 触发折叠爷组件）**。为此业界演进出两大经典方案：
+
+##### 方案 ①：FeedAction 统一事件流 + 中间拦截（⭐ 80% 业务首选）
 
 - **通俗心智**：用一个密封接口收拢所有事件，中间所有层级**只占一个参数位 \`onAction: (FeedAction) -> Unit\`**。底层新增按钮中间层零改动；若存在“按钮 B 折叠爷组件”的局部联动，爷组件还可充当拦截器，就地消化局部事件，业务事件放行给 ViewModel。
 
@@ -672,7 +708,7 @@ fun LeafButtonRow(item: ProductItem, onAction: (FeedAction) -> Unit) {
 }
 \`\`\`
 
-#### 方案 ②：CompositionLocal 穿透（超深层级 / 全局基建）
+##### 方案 ②：CompositionLocal 穿透（超深层级 / 全局基建）
 
 - **通俗心智**：在根部架设无线电基站（Provider），深层组件隔空拾取调度器，彻底解放中间所有层级（无需任何参数传递）。\`viewModel()\` 底层就是基于此机制实现。
 - **避坑红线**：适合全树同质的基础设施（全局导航、主题、埋点）；严禁在列表每个项内滥用覆写 Provider，否则会导致隐式依赖泛滥、作用域漂移与 Preview 瘫痪。
