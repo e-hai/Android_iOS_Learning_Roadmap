@@ -8,30 +8,49 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
         title: 'Kotlin 核心特性：委托、扩展与内联具现化',
         caseStudy: `### 一、委托：属性委托与类委托（状态托管与无样板装饰器）
 
-- **1. 属性委托（Property Delegation）**：
-  - **解决痛点与机制**：避免在每个类中重复编写状态读写、线程同步或缓存样板代码。通过 \`by delegate\` 将属性的 \`get()\` 和 \`set()\` 转发给专门的托管对象，由委托者统一管控属性的读写生命周期；
-  - **高频实战**：\`by lazy\` 双检锁懒加载、\`by Delegates.observable\` 状态监听更新 UI、自定义 \`AutoClearedValue\` 自动释放 Fragment ViewBinding 防泄漏。
+- **1. 属性委托（Property Delegation）演进三步曲**：
+  - **核心本质**：通过 \`by delegate\` 将属性的 \`get()\` 和 \`set()\` 转发给托管对象，省去重复的样板代码。其演进与使用分为清晰的三步：
+  - **第一步：官方开箱即用（\`by lazy\` 延迟加载）**：
+    - 最经典的日常用法。默认采用 \`LazyThreadSafetyMode.SYNCHRONIZED\` 双重检查锁（DCL），仅在首次被访问时才执行代码块并缓存结果，非常适合重量级实例（数据库/网络客户端）的按需初始化：
 
 \`\`\`kotlin
-// 1. 耗时实例懒加载：首次使用时才初始化，线程安全
+// ⚡ 第一步：官方开箱即用，首次访问才初始化，线程安全单例
 val databaseHelper: DatabaseHelper by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
     DatabaseHelper().apply { initTables() }
 }
+\`\`\`
 
-// 2. 状态监听：标题变动自动同步给 UI 状态栏
-var currentTitle: String by Delegates.observable("首页") { _, oldTitle, newTitle ->
-    Log.d("NavBar", "标题从 \$oldTitle 切换为 \$newTitle")
-    updateTitleBar(newTitle)
+  - **第二步：自定义约定规则（零接口继承，纯靠 \`operator\` 固定函数名）**：
+    - 属性委托**绝非基于接口继承，而是基于操作符重载约定**！任何普通类（甚至扩展函数），只要提供了编译器死认的固定名称 \`operator fun getValue\`（只读）或 \`operator fun setValue\`（读写），无需实现任何接口就能直接充当委托：
+
+\`\`\`kotlin
+// ⚡ 第二步：零接口继承的纯普通类！函数名受语言规范硬编码约束，必须是 getValue / setValue
+class CustomStringDelegate {
+    private var internalText = "默认值"
+
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): String = internalText
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: String) {
+        println("属性 \${property.name} 变更为: \$value")
+        internalText = value
+    }
 }
 
-// 3. 自定义委托实战：Fragment ViewBinding 离开页面自动解绑
+// 业务直接使用：
+var myName: String by CustomStringDelegate()
+\`\`\`
+
+  - **第三步：官方辅助工具接口（\`ReadOnlyProperty\` 与 \`ReadWriteProperty\`）**：
+    - 既然不强制实现接口，官方为何提供这两个接口？它们是**选修的开发提效工具**：① 免手写很长的参数签名（IDE 自动补全）；② 提供泛型安全约束，方便结合生命周期打造工业级工具：
+
+\`\`\`kotlin
+// ⚡ 第三步：基于官方 ReadOnlyProperty 接口封装生命周期感知委托，离开页面自动置空防泄漏
 class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment, T> {
     private var value: T? = null
     init {
         fragment.viewLifecycleOwnerLiveData.observe(fragment) { owner ->
             owner?.lifecycle?.addObserver(object : DefaultLifecycleObserver {
                 override fun onDestroy(owner: LifecycleOwner) {
-                    value = null // ⚡ onDestroyView 时自动将引用置空，杜绝内存泄漏
+                    value = null // ⚡ onDestroyView 时自动将引用置空，彻底杜绝 ViewBinding 内存泄漏
                 }
             })
         }
@@ -41,7 +60,7 @@ class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment,
     fun setValue(newValue: T) { value = newValue }
 }
 
-// 声明用法：离开视图自动安全释放
+// 声明用法：一行代码搞定 Fragment 内存安全
 // private var binding: FragmentHomeBinding by autoCleared()
 \`\`\`
 
