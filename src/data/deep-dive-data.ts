@@ -73,7 +73,10 @@ class TrackedList<T>(
 ### 三、扩展函数与属性：对既有类的非侵入式能力装配
 
 - **解决痛点与机制**：不再需要编写死板难用的 \`ViewUtils.setVisibility(view, ...)\` 静态工具类。扩展机制允许在不修改类源码、不继承子类的情况下，直接为 Android 原生控件或第三方类型注入符合业务语意的成员方法与计算属性，调用体验如同原生 API。
-- **工程实战**：常用的视图显隐切换、上下文极简 Toast、屏幕宽高计算属性。
+- **高频场景与工程实战**：
+  1. 常用视图显隐切换扩展；
+  2. 上下文极简 Toast；
+  3. 屏幕宽高计算属性。
 
 \`\`\`kotlin
 // 1. 扩展函数：语义化控制 View 显隐，消除到处手写的 View.VISIBLE / View.GONE
@@ -86,7 +89,7 @@ fun Context.toast(message: CharSequence) {
     Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
 }
 
-// 3. 扩展计算属性：随手获取屏幕像素宽度
+// 3. 扩展计算属性：随手获取屏幕像素宽度（注意：必须提供 get()，无幕后字段）
 val Context.screenWidth: Int
     get() = resources.displayMetrics.widthPixels
 
@@ -94,6 +97,12 @@ val Context.screenWidth: Int
 // loginButton.visibleOrGone(user.isLoggedIn)
 // context.toast("操作成功，当前屏幕宽: \${context.screenWidth}px")
 \`\`\`
+
+- **关键边界与核心局限性（避坑指南）**：
+  1. **静态分派，无运行时多态**：扩展函数在编译期根据“声明的静态类型”决定，而非运行时具体子类实例（如 \`val a: Animal = Dog()\`; 调用 \`a.speak()\` 实际执行的是 \`Animal.speak\`）；若扩展与类的内置成员同名同参，**成员方法永远优先胜出**，扩展将被静默遮蔽；
+  2. **不可突破私有封装**：虽然书写时能直接使用 \`this\`，但它在字节码层面只是外部静态方法，**绝对无法访问原类的 \`private\` 或 \`protected\` 私有变量**；
+  3. **扩展属性没有幕后字段（No Backing Field）**：扩展无法向目标对象内存中增添新的属性字段，严禁赋初始值，只能显式提供 \`get()\` 做动态计算；
+  4. **与“内部类”的本质辨析**：非静态内部类会在堆上分配真实对象并**隐式强持有外部类引用（泄漏元凶），但能穿透 private**；而扩展函数**零对象分配、零内存常驻、随调随走**，编译后只是把接收者作为第一个参数的外部静态方法。
 
 ### 四、带接收者的 Lambda：打造类型安全的流畅领域 DSL
 
