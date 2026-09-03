@@ -839,21 +839,43 @@ fun UserProfileRoute(userId: String, repository: UserRepository) {
 
 ### 五、生命周期：可见才收集与前台独占
 
-- **场景解释**：页面切到后台、或者被全屏新页面遮挡时，UI 收集 Flow 会白白消耗 CPU 和电量。\`collectAsStateWithLifecycle\` 在低于 \`STARTED\` 时自动暂停收集；定位、相机等强前台任务使用 \`LifecycleResumeEffect\`，离开 \`RESUMED\` 时立即在 \`onPauseOrDispose\` 中暂停。
+- **场景解释**：组合在树上不等于页面在前台。按 Home 切后台或全屏跳转时，组合树仍常驻内存，若盲目跑任务会空耗 CPU 与电量。三大官方生命周期 API 各司其职，精准对齐 \`LocalLifecycleOwner\`（当前导航页的 \`NavBackStackEntry\`）：
+  1. \`collectAsStateWithLifecycle\`：Flow 转界面状态，低于 \`STARTED\` 自动停止收集省电；
+  2. \`LifecycleStartEffect\`：**可见即可**（轻量轮询/未读数同步），跟 \`onStart / onStop\`，有 Dialog 盖在上面时仍在运行；
+  3. \`LifecycleResumeEffect\`：**必须在前台**（高精度定位/相机/停留曝光），跟 \`onResume / onPause\`，有 Dialog 盖在上面失焦时立即暂停。
 
 \`\`\`kotlin
 @Composable
-fun OrderTrackingRoute(viewModel: OrderViewModel = viewModel()) {
-    // ⚡ 1. 界面状态：离开前台时自动停止收集 Flow，回到前台自动恢复
+fun OrderTrackingRoute(
+    orderId: String,
+    viewModel: OrderViewModel = viewModel()
+) {
+    // ⚡ 1. 界面状态：低于 STARTED 停止收集 Flow，回到前台自动恢复
     val orderStatus by viewModel.orderStatus.collectAsStateWithLifecycle()
 
-    // ⚡ 2. 强前台事件：仅在处于 RESUMED 状态时开启高精度定位与轮询
-    LifecycleResumeEffect(Unit) {
-        Log.d("Compose", "处于 RESUMED 前台: 开启高精度定位")
+    // ⚡ 2. 可见即可（跟 onStart / onStop）：
+    // • 只要页面看得见就跑（轻量未读数/订单状态长轮询）
+    // • 即使上方盖了半透明 Dialog，依然保持 STARTED 活跃！
+    // • 只有全屏跳转或退后台（onStop）时，才触发 onStopOrDispose 停止
+    LifecycleStartEffect(orderId) {
+        Log.d("Lifecycle", "进入 STARTED (可见): 启动订单轻量轮询")
+        val pollingJob = viewModel.startOrderPolling(orderId)
+
+        onStopOrDispose {
+            Log.d("Lifecycle", "离开 STARTED (不可见): 停止订单轮询")
+            pollingJob.cancel()
+        }
+    }
+
+    // ⚡ 3. 必须在前台（跟 onResume / onPause）：
+    // • 强前台独占业务（骑手高精定位、相机预览、停留曝光）
+    // • 一旦有 Dialog 弹窗遮挡导致失焦（onPause），立刻停止以极致省电！
+    LifecycleResumeEffect(orderId) {
+        Log.d("Lifecycle", "进入 RESUMED (前台获焦): 开启高精定位")
         viewModel.startHighAccuracyLocation()
 
         onPauseOrDispose {
-            Log.d("Compose", "离开 RESUMED: 停止高精度定位以省电")
+            Log.d("Lifecycle", "离开 RESUMED (失焦/遮挡): 暂停高精定位")
             viewModel.stopLocation()
         }
     }
