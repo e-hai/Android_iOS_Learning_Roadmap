@@ -258,8 +258,8 @@ function renderSingleChapterView(
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
         <h2 class="section-header-title">深度实战思考</h2>
       </div>
-      <div class="case-study-card ${platform === 'ios' ? 'deepdive-ios' : ''}">
-        ${formatCaseStudyHtml(mod.caseStudy)}
+      <div class="case-study-list ${platform === 'ios' ? 'deepdive-ios' : ''}">
+        ${formatCaseStudyHtml(mod.caseStudy, platform)}
       </div>
     `;
 
@@ -733,7 +733,54 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
   }).join('');
 }
 
-function formatCaseStudyHtml(rawText: string): string {
+function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'android'): string {
+  if (!rawText) return '';
+
+  const hasH3 = rawText.includes('### ');
+  if (!hasH3) {
+    return `
+      <div class="case-study-panel ${platform === 'ios' ? 'deepdive-ios' : ''}">
+        <div class="case-study-panel-body">
+          ${formatCaseStudyBody(rawText)}
+        </div>
+      </div>
+    `;
+  }
+
+  const sections = rawText.split(/(?=###\s+)/g).map((s) => s.trim()).filter(Boolean);
+
+  return sections.map((sec, idx) => {
+    const lines = sec.split('\n');
+    const firstLine = lines[0].trim();
+    let title = '';
+    let bodyText = '';
+
+    if (firstLine.startsWith('### ')) {
+      title = firstLine.replace(/^###\s+/, '').trim();
+      bodyText = lines.slice(1).join('\n').trim();
+    } else {
+      bodyText = sec;
+    }
+
+    const badgeNumber = String(idx + 1).padStart(2, '0');
+
+    return `
+      <div class="case-study-panel ${platform === 'ios' ? 'deepdive-ios' : ''}">
+        ${title ? `
+          <div class="case-study-panel-header">
+            <span class="case-study-panel-badge">${badgeNumber}</span>
+            <h3 class="case-study-panel-title">${formatInlineText(title)}</h3>
+          </div>
+        ` : ''}
+        <div class="case-study-panel-body">
+          ${formatCaseStudyBody(bodyText)}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function formatCaseStudyBody(rawText: string): string {
   if (!rawText) return '';
 
   const lines = rawText.split('\n');
@@ -804,10 +851,7 @@ function formatCaseStudyHtml(rawText: string): string {
     if (!trimmed) continue;
 
     // Headings & formatting
-    if (trimmed.startsWith('### ')) {
-      // Top heading
-      html += `<div class="case-study-intro-banner"><h3 class="case-study-banner-title">${formatInlineText(trimmed.replace(/^###\s+/, ''))}</h3></div>`;
-    } else if (trimmed.startsWith('#### ')) {
+    if (trimmed.startsWith('#### ')) {
       html += `<h4 class="case-study-h4">${formatInlineText(trimmed.replace(/^####\s+/, ''))}</h4>`;
     } else if (trimmed.startsWith('##### ')) {
       html += `<h5 class="case-study-h5">${formatInlineText(trimmed.replace(/^#####\s+/, ''))}</h5>`;
