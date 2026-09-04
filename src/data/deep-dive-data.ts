@@ -1330,6 +1330,12 @@ fun NativeVideoPlayer(
   2. **系统级转交（onRetainNonConfigurationInstance）**：在 Activity 销毁前，AMS 通知主线程执行清理，系统触发 \`onRetainNonConfigurationInstance()\`，将当前的 \`ViewModelStore\` 暂存到宿主 \`ActivityClientRecord\` 中（应用进程未死，\`ActivityClientRecord\` 在内存中保持常驻）；
   3. **重建零拷贝取回（getLastNonConfigurationInstance）**：新 Activity 实例在 \`onCreate()\` 时，直接通过 \`getLastNonConfigurationInstance()\` 取回旧的 \`ViewModelStore\`，使内部的 ViewModel 实例及 \`viewModelScope\` 协程执行栈完好如初；
   4. **终结清理边界**：只有在用户主动按返回键退出、调用 \`finish()\` 使 \`isFinishing == true\` 时，系统才会调用 \`viewModelStore.clear()\`，触发各个 ViewModel 的 \`onCleared()\` 并取消所有内部协程任务。
+- **现代 Compose 导航树状生命周期（Navigation / NavBackStackEntry）**：
+  - **核心机制**：在单 Activity 多 Compose 页面架构下，ViewModel 的根基**最终依然由宿主 Activity 的根 \`ViewModelStore\`（ActivityClientRecord）托底抗旋转**，但中间通过 \`NavControllerViewModel\` 演化出了精细的树状代理分级体系：
+  1. **层级托底（ActivityThread ➔ Activity ViewModelStore）**：宿主 Activity 在其根 Store 中常驻系统级 \`NavControllerViewModel\`，确保屏幕旋转时整棵导航回退栈与所有页面状态毫发无损；
+  2. **局部作用域代理（NavBackStackEntry）**：每个页面目的地压入回退栈时分配一个 \`NavBackStackEntry\`（自身也是 \`ViewModelStoreOwner\`），页面内 \`viewModel()\` 默认绑定当前 Entry 的局部 Store；
+  3. **出栈即毁（Pop 触发 onCleared）**：用户点击返回或页面出栈（Pop）瞬间，框架立即调用该 Entry 的 \`viewModelStore.clear()\`，触发 \`onCleared()\` 并取消协程，杜绝单 Activity 容器下内存泄漏；
+  4. **跨页面子图共享（NavGraph Scope）**：通过 \`navController.getBackStackEntry("flow_route")\`，可将 ViewModel 绑定在嵌套导航图上，实现多步流程（如认证、结账）间无感共享状态。
 
 ### 二、系统进程被杀恢复机制（SavedStateHandle 与持久化快照）
 
