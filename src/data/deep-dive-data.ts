@@ -1546,45 +1546,36 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
 \`\`\``,
       },
       {
-        tag: '数据底座',
-        title: '数据层：网络通信与 Room 关系/事务/迁移实战协同',
-        explanation: `### 一、网络通信管线：OkHttp 连接池与责任链拦截器
+        tag: '网络通信',
+        title: '网络层：OkHttp 核心原理与通信管线',
+        explanation: `### 一、Dispatcher 分发器与高并发队列调度机制
 
-- **Socket 复用（ConnectionPool）**：
-  1. TCP 三次握手与 TLS 握手开销极大（100~300ms）。OkHttp 维护一个连接池（默认最多保持 5 个空闲 Socket，存活 5 分钟），多路复用 HTTP/2 连接，后续请求直接复用已建连的物理通道；
-  2. 后台守护线程池定时清理过期与超额空闲 Socket，平衡内存占用与高并发吞吐。
-- **责任链模式（RealInterceptorChain）**：
-  - 核心思想：每个拦截器只需关注自身切面逻辑，调用 \`chain.proceed(request)\` 将请求交给下一棒，并对拿到的响应执行后置加工；
-  - 拦截器顺序：重试重定向（RetryAndFollowUp）➔ 注入公共标头（Bridge）➔ 本地缓存策略（Cache）➔ 寻址与复用 Socket（Connect）➔ 写入网络字节帧（CallServer）。
+- **高并发阀门痛点**：大量网络请求无序并发会迅速耗尽客户端 Socket 资源与文件描述符，或者瞬时打满服务端带宽。OkHttp 通过 \`Dispatcher\` 统筹调度，保障高吞吐与有序背压。
+- **调度核心原理（双队列与动态提升）**：
+  1. **并发阈值配置**：默认 \`maxRequests = 64\`（客户端最大并发总数）、\`maxRequestsPerHost = 5\`（单个 Host 最大并发数，防止单域名垄断网络带宽）；
+  2. **三大双向队列（Deque）**：
+     - \`readyAsyncCalls\`：就绪等待队列（缓冲就餐区）；
+     - \`runningAsyncCalls\`：正在执行的异步请求队列；
+     - \`runningSyncCalls\`：同步阻塞式请求队列；
+  3. **任务提升触发（promoteAndExecute）**：新异步任务入队时，或任意请求完成回调 \`finished()\` 释放并发配额时，分发器自动从 \`readyAsyncCalls\` 头部筛选符合条件的 Call 移入 \`runningAsyncCalls\`，并提交给内置的 \`ExecutorService\`（零核心线程、无界缓冲的 CachedThreadPool）并发执行。
 
-### 二、数据库安全升级与迁移（Migrations）
+### 二、ConnectionPool 连接池与 Socket 多路复用机制
 
-- **手动迁移（Manual Migration）**：
-  - 当数据库结构变动（增加表、修改列）时，递增 \`version\` 并编写 \`Migration(startVersion, endVersion)\`；
-  - 执行精细 SQL：\`ALTER TABLE users ADD COLUMN age INTEGER NOT NULL DEFAULT 0\`；
-  - **复杂表重构三步法**：SQLite 无法直接删除或重命名旧列时，必须“① 创建新临时表 ➔ ② 将旧表数据复制到新表 ➔ ③ 删除旧表并重命名新表”。
-- **自动迁移（AutoMigration）**：
-  - Room 2.4+ 支持通过注解声明 \`@AutoMigration(from = 1, to = 2)\`，编译器自动比对 Schema JSON 差量；
-  - 重命名列或删除列存在歧义时，需配合 \`@RenameColumn\` / \`@DeleteColumn\` 提供辅助迁移声明规范。
-- **避坑红线**：严禁在线上版本配置 \`fallbackToDestructiveMigration()\`，否则升级失败时会瞬间抹除用户所有本地离线数据！
+- **建连开销痛点**：TCP 三次握手与 TLS 密钥协商物理延迟极大（通常耗时 100~300ms）。频繁新建与销毁 Socket 会严重损耗网络性能与电量。
+- **连接池复用与防泄漏原理**：
+  1. **连接池复用策略**：默认最多保持 5 个空闲物理连接，空闲存活时长为 5 分钟。在 HTTP/2 协议下，相同 Host:Port 的所有请求自动共享同一个已握手的物理 TCP 管道（多路复用 Multiplexing）；
+  2. **后台守护清理线程（cleanupRunnable）**：采用类似垃圾回收的弱引用计数算法（\`List<Reference<RealCall>>\`）；遍历发现某个连接的引用计数为 0 且空闲时间超标，后台线程自动触发 \`socket.closeQuietly()\` 关闭物理通道并移出连接池；
+  3. **防泄漏机制**：若业务层消费完数据未显式调用 \`response.close()\` 或 \`response.body.close()\`，OkHttp 内部会在下一次清理周期通过未回收的弱引用感知到泄漏，强行关闭并回收底层 Socket。
 
-### 三、复杂关系模型映射（Relations）
+### 三、责任链拦截器管线（RealInterceptorChain）执行全流程
 
-- **一对多关系（One-to-Many）**：
-  - 场景：一个用户（User）拥有多个订单（Order）；
-  - 方案：通过 \`@Embedded\` 嵌套主表 Entity，并在子表字段上标注 \`@Relation(parentColumn = "userId", entityColumn = "ownerId")\`；
-  - 价值：Room 自动执行分步查询并拼装为嵌套对象，彻底告别手动拼接 SQL 与实体映射。
-- **多对多关系（Many-to-Many）**：
-  - 场景：学生（Student）与课程（Course）相互多对多关联；
-  - 方案：引入中间交叉关联表（Junction Table），在数据类中配置 \`@Relation(associateBy = Junction(StudentCourseCrossRef::class))\`。
-
-### 四、事务控制与原子回滚（Transactions）
-
-- **DAO 声明式事务（@Transaction）**：
-  - 在 DAO 方法上标注 \`@Transaction\`，确保该方法内的多次数据库读写（如查询主表 + 批量查询子表，或清空旧表 + 插入新表）在单一 SQLite 事务内原子执行，杜绝数据半写入。
-- **Repository 编程式挂起事务（withTransaction）**：
-  - 跨多个 DAO 或结合网络业务编排时，在协程中调用 \`roomDatabase.withTransaction { ... }\`；
-  - 块内任何步骤抛出异常，整个事务全量自动回滚，保障本地数据绝对强一致。`,
+- **切面解耦思想**：通过责任链模式将重试、重定向、公共标头、协议协商、缓存与物理 I/O 拆分为独立的拦截器切面，每个拦截器只需调用 \`chain.proceed(request)\` 驱动下一棒，并对拿到的响应执行后置加工。
+- **五大内置核心拦截器协同顺序**：
+  1. \`RetryAndFollowUpInterceptor\`：负责在网络超时、连接断开时自动重试，并解析 3xx 重定向与 407 代理鉴权；
+  2. \`BridgeInterceptor\`：将应用层高阶模型转换为标准 HTTP 帧，自动补充 \`Host\`、\`Keep-Alive\`、\`User-Agent\` 与 Cookie，透明处理 \`gzip\` 压缩与解压缩；
+  3. \`CacheInterceptor\`：严格遵循 RFC 7234 HTTP 缓存规范，根据 Cache-Control 决定是直接返回本地磁盘缓存还是发起网络请求，命中 304 时智能合并响应头；
+  4. \`ConnectInterceptor\`：核心寻址与物理连接建立，从 \`ConnectionPool\` 捞取空闲连接或握手新建 \`RealConnection\`，并创建网络通信编解码器 \`HttpCodec\`；
+  5. \`CallServerInterceptor\`：终点拦截器，真正向物理网络 I/O 字节流写入 Request 报文（请求行、头、体），并读取远程服务端的 Response 字节流（状态行、头、体）。`,
         caseStudy: `### 一、OkHttp Token 无感自动刷新拦截器实战
 
 - **场景解释**：API 采用双 Token 机制（短期 AccessToken + 长期 RefreshToken）。当多个并发网络请求同时遇到 401 Unauthorized 时，必须确保**只发起一次 RefreshToken 换票请求**，换到新 Token 后唤醒所有等待的请求重新发起，避免并发换票死锁或重复失效。
@@ -1637,69 +1628,182 @@ class TokenAuthenticator(
 }
 \`\`\`
 
-### 二、Room 一对多 / 多对多嵌套关联与事务写入实战
+### 二、全链路网络耗时监控与防篡改签名拦截器实战
 
-- **场景解释**：电商业务中，一个订单详情包含：订单基本信息（一对一）、买家信息（一对一）、关联商品列表（多对多），要求一次性查询并组装为完整的领域对象。
+- **场景解释**：金融级接口要求防重放攻击与防数据篡改，自动为请求体按字典序拼接私钥生成 HMAC-SHA256 签名；同时借助 \`EventListener\` 精确采集 DNS 解析、TCP 建连、TLS 握手及首包到达（TTFB）耗时。
 
 \`\`\`kotlin
-// 1. 实体定义
+// 1. 防篡改与加签拦截器（Application Interceptor）
+class SignatureInterceptor(private val secretKey: String) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val original = chain.request()
+        val timestamp = System.currentTimeMillis().toString()
+        val nonce = UUID.randomUUID().toString()
+
+        // 按字典序拼接 query 与 timestamp 计算签名
+        val signature = computeHmacSha256(
+            payload = "\${original.url.encodedPath}?time=\$timestamp&nonce=\$nonce",
+            key = secretKey
+        )
+
+        val signedRequest = original.newBuilder()
+            .header("X-Timestamp", timestamp)
+            .header("X-Nonce", nonce)
+            .header("X-Signature", signature)
+            .build()
+
+        return chain.proceed(signedRequest)
+    }
+}
+
+// 2. 全链路耗时打点 EventListener
+class MetricEventListener : EventListener() {
+    private var dnsStartTime = 0L
+    private var connectStartTime = 0L
+
+    override fun dnsStart(call: Call, domainName: String) { dnsStartTime = System.currentTimeMillis() }
+    override fun dnsEnd(call: Call, domainName: String, inetAddressList: List<InetAddress>) {
+        Log.d("OkHttpMetric", "DNS 解析耗时: \${System.currentTimeMillis() - dnsStartTime} ms")
+    }
+
+    override fun connectStart(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy) {
+        connectStartTime = System.currentTimeMillis()
+    }
+    override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
+        Log.d("OkHttpMetric", "TCP 建连耗时: \${System.currentTimeMillis() - connectStartTime} ms")
+    }
+}
+\`\`\``,
+      },
+      {
+        tag: '本地存储',
+        title: '持久层：Room 数据库实战（迁移、关系与事务）',
+        caseStudy: `### 一、数据库安全升级与跨版本平滑迁移实战（AutoMigration 与复杂表三步法）
+
+- **解决痛点与实战规范**：应用版本迭代时，本地 SQLite 表结构变更（新增字段、重命名列）极易引发用户端崩盘。严禁在线上开启 \`fallbackToDestructiveMigration()\`，必须严格遵循可追溯的迁移规范。
+- **两大迁移姿势**：
+  1. **自动迁移（@AutoMigration）**：Room 2.4+ 支持通过注解声明差量迁移，遇到重命名或删除列歧义时，配置 \`@RenameColumn\` / \`@DeleteColumn\` 进行显式说明；
+  2. **手动复杂表迁移三步法**：SQLite 不支持直接 DROP COLUMN，涉及旧列删除或重构时，遵循“① 创建新临时表 ➔ ② 将旧表数据复制到新表 ➔ ③ DROP 旧表并重命名新表”。
+
+\`\`\`kotlin
+// 1. 数据库升级声明：同时支持 AutoMigration 与手动 Migration
+@Database(
+    entities = [UserEntity::class],
+    version = 3,
+    autoMigrations = [
+        AutoMigration(from = 1, to = 2, spec = AppDatabase.Migration1To2Spec::class)
+    ]
+)
+abstract class AppDatabase : RoomDatabase() {
+    @RenameColumn(tableName = "users", fromColumnName = "fullName", toColumnName = "displayName")
+    class Migration1To2Spec : AutoMigrationSpec
+
+    companion object {
+        // ⚡ 2. 复杂表重构三步法：删除旧列（版本 2 ➔ 3）
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 第一步：创建包含新字段的全新临时表
+                db.execSQL("CREATE TABLE users_temp (id TEXT PRIMARY KEY NOT NULL, displayName TEXT NOT NULL, age INTEGER NOT NULL DEFAULT 0)")
+                // 第二步：将需要保留的旧表数据复制进临时表
+                db.execSQL("INSERT INTO users_temp (id, displayName) SELECT id, displayName FROM users")
+                // 第三步：删除旧表并将临时表更名为正式表
+                db.execSQL("DROP TABLE users")
+                db.execSQL("ALTER TABLE users_temp RENAME TO users")
+            }
+        }
+    }
+}
+\`\`\`
+
+### 二、一对多与多对多关系模型实战（@Embedded、@Relation 与交叉表 Junction）
+
+- **解决痛点与实战规范**：打破传统手动手写多表联查 SQL 并繁琐映射实体的旧模式。利用 Room 声明式关系注解，自动分步查库并装配出完整的领域对象树。
+- **两种高频关系模型**：
+  1. **一对多关系（One-to-Many）**：用户与名下多个订单；使用 \`@Embedded\` 嵌套主表，配合 \`@Relation(parentColumn = "userId", entityColumn = "ownerId")\`；
+  2. **多对多关系（Many-to-Many）**：订单与多种商品；引入中间交叉表（Junction Table），声明复合主键并通过 \`associateBy = Junction(...)\` 进行多对多关联。
+
+\`\`\`kotlin
+// 1. 实体与多对多中间交叉表定义
 @Entity(tableName = "orders")
 data class OrderEntity(@PrimaryKey val orderId: String, val createTime: Long)
 
 @Entity(tableName = "products")
 data class ProductEntity(@PrimaryKey val productId: String, val title: String, val price: Long)
 
-// 中间交叉表：声明订单与多商品的多对多关联
 @Entity(tableName = "order_product_cross_ref", primaryKeys = ["orderId", "productId"])
 data class OrderProductCrossRef(val orderId: String, val productId: String)
 
-// 2. 嵌套数据关系模型
+// 2. 嵌套数据关系模型（声明式关联）
 data class OrderWithProducts(
     @Embedded val order: OrderEntity,
     @Relation(
         parentColumn = "orderId",
         entityColumn = "productId",
-        associateBy = Junction(OrderProductCrossRef::class) // ⚡ 声明多对多交叉表关联
+        associateBy = Junction(OrderProductCrossRef::class) // ⚡ 声明通过交叉表进行多对多映射
     )
     val products: List<ProductEntity>
 )
 
-// 3. DAO 声明式事务操作
+// 3. DAO 声明式关联查询
 @Dao
 interface OrderDao {
-    // 自动在单一事务中分步查询并组装出完整图谱
     @Transaction
     @Query("SELECT * FROM orders WHERE orderId = :orderId")
     fun getOrderWithProducts(orderId: String): Flow<OrderWithProducts>
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertOrder(order: OrderEntity)
-
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertProducts(products: List<ProductEntity>)
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCrossRefs(refs: List<OrderProductCrossRef>)
 }
 \`\`\`
 
-### 三、离线优先 Repository 协同流水线
+### 三、事务控制与原子回滚实战（@Transaction 声明式与 withTransaction 编程式）
 
-- **场景解释**：现代工业级应用核心原则——“页面优先展示本地缓存（秒开），后台静默发起网络拉取，利用 \`withTransaction\` 批量更新数据库，自动触发上层 Flow 刷新”，构建不可破败的单一可信数据源（SOT）。
+- **解决痛点与实战规范**：在多表批量读写、或者“先清空旧数据后插入新数据”场景下，必须保证原子性（Atomicity）。中间任何一步失败，全量数据自动回滚，杜绝脏数据。
+- **两种事务控制手段**：
+  1. **DAO 声明式（@Transaction）**：适用于 DAO 方法内部的多步查询或复合写入；
+  2. **Repository 编程式挂起事务（roomDb.withTransaction）**：适用于跨多个 DAO、或结合协程异步编排的复杂业务事务。
+
+\`\`\`kotlin
+@Dao
+interface ProductDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProducts(items: List<ProductEntity>)
+
+    @Query("DELETE FROM products WHERE category = :category")
+    suspend fun clearCategory(category: String)
+
+    // ⚡ 1. 声明式事务：确保清空旧分类与插入新列表在单个 SQLite 事务中完成
+    @Transaction
+    suspend fun replaceCategory(category: String, newItems: List<ProductEntity>) {
+        clearCategory(category)
+        insertProducts(newItems)
+    }
+}
+
+// ⚡ 2. 编程式挂起事务：跨多 DAO 协同事务
+class InventoryRepository(private val db: AppDatabase) {
+    suspend fun updateStockAndOrder(order: OrderEntity, products: List<ProductEntity>) = db.withTransaction {
+        db.orderDao().insertOrder(order)
+        db.productDao().insertProducts(products)
+        // 块内任何一步抛出异常，整个操作自动全量原子回滚！
+    }
+}
+\`\`\`
+
+### 四、离线优先单一事实源（SOT）架构协同流水线
+
+- **解决痛点与实战规范**：现代移动端极致体验原则——“UI 永远只观察本地数据库（秒开且无网络时可读），后台静默发起网络拉取，利用事务写入数据库，自动触发上层 Flow 刷新”，构建不可破败的单一可信数据源（SOT）。
 
 \`\`\`kotlin
 class FeedRepository(
     private val db: AppDatabase,
     private val api: FeedApiService
 ) {
-    // ⚡ 单一事实源：向 UI 暴露本地数据库 Flow，上层永远只认本地数据库
+    // ⚡ 1. 单一事实源：向 UI 暴露本地数据库 Flow，上层完全与网络请求解耦
     fun getFeedStream(): Flow<List<FeedItem>> = db.feedDao().observeFeeds()
 
-    // 后台静默刷新：网络数据原子写入数据库，自动触发上方的 Flow 刷新！
+    // ⚡ 2. 后台静默刷新：网络数据原子写入数据库，自动触发上方的 Flow 刷新！
     suspend fun refreshFeed(): Result<Unit> = runCatching {
         val remoteData = api.fetchLatestFeeds()
 
-        // ⚡ 编程式挂起事务：多表原子清空与替换，失败自动全量回滚
+        // 编程式挂起事务：多表原子清空与替换，失败自动全量回滚
         db.withTransaction {
             db.feedDao().clearAll()
             db.feedDao().insertAll(remoteData.map { it.toEntity() })
