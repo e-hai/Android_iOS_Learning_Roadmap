@@ -1195,7 +1195,7 @@ fun ZoomableBox() {
 
 ### 八、自定义组件：Canvas 免重组重绘与 Layout 测量管线
 
-- **场景解释**：传统自定义 View 需重写 \`onMeasure\` / \`onLayout\` / \`onDraw\`。在 Compose 中，轻量图形绘制使用 \`Canvas\` / \`drawBehind\`；复杂的规则排版（如 **iScreen / Colorful Widget 的 DIY 拼图壁纸**）使用自定义 \`Layout\`。
+- **场景解释**：传统自定义 View 需重写 \`onMeasure\` / \`onLayout\` / \`onDraw\`。在 Compose 中，轻量图形绘制使用 \`Canvas\` / \`drawBehind\`；复杂的规则排版使用自定义 \`Layout\`。
 - **免重组重绘（60/120fps 性能神技）**：在 \`Canvas\` 或 \`graphicsLayer\` 内部直接读取手势状态时，Compose **只会触发 Draw（重绘）阶段，完全跳过 Recomposition（重组）与 Layout（测量布局）阶段**，实现极致丝滑的高频动画！
 
 \`\`\`kotlin
