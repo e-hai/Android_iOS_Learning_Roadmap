@@ -1322,37 +1322,24 @@ fun NativeVideoPlayer(
       {
         tag: '表现逻辑',
         title: '逻辑层：ViewModel 机制与状态基座',
-        explanation: `### 一、ViewModel 跨配置存活源码机制
+        explanation: `### 一、跨配置变更存活机制（NonConfigurationInstances 与 ViewModelStore）
 
-- **配置变更痛点**：横竖屏旋转、深色模式切换或系统语言改变时，Activity 会经历完整的 \`onDestroy\` ➔ \`onCreate\` 销毁重建。普通局部变量或异步任务若绑定在 Activity 上会全部丢失或泄漏。
-- **存活底层原理**：
-  1. \`ViewModelStoreOwner\`：Activity / Fragment 实现了此接口，管理着一个 \`ViewModelStore\`（本质是 \`HashMap<String, ViewModel>\`）；
-  2. \`NonConfigurationInstances\`：在 Activity 销毁前，系统回调 \`onRetainNonConfigurationInstance()\`，将当前的 \`ViewModelStore\` 实例托管给底层的 \`ActivityClientRecord\`（由 AMS 和 ActivityThread 强持有，不受配置变更重建影响）；
-  3. 重建恢复：新 Activity 启动在 \`onCreate()\` 中，通过 \`getLastNonConfigurationInstance()\` 直接将旧的 \`ViewModelStore\` 原封不动取回，所有 ViewModel 实例及其内存状态完好如初。
+- **配置变更痛点**：横竖屏旋转、深色模式切换或系统语言改变时，Activity 会经历完整的 \`onDestroy\` ➔ \`onCreate\` 销毁重建。普通成员变量或异步任务若绑定在 Activity 上会全部丢失或造成内存泄漏。
+- **存活底层原理（AMS ➔ ActivityThread ➔ ViewModelStore）**：
+  1. **所有权解耦（ViewModelStoreOwner）**：Activity 并不直接存储 ViewModel 实例，而是实现 \`ViewModelStoreOwner\` 接口管理一个 \`ViewModelStore\`（内部封装为 \`HashMap<String, ViewModel>\`）；
+  2. **系统级转交（onRetainNonConfigurationInstance）**：在 Activity 销毁前，AMS 通知主线程执行清理，系统触发 \`onRetainNonConfigurationInstance()\`，将当前的 \`ViewModelStore\` 暂存到宿主 \`ActivityClientRecord\` 中（进程未死，\`ActivityClientRecord\` 在内存中保持常驻）；
+  3. **重建无缝取回（getLastNonConfigurationInstance）**：新 Activity 实例在 \`onCreate()\` 时，直接通过 \`getLastNonConfigurationInstance()\` 取回旧的 \`ViewModelStore\`，使内部的 ViewModel 实例及 \`viewModelScope\` 协程执行栈完好如初；
+  4. **终结清理边界**：只有在用户主动按返回键退出、调用 \`finish()\` 使 \`isFinishing == true\` 时，系统才会调用 \`viewModelStore.clear()\`，触发 ViewModel 的 \`onCleared()\` 并取消所有内部协程任务。
 
-### 二、进程死亡恢复机制（SavedStateHandle）
+### 二、系统进程被杀恢复机制（SavedStateHandle 与持久化快照）
 
-- **被杀与旋转的本质区别**：
-  - 横竖屏旋转属于**配置变更**，进程未死，内存还在；
-  - 用户按 Home 切后台，当系统内存紧张时，**整个应用进程会被操作系统彻底杀死（Low Memory Kill）**！此时 \`NonConfigurationInstances\` 在内存中灰飞烟灭，重新打开 App 时 ViewModel 必然重新初始化！
-- **SavedStateHandle 原理**：
-  - 依托系统底层的 \`onSaveInstanceState(Bundle)\` 机制；
-  - ViewModel 通过构造函数注入 \`SavedStateHandle\`，在进程被杀前将关键状态序列化进系统的持久化 Bundle；
-  - 进程重启冷启动时，框架自动将 Bundle 状态反序列化注入回新生成的 ViewModel 中，配合 \`getStateFlow()\` 实现全自动热恢复。
-
-### 三、状态冷热订阅与防抖：WhileSubscribed(5000)
-
-- **黄金 5 秒规则**：在 ViewModel 中将冷流转换为给 UI 订阅的 \`StateFlow\` 时，推荐使用：
-  \`flow.stateIn(scope, SharingStarted.WhileSubscribed(5_000), initialValue)\`
-- **为什么必须是 5000 毫秒？**
-  1. **配置变更保护**：横竖屏旋转时，旧 Activity 销毁（取消订阅）到新 Activity 重建（重新订阅）通常耗时数十毫秒。5000ms 缓冲期内上游流**不停止收集**，避免了旋转瞬间重复打网络请求；
-  2. **切后台节能**：用户按 Home 键切后台超过 5 秒后，订阅计数清零，上游网络/定位流自动停止，为手机省电省流量；
-  3. **重新切回前台**：UI 再次可见重新订阅，瞬间唤醒上游流继续发射数据。
-
-### 四、业务下沉 UseCase（避免上帝类）
-
-- **单一职责原则**：ViewModel 只负责“UI 状态持有”与“交互事件接收”，严禁在 ViewModel 里编写复杂业务算法、权限校验或多仓库数据编排。
-- **UseCase 契约**：每个 UseCase 只做一件事（通常重载 \`operator fun invoke(...)\` 作为纯函数调用），方便跨 ViewModel 复用，且可脱离 Android 运行时极速进行纯 JVM 单元测试。`,
+- **被杀与旋转的本质鸿沟**：
+  - **横竖屏旋转属于配置变更**：应用进程仍在，堆内存数据毫发无损；
+  - **切后台被杀属于进程死亡**：当用户切后台玩游戏或待机导致系统内存紧张时，操作系统触发 **LMK（Low Memory Killer）直接杀死整个 App 进程**！此时堆内存中的 \`NonConfigurationInstances\` 灰飞烟灭，重新打开 App 必走冷启动，普通 ViewModel 必然被完全重新初始化。
+- **SavedStateHandle 恢复链路**：
+  1. **跨进程系统托管**：依托系统底层的 \`onSaveInstanceState(Bundle)\` 机制，在进程被杀前将关键状态持久化到系统级进程守护的 Bundle 快照中；
+  2. **双向状态注册表**：ViewModel 通过构造函数注入 \`SavedStateHandle\`，它内部通过 \`SavedStateRegistry\` 将内存 Map 与系统的 Bundle 进行双向绑定；
+  3. **冷启动自动回填**：进程被杀重启时，\`SavedStateViewModelFactory\` 自动从系统还原的 Bundle 提取状态并注入新生成的 ViewModel 中，配合 \`getStateFlow()\` 实现全自动无感热恢复。`,
         caseStudy: `### 一、SavedStateHandle 复杂对象持久化与进程被杀热恢复
 
 - **场景解释**：电商搜索页中，用户输入了关键词并勾选了复杂的筛选器。当用户切去微信聊天导致 App 被系统后台杀死后，重新返回时必须无感恢复原有的搜索状态，绝不能白屏回滚。
