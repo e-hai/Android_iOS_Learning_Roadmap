@@ -1423,6 +1423,126 @@ class CheckoutViewModel(
         }
     }
 }
+\`\`\`
+
+### 三、复杂长流程协同架构：管线编排、多列表并发与双轨 SSOT
+
+- **场景痛点**：跨越“手势点击 ➔ 隐私弹窗 ➔ 系统相册 ➔ 广告 ➔ 上传推理 ➔ 结果展示”的长链路流程；页面内发型（有广告）与美妆（免广告且顺序可颠倒）等多横向列表并存；后台点赞等数据库写入会导致全量数据推送，粗暴覆盖极易冲刷掉正在转圈的 loading 状态。
+- **三大核心架构解法**：
+  1. **管线配方架构（Pipeline Recipe）**：将各动作抽象为原子卡片（\`Privacy\`、\`PickPhoto\`、\`Ad\`、\`Upload\`），具体业务以步骤列表组装配方。ViewModel 仅通用推进 \`currentIndex + 1\`，彻底消除 \`if-else\` 迷宫；
+  2. **列表项上下文绑定（Context-binding）**：管线强绑定 \`targetItemId\`；进入耗时上传时立即解除全屏模态（\`activePipeline = null\`），仅目标 Item“就地转圈”，用户可继续自由滑动列表；
+  3. **单一可信源（SSOT）双轨流合并**：通过 \`combine(dao.observeAll(), _generatingKeys, _activePipeline)\` 将数据库持久数据与内存任务流实时编织，点赞刷新永不丢状态；生成完毕直接回写数据库形成持久化闭环。
+
+\`\`\`kotlin
+// 1. 原子步骤与配方定义
+sealed interface PipelineStep {
+    data object Privacy : PipelineStep
+    data object PickPhoto : PipelineStep
+    data class Ad(val adUnitId: String) : PipelineStep
+    data object UploadAndGenerate : PipelineStep
+}
+
+data class ActivePipeline(val steps: List<PipelineStep>, val currentIndex: Int = 0, val targetItemId: String)
+
+// 2. ViewModel 双轨合并驱动（Room 只读持久流 + 内存正在生成 ID 集合）
+class MasterPipelineViewModel(
+    private val templateDao: TemplateDao,
+    private val repository: ImageRecognitionRepository
+) : ViewModel() {
+    private val _generatingKeys = MutableStateFlow<Set<String>>(emptySet())
+    private val _activePipeline = MutableStateFlow<ActivePipeline?>(null)
+
+    // 🌟 核心：combine 动态编织持久数据与内存状态，杜绝点赞刷新冲刷掉 loading！
+    val uiState: StateFlow<TemplateListUiState> = combine(
+        templateDao.observeAll(),
+        _generatingKeys,
+        _activePipeline
+    ) { dbList, genKeys, pipeline ->
+        TemplateListUiState(
+            items = dbList.map { entity ->
+                entity.toUiModel(isGenerating = entity.id in genKeys)
+            },
+            activePipeline = pipeline
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TemplateListUiState())
+
+    fun onStepCompleted() {
+        val pipeline = _activePipeline.value ?: return
+        val nextIdx = pipeline.currentIndex + 1
+        if (nextIdx < pipeline.steps.size) {
+            _activePipeline.value = pipeline.copy(currentIndex = nextIdx)
+            if (pipeline.steps[nextIdx] is PipelineStep.UploadAndGenerate) {
+                executeUpload(pipeline.targetItemId)
+            }
+        } else {
+            _activePipeline.value = null
+        }
+    }
+
+    private fun executeUpload(targetId: String) {
+        _activePipeline.value = null // 全屏模态解除，用户可继续滑动
+        _generatingKeys.update { it + targetId } // 目标项就地转圈
+
+        viewModelScope.launch {
+            repository.uploadAndGenerate(targetId)
+                .onSuccess { resultUrl ->
+                    templateDao.updateResult(targetId, resultUrl) // ⚡ 写回数据库形成闭环
+                    _generatingKeys.update { it - targetId }
+                }
+                .onFailure { _generatingKeys.update { it - targetId } }
+        }
+    }
+}
+\`\`\`
+
+### 四、生命周期与健壮性防线：屏幕旋转防抖与广告假死防御
+
+- **场景痛点**：屏幕旋转导致 Activity 销毁重建，新 Compose 树初次挂载容易导致 \`LaunchedEffect\` 二次调起相册或重复播放广告；第三方广告 SDK 偶发黑屏假死或吞掉关闭回调，导致用户被永久死锁在全屏遮罩中。
+- **两大防御法则与护城河**：
+  1. **“渲染归 State，动作归 Callback”法则**：
+     - 弹窗、进度条是 UI 呈现，由 \`State\` 驱动（旋转重建后自适应还原，弹窗不丢）；
+     - 拉相册、调支付等外部不可逆动作，**直接在用户点击回调（onClick）中调起**（物理上杜绝旋转自动触发）；
+     - 依赖异步凭证的动作（如预下单后唤起支付），由 ViewModel 准备好后通过 **\`Channel<Effect>\`** 发送（消费即焚，旋转不重放）；
+  2. **广告假死与吞回调的 4 道防御护城河**：
+     - **预检放行**：展示前 \`adManager.isReady\` 预检，未就绪直接免广告放行；
+     - **UI 逃生通道**：全屏遮罩 5 秒后延迟浮现“跳过”逃生按钮；
+     - **宿主生命周期回流（onResume 兜底）**：用户从广告界面返回主页面 500ms 后，若状态仍处于广告中，强制兜底放行；
+     - **协程超时熔断**：\`withTimeoutOrNull(40_000L)\` 强制设立超时死线，绝不允许广告阻断核心业务链路。
+
+\`\`\`kotlin
+// 1. 宿主生命周期回流（onResume 兜底防吞回调）
+@Composable
+fun AdLifecycleGuard(isAdShowing: Boolean, onForceDismiss: () -> Unit) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, isAdShowing) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && isAdShowing) {
+                // 回到前台 500ms 后若广告状态仍未解除，判定为 SDK 吞回调，自动强制放行！
+                CoroutineScope(Dispatchers.Main).launch {
+                    delay(500)
+                    onForceDismiss()
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+}
+
+// 2. 协程超时熔断：无论 SDK 内部如何假死，40 秒后保底进入下一步
+suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
+    return withTimeoutOrNull(40_000L) {
+        suspendCancellableCoroutine { cont ->
+            adManager.showAd(
+                onCompleted = { cont.resume(true) },
+                onFailed = { cont.resume(false) }
+            )
+        }
+    } ?: run {
+        Log.e("AdGuard", "广告超时假死，触发熔断兜底放行")
+        false
+    }
+}
 \`\`\``,
       },
       {
