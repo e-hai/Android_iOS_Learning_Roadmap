@@ -1324,22 +1324,30 @@ fun NativeVideoPlayer(
         title: '逻辑层：ViewModel 机制与状态基座',
         explanation: `### 一、跨配置变更存活机制（NonConfigurationInstances 与 ViewModelStore）
 
-- **配置变更痛点**：横竖屏旋转、深色模式切换或系统语言改变时，Activity 会经历完整的 \`onDestroy\` ➔ \`onCreate\` 销毁重建。普通成员变量或异步任务若绑定在 Activity 上会全部丢失或造成内存泄漏。
-- **存活底层原理（AMS ➔ ActivityThread ➔ ViewModelStore）**：
+- **配置变更痛点**：横竖屏旋转、深色模式切换或系统语言改变时，Activity 会经历完整的 \`onDestroy()\` ➔ \`onCreate()\` 销毁重建。普通成员变量或异步任务若绑定在 Activity 上会全部丢失或造成内存泄漏。
+- **底层存活四步全链路（AMS ➔ ActivityThread ➔ ViewModelStore）**：
   1. **所有权解耦（ViewModelStoreOwner）**：Activity 并不直接存储 ViewModel 实例，而是实现 \`ViewModelStoreOwner\` 接口管理一个 \`ViewModelStore\`（内部封装为 \`HashMap<String, ViewModel>\`）；
-  2. **系统级转交（onRetainNonConfigurationInstance）**：在 Activity 销毁前，AMS 通知主线程执行清理，系统触发 \`onRetainNonConfigurationInstance()\`，将当前的 \`ViewModelStore\` 暂存到宿主 \`ActivityClientRecord\` 中（进程未死，\`ActivityClientRecord\` 在内存中保持常驻）；
-  3. **重建无缝取回（getLastNonConfigurationInstance）**：新 Activity 实例在 \`onCreate()\` 时，直接通过 \`getLastNonConfigurationInstance()\` 取回旧的 \`ViewModelStore\`，使内部的 ViewModel 实例及 \`viewModelScope\` 协程执行栈完好如初；
-  4. **终结清理边界**：只有在用户主动按返回键退出、调用 \`finish()\` 使 \`isFinishing == true\` 时，系统才会调用 \`viewModelStore.clear()\`，触发 ViewModel 的 \`onCleared()\` 并取消所有内部协程任务。
+  2. **系统级转交（onRetainNonConfigurationInstance）**：在 Activity 销毁前，AMS 通知主线程执行清理，系统触发 \`onRetainNonConfigurationInstance()\`，将当前的 \`ViewModelStore\` 暂存到宿主 \`ActivityClientRecord\` 中（应用进程未死，\`ActivityClientRecord\` 在内存中保持常驻）；
+  3. **重建零拷贝取回（getLastNonConfigurationInstance）**：新 Activity 实例在 \`onCreate()\` 时，直接通过 \`getLastNonConfigurationInstance()\` 取回旧的 \`ViewModelStore\`，使内部的 ViewModel 实例及 \`viewModelScope\` 协程执行栈完好如初；
+  4. **终结清理边界**：只有在用户主动按返回键退出、调用 \`finish()\` 使 \`isFinishing == true\` 时，系统才会调用 \`viewModelStore.clear()\`，触发各个 ViewModel 的 \`onCleared()\` 并取消所有内部协程任务。
 
 ### 二、系统进程被杀恢复机制（SavedStateHandle 与持久化快照）
 
 - **被杀与旋转的本质鸿沟**：
   - **横竖屏旋转属于配置变更**：应用进程仍在，堆内存数据毫发无损；
   - **切后台被杀属于进程死亡**：当用户切后台玩游戏或待机导致系统内存紧张时，操作系统触发 **LMK（Low Memory Killer）直接杀死整个 App 进程**！此时堆内存中的 \`NonConfigurationInstances\` 灰飞烟灭，重新打开 App 必走冷启动，普通 ViewModel 必然被完全重新初始化。
-- **SavedStateHandle 恢复链路**：
+- **SavedStateHandle 恢复三步链路**：
   1. **跨进程系统托管**：依托系统底层的 \`onSaveInstanceState(Bundle)\` 机制，在进程被杀前将关键状态持久化到系统级进程守护的 Bundle 快照中；
   2. **双向状态注册表**：ViewModel 通过构造函数注入 \`SavedStateHandle\`，它内部通过 \`SavedStateRegistry\` 将内存 Map 与系统的 Bundle 进行双向绑定；
-  3. **冷启动自动回填**：进程被杀重启时，\`SavedStateViewModelFactory\` 自动从系统还原的 Bundle 提取状态并注入新生成的 ViewModel 中，配合 \`getStateFlow()\` 实现全自动无感热恢复。`,
+  3. **冷启动自动回填**：进程被杀重启时，\`SavedStateViewModelFactory\` 自动从系统还原的 Bundle 提取状态并注入新生成的 ViewModel 中，配合 \`getStateFlow()\` 实现全自动无感热恢复。
+- **两大机制核心差异对比矩阵**：
+
+| 机制维度 | 跨配置变更存活（ViewModelStore） | 进程死亡恢复（SavedStateHandle） |
+| :--- | :--- | :--- |
+| **触发场景** | 屏幕旋转、深色模式、系统语言切换 | 切后台低内存被杀（LMK）、系统强制回收 |
+| **进程与内存状态** | 进程始终存活，堆内存完整保留 | 进程被彻底杀死，JVM 堆内存完全清空 |
+| **数据承载上限** | 内存引用级别（支持大对象、复杂流、未完协程任务） | Bundle 序列化限制（单事务建议 < 500KB，防 TransactionTooLargeException） |
+| **恢复开销与耗时** | 零拷贝内存指针直接复用（微秒级） | 跨进程序列化 / 反序列化重构（毫秒级） |`,
         caseStudy: `### 一、SavedStateHandle 复杂对象持久化与进程被杀热恢复
 
 - **场景解释**：电商搜索页中，用户输入了关键词并勾选了复杂的筛选器。当用户切去微信聊天导致 App 被系统后台杀死后，重新返回时必须无感恢复原有的搜索状态，绝不能白屏回滚。

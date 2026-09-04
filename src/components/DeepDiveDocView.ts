@@ -111,14 +111,17 @@ function renderSingleChapterView(
     if (mod.explanation && mod.explanation.trim()) {
       const principleSection = document.createElement('section');
       principleSection.className = 'chapter-content-section';
+      const hasSubPanels = mod.explanation.includes('### ');
+
       principleSection.innerHTML = `
         <div class="section-header">
           <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
           <h2 class="section-header-title">一、核心原理解析与底层机制</h2>
         </div>
-        <div class="chapter-card-box">
-          ${formatExplanationHtml(mod.explanation)}
-        </div>
+        ${hasSubPanels
+          ? `<div class="case-study-list ${platform === 'ios' ? 'deepdive-ios' : ''}">${formatCaseStudyHtml(mod.explanation, platform)}</div>`
+          : `<div class="chapter-card-box">${formatExplanationHtml(mod.explanation)}</div>`
+        }
       `;
       container.appendChild(principleSection);
     }
