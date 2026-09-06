@@ -34,6 +34,7 @@ export interface PipelineStep {
 
 /** Overrides the renderer's default section headings when a module reuses a slot differently. */
 export interface DeepDiveSectionTitles {
+  explanation?: string;
   stepper?: string;
   diagram?: string;
   diagramCaption?: string;

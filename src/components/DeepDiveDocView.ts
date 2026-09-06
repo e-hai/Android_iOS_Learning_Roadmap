@@ -116,7 +116,7 @@ function renderSingleChapterView(
       principleSection.innerHTML = `
         <div class="section-header">
           <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-          <h2 class="section-header-title">一、核心原理解析与底层机制</h2>
+          <h2 class="section-header-title">一、${mod.sectionTitles?.explanation ?? '核心原理解析与底层机制'}</h2>
         </div>
         ${hasSubPanels
           ? `<div class="case-study-list ${platform === 'ios' ? 'deepdive-ios' : ''}">${formatCaseStudyHtml(mod.explanation, platform)}</div>`

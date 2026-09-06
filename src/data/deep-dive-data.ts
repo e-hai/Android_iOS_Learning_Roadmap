@@ -7,156 +7,190 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
         tag: '现代语言',
         title: 'Kotlin 核心特性：委托、扩展与内联具现化',
         sectionTitles: {
-          diagram: '一图记住全部：意图 ➔ 脱糖形态 ➔ 硬性边界',
-          diagramCaption: '编译期改写全景图',
-          stepper: '逐个看脱糖过程（交互式记忆卡）',
+          explanation: '这一章只回答三个问题',
+          diagram: '一图速查：怎么写 ➔ 什么时候用',
+          diagramCaption: '五大特性用法速查图',
+          stepper: '逐个看用法（交互式速查卡）',
           caseStudy: '核心实战与用法指南',
         },
-        explanation: `五个特性共用一条主线：**你只写意图，编译器在编译期把重复代码补齐，运行时零魔法**。因此只需记住每个特性"被抄成什么形态"，所有能力边界都是它的推论。
+        explanation: `这五个特性都是**为了少写样板、让调用点更干净**而存在的语法工具。本章只关注三件事：**是什么**（一句话定义）、**为什么用**（替你省掉什么麻烦）、**怎么用**（最小写法与适用场景），不涉及编译器与字节码层面的实现原理。
 
-口诀五个动作：**转发（by）· 外挂（扩展）· 换 this（带接收者）· 平铺（inline）· 回填（reified）**。`,
+拿不准该用哪个时，先看下面的速查图对号入座，再翻对应的速查卡。`,
         stepper: [
           {
             title: '委托 by',
-            tag: '转发',
-            desc: '把属性的读写转发给托管对象；编译器按**函数名约定**找人，完全不看接口。',
-            diagram: `你写的：
-    var name: String by CustomDelegate()
+            tag: '少写样板',
+            desc: '**是什么**：用 `by` 把属性的读写、或整个接口的实现，交给另一个对象去完成。',
+            diagram: `// 1. 用现成的委托：用到时才初始化，之后缓存复用
+val database by lazy { DatabaseHelper() }
 
-编译器生成（等价形态）：
-    private val name$delegate = CustomDelegate()
-    fun getName(): String  = name$delegate.getValue(this, ::name)
-    fun setName(v: String) = name$delegate.setValue(this, ::name, v)
+// 2. 自己写一个：多个属性共用同一套读写逻辑（只需提供 getValue / setValue）
+class Prefs(sp: SharedPreferences) {
+    var token: String by StringPref(sp, "token")
+    var userId: String by StringPref(sp, "user_id")
+}
 
-类委托同理：
-    class TrackedList<T>(inner: MutableList<T>) : MutableList<T> by inner
-    ──▶ 编译器逐个生成 size / add / remove / iterator ... 的转发方法
-        你只覆写想拦截的那两三个`,
+// 3. 类委托：想增强一个集合，但只关心其中两个方法
+class TrackedList<T>(private val inner: MutableList<T>) : MutableList<T> by inner {
+    override fun add(element: T): Boolean {
+        report(element)                 // 只写你要拦截的
+        return inner.add(element)
+    }
+}                                       // 其余方法自动交给 inner，一行都不用写`,
             stateSnapshot: {
-              '记忆钩子': '转发 —— 这活我不干，转给它干',
-              '编译器认的名字': 'getValue / setValue / provideDelegate',
-              '高频落地': 'by lazy · by viewModels() · by autoCleared()',
+              '为什么用': '省掉重复的 get / set 样板，逻辑收在一处',
+              '怎么用': '属性：val / var x by 委托对象；类：: 接口 by 内部实例',
+              '常见场景': 'by lazy · by viewModels() · SharedPreferences 读写',
             },
           },
           {
             title: '扩展 fun / val',
-            tag: '外挂',
-            desc: '不改源码给既有类装配 API；本质是**首参为接收者的静态方法**。',
-            diagram: `你写的：
-    fun View.visibleOrGone(visible: Boolean) {
-        visibility = if (visible) View.VISIBLE else View.GONE
-    }
+            tag: '补 API',
+            desc: '**是什么**：不改源码、不写子类，直接给现成的类补上你想要的方法或属性。',
+            diagram: `// 1. 扩展函数：语义化控制显隐，不用到处写 VISIBLE / GONE
+fun View.visibleOrGone(visible: Boolean) {
+    visibility = if (visible) View.VISIBLE else View.GONE
+}
 
-编译器生成（Java 视角）：
-    public final class ViewExtKt {
-        public static void visibleOrGone(View $this, boolean visible) { ... }
-    }
+// 2. 扩展函数：把冗长构造包成一行
+fun Context.toast(message: CharSequence) {
+    Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+}
 
-调用点改写：
-    view.visibleOrGone(true)   ──▶   ViewExtKt.visibleOrGone(view, true)
-                                     ▲ 接收者只是第一个普通入参`,
+// 3. 扩展属性：必须自己写 get()，不能带初始值
+val Context.screenWidth: Int
+    get() = resources.displayMetrics.widthPixels
+
+// 调用起来和类自带的 API 没有区别：
+loginButton.visibleOrGone(user.isLoggedIn)
+context.toast("屏幕宽 \${context.screenWidth}px")`,
             stateSnapshot: {
-              '记忆钩子': '外挂 —— 贴在原类外面，进不去类内部',
-              '三个"没有"': '无多态 · 无幕后字段 · 无私有访问',
-              '高频落地': 'View.gone() · Context.toast() · 屏幕尺寸属性',
+              '为什么用': '取代 XxxUtils 静态工具类，调用点更自然',
+              '怎么用': 'fun 类型.方法名() / val 类型.属性名 get() = ...',
+              '注意': '与已有同名成员方法冲突时成员优先；扩展属性必须写 get()',
             },
           },
           {
             title: '带接收者 Lambda',
-            tag: '换 this',
-            desc: '`T.() -> Unit` 把实例注入闭包作为隐式 `this`，是各类 DSL 的母体语法。',
-            diagram: `你写的：
-    fun setupHttpClient(block: HttpClientConfig.() -> Unit): HttpClientConfig {
-        val config = HttpClientConfig()
-        config.block()      // 在 config 的作用域里执行用户代码
-        return config
-    }
+            tag: '写 DSL',
+            desc: '**是什么**：参数写成 `T.() -> Unit`，花括号里就能直接以那个对象为 `this` 写代码。',
+            diagram: `// 1. 定义一个配置类
+class HttpClientConfig {
+    var baseUrl: String = ""
+    var timeoutMs: Long = 3000
+    fun header(key: String, value: String) { /* ... */ }
+}
 
-    setupHttpClient {
-        baseUrl = "https://api.example.com"   // 没有前缀！
-        header("Authorization", "Bearer xxx")
-    }
+// 2. 关键就是这个参数类型：HttpClientConfig.() -> Unit
+fun setupHttpClient(block: HttpClientConfig.() -> Unit): HttpClientConfig {
+    val config = HttpClientConfig()
+    config.block()
+    return config
+}
 
-编译器视角：
-    block 的真实签名是 (HttpClientConfig) -> Unit
-    实例被塞进第一个参数 ──▶ 花括号内的 this = 那个 config
-    于是 baseUrl = ... 实际是 this.baseUrl = ...`,
+// 3. 调用处：花括号里的 this 就是 config，属性名直接写，不用前缀
+val client = setupHttpClient {
+    baseUrl = "https://api.example.com"
+    timeoutMs = 5000
+    header("Authorization", "Bearer token_xyz")
+}`,
             stateSnapshot: {
-              '记忆钩子': '换 this —— 进门换鞋，作用域里的 this 变了',
-              '对比': '() -> Unit 拿不到上下文；T.() -> Unit 有 this',
-              '高频落地': 'Compose 组件树 · Gradle KTS · buildString · apply',
+              '为什么用': '配置类 API 写起来像 DSL，省掉一堆 config. 前缀',
+              '怎么用': '参数声明为 T.() -> Unit，函数体内调用 实例.block()',
+              '常见场景': 'apply · buildString · Gradle KTS · Compose 组件树',
             },
           },
           {
-            title: 'inline 三兄弟',
-            tag: '平铺',
-            desc: 'Lambda 函数体被复制到调用处，省掉匿名类分配；**非局部返回的坑正是平铺的副产品**。',
-            diagram: `inline fun <T> measureDuration(tag: String, block: () -> T): T {
-    val start = now(); val result = block(); log(now() - start); return result
+            title: 'inline 家族',
+            tag: '省开销',
+            desc: '**是什么**：给「参数是 Lambda」的函数加的性能修饰；`noinline` 与 `crossinline` 是它的两条补充规则。',
+            diagram: `// 1. inline：高频调用的小工具函数，加上它更省
+inline fun <T> measureDuration(tag: String, block: () -> T): T {
+    val start = System.currentTimeMillis()
+    val result = block()
+    Log.d(tag, "耗时: \${System.currentTimeMillis() - start} ms")
+    return result
 }
 
-调用点被展开成：
-    val start = now()
-    << block 的函数体原地平铺，没有任何匿名类对象 >>
-    log(now() - start)
+// 2. 两条补充规则，按 Lambda 的用法二选一
+inline fun runAsyncTask(
+    noinline onLog: () -> Unit,        // 要把它当对象存起来 / 传给别人 ──▶ noinline
+    crossinline onExecute: () -> Unit  // 它会异步、跨线程执行     ──▶ crossinline
+) {
+    Handler(Looper.getMainLooper()).post(onLog)
+    Thread { onExecute() }.start()
+}
 
-因为平铺了 ⇒ 闭包里的 return 属于「外层函数」（非局部返回）
-    ├─ 这个 Lambda 要存起来 / 传给 Handler  ──▶  noinline
-    └─ 这个 Lambda 会跨线程、异步执行       ──▶  crossinline（禁止 return 逃逸）`,
+// 用法：
+val user = measureDuration("loadUser") { repository.loadUser() }`,
             stateSnapshot: {
-              '记忆钩子': '平铺 —— 把活搬到现场干，不再派对象过来',
-              '副产品': '闭包内 return 属于外层函数（非局部返回）',
-              '别滥用': '函数体大 + 调用点多 ⇒ 字节码膨胀',
+              '为什么用': '高阶函数被高频调用时减少额外开销',
+              '怎么用': '函数体小、调用点多时加 inline；大函数别加',
+              '两条规则': 'Lambda 要存起来 ──▶ noinline；会异步执行 ──▶ crossinline',
             },
           },
           {
             title: 'reified',
-            tag: '回填',
-            desc: '只能用在 `inline` 函数上：展开时把 `T` 换成真实 Class，击穿 JVM 类型擦除。',
-            diagram: `inline fun <reified T : Activity> Context.startActivity(block: Intent.() -> Unit = {}) {
+            tag: '认出 T',
+            desc: '**是什么**：加在 `inline` 函数的泛型上，让函数体里能把 `T` 当成真实类型用（`T::class.java`、`is T`）。',
+            diagram: `// 1. 页面跳转：调用处再也不用写 DetailActivity::class.java
+inline fun <reified T : Activity> Context.startActivity(block: Intent.() -> Unit = {}) {
     val intent = Intent(this, T::class.java)
-    intent.block(); startActivity(intent)
+    intent.block()
+    startActivity(intent)
 }
 
-调用：   context.startActivity<DetailActivity> { putExtra("id", "1") }
+context.startActivity<DetailActivity> {
+    putExtra("order_id", "20260903")
+}
 
-展开后： Intent(context, DetailActivity.class)
-                          ▲ T 已被替换成真实类，不再是被擦除的 Object
+// 2. 从混合集合里挑出某种类型
+inline fun <reified T> List<Any>.firstInstanceOrNull(): T? {
+    for (item in this) if (item is T) return item
+    return null
+}
 
-对照：非 inline 函数里写 T::class.java / item is T ──▶ 直接编译失败
-      因为没有调用点展开，真实类型无处回填`,
+// ⚠️ reified 只能写在 inline 函数上，单独用会编译失败`,
             stateSnapshot: {
-              '记忆钩子': '回填 —— 开工前把图纸上的型号填成真的',
-              '解锁能力': 'T::class.java · item is T · 泛型 JSON 解析',
-              '高频落地': 'startActivity<T>() · filterIsInstance<T>()',
+              '为什么用': '免去到处传 Class 参数，调用点更干净',
+              '怎么用': '固定搭配写成 inline fun <reified T> ...',
+              '常见场景': 'startActivity<T>() · filterIsInstance<T>() · fromJson<T>()',
             },
           },
         ],
-        diagram: `          你写的（意图）                             编译器脱糖后（真相）
-   ┌──────────────────────────┐        ┌─────────────────────────────────────┐
-   │ val x by lazy { ... }    │ ─────> │ x$delegate.getValue(this, ::x)      │  ① 转发
-   │ fun View.gone()          │ ─────> │ static ViewExtKt.gone(View recv)    │  ② 外挂
-   │ block: Config.() -> Unit │ ─────> │ (Config) -> Unit,  this = config    │  ③ 换 this
-   │ inline fun m(block)      │ ─────> │ << block body pasted at callsite >> │  ④ 平铺
-   │ inline fun <reified T>   │ ─────> │ T  ==>  DetailActivity.class        │  ⑤ 回填
-   └──────────────────────────┘        └─────────────────────────────────────┘
-                                        ▲ 只背这一列，下面全是它的推论
+        diagram: `   每组左边是怎么写，右边是什么时候用它。
 
+   ① 委托 by ── 把重复的读写逻辑交给别人做
+      val db by lazy { DatabaseHelper() } ──▶  重量级对象，首次用到才初始化
+      var token: String by StringPref(sp) ──▶  多个属性共用同一套读写逻辑
+      class L : MutableList<T> by inner   ──▶  只想改集合的几个方法，其余照转
+      by viewModels() / by autoCleared()  ──▶  Android 里现成好用的委托
 
-   右列形态推出全部硬性边界，都不必单独背：
-   static method         ──▶  无多态 · 无幕后字段 · 无私有访问
-   pasted at callsite    ──▶  return 属于外层函数，异步执行必须 crossinline
-   callsite expansion    ──▶  reified 必须搭 inline，否则无处可填
-   name convention       ──▶  属性委托不需要实现任何接口
+   ② 扩展 fun / val ── 给现成的类补上你想要的 API
+      fun View.visibleOrGone(visible)     ──▶  取代 ViewUtils 这类静态工具类
+      fun Context.toast(msg)              ──▶  把冗长的构造调用包成一行
+      val Context.screenWidth get() = ... ──▶  常用计算值做成属性（必须写 get()）
+      注意：和类里已有的同名成员方法冲突时，成员优先，扩展不会覆盖它
 
-   ④ 三兄弟怎么选？看这个 Lambda 会被怎样使用：
-   inline                ──▶  当场执行就好，消除匿名类分配
-   noinline              ──▶  要存起来、当对象传给别人
-   crossinline           ──▶  会异步 / 跨线程跑，禁止 return 逃逸
-   reified               ──▶  函数体里要认出 T（必须搭 inline）`,
+   ③ 带接收者 Lambda ── 让配置代码写起来像 DSL
+      fun setup(block: Config.() -> Unit) ──▶  自己写配置式 API
+      setup { baseUrl = "..." }           ──▶  调用处省掉所有 config. 前缀
+      apply / buildString / Gradle KTS    ──▶  你早就在用的同一套写法
+
+   ④ inline 家族 ── 高频调用的高阶函数用它更省
+      inline fun measure(block: () -> T)  ──▶  小函数 + 调用点多，减少额外开销
+      noinline block                      ──▶  这个 Lambda 要存起来、传给别人
+      crossinline block                   ──▶  这个 Lambda 会异步 / 跨线程执行
+      注意：函数体很大的函数别加 inline，调用点多了反而变胖
+
+   ⑤ reified ── 让泛型 T 在函数体里能被认出来
+      inline fun <reified T> ...          ──▶  reified 必须和 inline 一起写
+      startActivity<DetailActivity>()     ──▶  页面跳转免写 ::class.java
+      list.filterIsInstance<T>()          ──▶  从混合集合里挑出某种类型
+      gson.fromJson<T>(json)              ──▶  泛型 JSON 解析`,
         caseStudy: `### 一、委托：属性委托与类委托（状态托管与无样板装饰器）
 
-> 记忆钩子 ——**转发**：\`by\` 的意思是「这活我不干，转给它干」；编译器只按函数名 \`getValue\` / \`setValue\` 找人，不看接口。
+> **一句话**：把属性的读写、或整个接口的实现交给另一个对象去做，省掉重复样板。最常用的是现成委托 \`by lazy\` 与 \`by viewModels()\`。
 
 - **1. 属性委托（Property Delegation）演进三步曲**：
   - **核心本质**：通过 \`by delegate\` 将属性的 \`get()\` 和 \`set()\` 转发给托管对象，省去重复的样板代码。其演进与使用分为清晰的三步：
@@ -170,12 +204,12 @@ val databaseHelper: DatabaseHelper by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
 }
 \`\`\`
 
-  - **第二步：自定义约定规则（零接口继承，纯靠 \`operator\` 固定函数名）**：
-    - 属性委托**绝非基于接口继承，而是基于操作符重载约定**！任何普通类（甚至扩展函数），只要提供了编译器死认的固定名称，无需实现任何接口就能直接充当委托；
-    - **编译器死认的固定名称**：属性委托专属仅认 \`getValue\`（读）、\`setValue\`（写）、\`provideDelegate\`（委托创建拦截）；其它常见操作符如 \`invoke\`（对象调用）、\`get\`/\`set\`（下标索引）、\`contains\`（in 判断）；
+  - **第二步：自己写一个委托（不需要实现任何接口）**：
+    - 任何普通类只要提供约定名称的 \`operator\` 函数就能直接当委托用：\`getValue\`（读）、\`setValue\`（写，只读属性不需要）；
+    - 函数名是固定的，不能自己改；参数签名照抄下面的写法即可；
 
 \`\`\`kotlin
-// ⚡ 第二步：零接口继承的纯普通类！函数名受语言规范硬编码约束，必须是 getValue / setValue
+// ⚡ 第二步：不实现任何接口的普通类，函数名必须是 getValue / setValue
 class CustomStringDelegate {
     private var internalText = "默认值"
 
@@ -220,11 +254,11 @@ class AutoClearedValue<T : Any>(fragment: Fragment) : ReadWriteProperty<Fragment
 \`\`\`
 
 - **2. 类委托（Class Delegation）**：
-  - **解决痛点与机制**：传统面向对象中若要为既有类增强能力，若使用继承极易破坏封装且受限于单继承；若使用装饰器模式，则必须手写几十个空转发方法。Kotlin 的类委托允许通过 \`class Xxx : Interface by inner\`，由编译器在底层自动生成所有转发代码，真正践行“组合优于继承”；
-  - **高频实战**：无需手写数十个代理方法，直接代理 inner，仅覆写需要拦截增强的成员。
+  - **为什么用**：想给一个既有类型加点行为时，继承受限于单继承又容易破坏封装；自己写装饰器则要手写几十个只做转发的空方法。用 \`class Xxx : Interface by inner\` 就不用写这些转发方法了，是"组合优于继承"最省事的落地方式。
+  - **怎么用**：把内部实例声明为 \`by\` 的对象，只覆写你要拦截增强的成员，其余全部自动交给它。
 
 \`\`\`kotlin
-// ⚡ 仅覆写需要增强拦截的方法，其余数十个集合方法全部由编译器自动代理转发
+// ⚡ 只覆写要拦截的方法，其余数十个集合方法自动交给 inner，一行都不用写
 class TrackedList<T>(
     private val inner: MutableList<T>
 ) : MutableList<T> by inner {
@@ -243,9 +277,9 @@ class TrackedList<T>(
 
 ### 二、扩展函数与属性：对既有类的非侵入式能力装配
 
-> 记忆钩子 ——**外挂**：扩展进不了原类，编译后只是首参为接收者的静态方法，所以无多态、无私有访问、无幕后字段。
+> **一句话**：不改源码给现成的类补上你要的 API，取代 \`XxxUtils\` 静态工具类；注意与同名成员方法冲突时成员优先。
 
-- **解决痛点与机制**：不再需要编写死板难用的 \`ViewUtils.setVisibility(view, ...)\` 静态工具类。扩展机制允许在不修改类源码、不继承子类的情况下，直接为 Android 原生控件或第三方类型注入符合业务语意的成员方法与计算属性，调用体验如同原生 API。
+- **为什么用**：不用再写 \`ViewUtils.setVisibility(view, ...)\` 这种别扭的工具类。在不改源码、不继承子类的前提下，就能给 Android 原生控件或第三方类型补上贴合业务语义的方法与计算属性，调用起来和自带 API 一样自然。
 - **高频场景与工程实战**：
   1. 常用视图显隐切换扩展；
   2. 上下文极简 Toast；
@@ -271,23 +305,17 @@ val Context.screenWidth: Int
 // context.toast("操作成功，当前屏幕宽: \${context.screenWidth}px")
 \`\`\`
 
-- **底层字节码本质**：扩展并非侵入修改原类，编译后本质只是把目标对象作为首个入参的静态工具方法，天然无私有访问权、无运行时多态、无幕后字段：
-
-\`\`\`java
-// 只是一个普通的工具静态方法，把目标对象作为第一个入参！
-public final class UserExtKt {
-    public static final void printInfo(User $this) {
-        System.out.println($this.getName()); // 只能走 public 的 getter！
-    }
-}
-\`\`\`
+- **使用时的三条约束**（写之前先记住，避免踩坑）：
+  1. **成员优先**：若目标类中已有同名同参的成员方法，调用时永远走成员方法，扩展不会覆盖它；
+  2. **扩展属性必须写 \`get()\`**：它没有存储空间，不能带初始值，只能是计算属性；
+  3. **只能访问公开成员**：扩展写在类外部，拿不到目标类的 \`private\` / \`protected\` 内容。
 
 ### 三、带接收者的 Lambda：打造类型安全的流畅领域 DSL
 
-> 记忆钩子 ——**换 this**：\`T.() -> Unit\` 把实例注入闭包作用域，花括号里的 \`this\` 就是它，于是所有前缀都省掉了。
+> **一句话**：参数写成 \`T.() -> Unit\`，调用处的花括号里就能直接写属性名、省掉对象前缀，配置式 API 都靠它。
 
-- **解决痛点与机制**：普通闭包 \`() -> Unit\` 无法直接访问调用方上下文。带接收者的闭包 \`T.() -> Unit\` 将对象实例隐式注入为闭包内部的 \`this\`，使得在花括号作用域内可以直接调用该对象的所有公开属性与方法。这是 Jetpack Compose 声明式组件树、Gradle 构建脚本以及现代流畅配置 DSL 的底层母体语法。
-- **工程实战**：构建极简优雅的网络客户端配置器。
+- **为什么用**：参数写成普通闭包 \`() -> Unit\` 时，调用者在花括号里访问配置对象必须处处带前缀；写成 \`T.() -> Unit\` 后，花括号里的 \`this\` 就是那个对象，属性名、方法名都能直接写。Compose 的组件树、Gradle 脚本、\`apply\` / \`buildString\` 用的都是这个写法。
+- **怎么用**：下面用一个网络客户端配置器演示完整三步。
 
 \`\`\`kotlin
 // 1. 领域配置实体
@@ -319,11 +347,12 @@ val client = setupHttpClient {
 
 ### 四、内联函数生态：inline / noinline / crossinline 的性能优化与安全避坑
 
-> 记忆钩子 ——**平铺**：代码被复制到调用处所以省掉了匿名类；也正因为平铺，闭包里的 \`return\` 属于外层函数，异步执行必须 \`crossinline\`。
+> **一句话**：高频调用的高阶函数加 \`inline\` 更省开销；Lambda 要存起来就标 \`noinline\`，会异步执行就标 \`crossinline\`。
 
-- **解决痛点与机制**：
-  - 在高阶函数中每次传递 Lambda，底层都会在堆内存新建匿名内部类对象，高频调用时引发频繁 GC；\`inline\` 告诉编译器**直接把 Lambda 代码复制平铺到调用处**，彻底消除对象分配与虚方法栈帧开销；
-  - **避坑红线**：内联函数的 Lambda 默认支持非局部返回（Non-local \`return\` 会直接跳出外层封闭函数）。若将 Lambda 传递到子线程、协程池或异步任务中执行，非局部返回会导致致命的线程栈崩溃。此时必须使用 \`crossinline\` 构筑安全防线。
+- **为什么用**：参数是 Lambda 的函数被高频调用时会产生额外开销，给函数加上 \`inline\` 就能省掉这部分开销，适合体积小、调用点多的工具函数。
+- **两条补充规则（怎么选）**：
+  - \`noinline\`：这个 Lambda 需要被**保存下来或传给别人**（例如交给 \`Handler.post\`），就给它加 \`noinline\`；
+  - \`crossinline\`：这个 Lambda 会在**子线程、协程或异步回调里执行**，就给它加 \`crossinline\`——否则调用方在 Lambda 里直接写 \`return\` 会引发崩溃。
 - **工程实战**：高频执行耗时监控工具，与跨线程异步安全调度。
 
 \`\`\`kotlin
@@ -335,7 +364,7 @@ inline fun <T> measureDuration(tag: String, block: () -> T): T {
     return result
 }
 
-// 2. crossinline 确保在异步回调中禁止非局部 return，防止多线程崩溃
+// 2. 会异步执行的 Lambda 标 crossinline；要当对象传给别人的标 noinline
 inline fun runAsyncTask(
     noinline onLog: () -> Unit,       // 不需要内联，作为对象引用传给 Handler
     crossinline onExecute: () -> Unit // 跨线程执行，使用 crossinline 限制闭包不能在此直接 return 逃逸
@@ -347,11 +376,11 @@ inline fun runAsyncTask(
 }
 \`\`\`
 
-### 五、泛型具现化 reified：击穿 JVM 编译期类型擦除
+### 五、reified：让泛型 T 在函数体里能被认出来
 
-> 记忆钩子 ——**回填**：展开时把 \`T\` 换成真实 Class，所以 \`reified\` 离不开 \`inline\`。
+> **一句话**：让泛型 \`T\` 在函数体里能被认出来（可写 \`T::class.java\`、\`is T\`），固定搭配 \`inline\` 使用。
 
-- **解决痛点与机制**：Java 泛型采用类型擦除（Type Erasure），编译后泛型信息全部变成 \`Object\`，无法在运行时直接通过 \`T::class.java\` 获取类元数据，也无法使用 \`item is T\` 进行类型判断。在 \`inline\` 函数中为泛型加上 \`reified\`，编译器由于在调用点将函数展开，**能够直接将 \`T\` 替换为调用处的真实 Class 常量**，使运行时重新具备类型感知能力。
+- **为什么用**：普通泛型函数的函数体里写不了 \`T::class.java\` 与 \`item is T\`，只能额外传一个 \`Class<T>\` 参数；把泛型标成 \`reified\`（必须同时是 \`inline\` 函数）之后，这两种写法都可以直接用，调用点也不必再传 Class。
 - **工程实战**：页面极简跳转语法糖，以及异构数据集合安全类型过滤。
 
 \`\`\`kotlin
