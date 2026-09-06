@@ -141,7 +141,7 @@ function renderSingleChapterView(
     stepperSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">${sectionNumStr}、执行时序与状态机动态演进 (交互式步进)</h2>
+        <h2 class="section-header-title">${sectionNumStr}、${mod.sectionTitles?.stepper ?? '执行时序与状态机动态演进 (交互式步进)'}</h2>
       </div>
     `;
     stepperSection.appendChild(renderStepperComponent(mod.stepper, platform));
@@ -158,7 +158,7 @@ function renderSingleChapterView(
     diagramSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">${sectionNumStr}、架构与执行时序图解</h2>
+        <h2 class="section-header-title">${sectionNumStr}、${mod.sectionTitles?.diagram ?? '架构与执行时序图解'}</h2>
       </div>
       <div class="box-diagram-card">
         <div class="box-diagram-header">
@@ -167,7 +167,7 @@ function renderSingleChapterView(
             <span class="box-dot dot-yellow"></span>
             <span class="box-dot dot-green"></span>
           </div>
-          <span class="box-diagram-title">时序与状态转换 · 盒线全景图</span>
+          <span class="box-diagram-title">${escapeHtml(mod.sectionTitles?.diagramCaption ?? '时序与状态转换 · 盒线全景图')}</span>
           <button class="box-copy-btn btn-ghost" id="btn-copy-chapter-diag" title="复制图示">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
             <span>复制</span>
@@ -260,7 +260,7 @@ function renderSingleChapterView(
     caseSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">${mod.explanation ? '深度实战思考' : '核心实战与用法指南'}</h2>
+        <h2 class="section-header-title">${mod.sectionTitles?.caseStudy ?? (mod.explanation ? '深度实战思考' : '核心实战与用法指南')}</h2>
       </div>
       <div class="case-study-list ${platform === 'ios' ? 'deepdive-ios' : ''}">
         ${formatCaseStudyHtml(mod.caseStudy, platform)}

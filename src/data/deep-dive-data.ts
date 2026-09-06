@@ -6,7 +6,216 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
       {
         tag: '现代语言',
         title: 'Kotlin 核心特性：委托、扩展与内联具现化',
+        sectionTitles: {
+          stepper: '五大特性脱糖对照（交互式记忆卡）',
+          diagram: '一图总览：语法糖 ➔ 脱糖形态 ➔ 硬性边界',
+          diagramCaption: '编译期改写全景图 · 语法糖与字节码本质对照',
+          caseStudy: '核心实战与用法指南',
+        },
+        metaphor: {
+          title: '编译器代笔：五种样板代码的省写术',
+          formula: '委托=转发 · 扩展=静态方法 · 接收者=换 this · inline=代码平铺 · reified=类型回填',
+          metaphorDesc: '把这五个特性想成同一个助理在替你抄样板：**你只写意图，编译器在编译期把重复代码补齐，运行时零魔法**。所以每个特性"能做什么、不能做什么"都不必硬背——只要记住它最终被抄成什么形态，边界自然推得出来。口诀五个动作：**转发 · 外挂 · 换 this · 平铺 · 回填**。',
+        },
+        explanation: `### 一、先记一条主线：五个特性都在编译期替你抄样板
+
+- 这五个特性看似彼此无关，其实共用一条主线：**你写意图，编译器补样板**。整章真正需要记住的只有 5 个"脱糖形态"。
+
+| 特性 | 你写的意图 | 编译器抄成什么 | 一句话记住 |
+|---|---|---|---|
+| 委托 \`by\` | 这活我不干，转出去 | 生成 \`xxx$delegate\` 字段，读写转成 \`getValue\` / \`setValue\` 调用 | **转发** |
+| 扩展 \`fun View.x()\` | 给既有类加语义化 API | 首参是接收者的静态方法 | **外挂** |
+| 带接收者 Lambda \`T.() -> Unit\` | 让花括号里少写前缀 | 把实例塞进闭包，作用域内 \`this\` 就是它 | **换 this** |
+| \`inline\` | 别为每个 Lambda 新建对象 | 把 Lambda 函数体复制平铺到调用处 | **平铺** |
+| \`reified\` | 运行时还想知道 T 是谁 | 展开时把 \`T\` 换成真实 Class 常量 | **回填** |
+
+### 二、能力边界不用背：全都能从"脱糖成什么"推出来
+
+- **扩展没有多态、拿不到 \`private\`、扩展属性没有幕后字段** ← 因为它只是个静态方法。静态方法自然不参与虚分派（按**声明类型**而非运行时类型分派）、没有类内访问权，也不可能凭空多出字段。
+- **\`reified\` 必须写在 \`inline\` 函数上** ← 因为真实类型是在**调用点展开时**回填的；不内联就没有展开点，也就无处可填。
+- **为什么需要 \`crossinline\`** ← 因为 \`inline\` 把闭包代码平铺进了调用处，闭包里的 \`return\` 就变成**外层函数**的 return（非局部返回）；这段代码一旦被扔到子线程或异步回调里执行，就会跳错栈。
+- **属性委托只认 \`getValue\` / \`setValue\` 这几个名字、不认接口** ← 因为它走编译期**约定（convention）**，与操作符重载是同一套机制；\`ReadWriteProperty\` 只是帮你补签名的提效工具，不是必需的父接口。
+
+> 一句话收束：背 5 个脱糖形态，剩下所有"为什么不能这样写"都是它的推论。
+
+### 三、易混四兄弟：inline / noinline / crossinline / reified
+
+| 关键字 | 解决的问题 | 判断依据（什么时候用它） |
+|---|---|---|
+| \`inline\` | 高频调用时 Lambda 反复在堆上新建匿名类对象 | 函数体小、调用点多、参数是 Lambda |
+| \`noinline\` | 平铺后的 Lambda 没有对象实体，无法被传递保存 | 这个 Lambda 要**存起来或交给别人**（如 \`Handler.post\`） |
+| \`crossinline\` | 平铺导致的非局部 return 跳错栈 | 这个 Lambda 会**异步或跨线程**执行 |
+| \`reified\` | JVM 类型擦除后运行时拿不到 \`T\` | 函数体里要写 \`T::class.java\` 或 \`item is T\` |
+
+### 四、自测三问（答得上就算真记住了）
+
+1. \`fun View.tag(): String\` 与 \`View\` 已有的同名成员方法冲突，调用时走哪个？——**成员永远优先**；扩展是静态方法，编译期就按声明类型定死了。
+2. \`fun <reified T> parse(json: String): T\` 为什么编译不过？——\`reified\` 离不开 \`inline\`，没有调用点展开就无法回填真实类型。
+3. 一个会被 \`post\` 到子线程执行的 Lambda 参数该标什么？——\`crossinline\`（禁止 return 逃逸）；若还需要把它当对象存起来，则用 \`noinline\`。
+`,
+        stepper: [
+          {
+            title: '委托 by',
+            tag: '转发',
+            desc: '把属性的读写转发给托管对象；编译器按**函数名约定**找人，完全不看接口。',
+            diagram: `你写的：
+    var name: String by CustomDelegate()
+
+编译器生成（等价形态）：
+    private val name$delegate = CustomDelegate()
+    fun getName(): String  = name$delegate.getValue(this, ::name)
+    fun setName(v: String) = name$delegate.setValue(this, ::name, v)
+
+类委托同理：
+    class TrackedList<T>(inner: MutableList<T>) : MutableList<T> by inner
+    ──▶ 编译器逐个生成 size / add / remove / iterator ... 的转发方法
+        你只覆写想拦截的那两三个`,
+            stateSnapshot: {
+              '记忆钩子': '转发 —— by 就是「这活我不干，转给它干」',
+              '编译器认的名字': 'getValue / setValue / provideDelegate',
+              '不需要什么': '任何接口继承（ReadWriteProperty 只是提效工具）',
+              '高频落地': 'by lazy · by viewModels() · by autoCleared()',
+            },
+          },
+          {
+            title: '扩展 fun / val',
+            tag: '外挂',
+            desc: '不改源码、不继承，给既有类装配语义化 API；本质是**首参为接收者的静态方法**。',
+            diagram: `你写的：
+    fun View.visibleOrGone(visible: Boolean) {
+        visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
+编译器生成（Java 视角）：
+    public final class ViewExtKt {
+        public static void visibleOrGone(View $this, boolean visible) { ... }
+    }
+
+调用点改写：
+    view.visibleOrGone(true)   ──▶   ViewExtKt.visibleOrGone(view, true)
+                                     ▲ 接收者只是第一个普通入参`,
+            stateSnapshot: {
+              '记忆钩子': '外挂 —— 贴在原类外面的挂件，进不去类内部',
+              '无多态': '静态绑定，按声明类型分派，不看运行时类型',
+              '无幕后字段': '扩展属性必须自己写 get()，不能有初始值',
+              '无私有访问': '只能调用目标类的 public 成员',
+            },
+          },
+          {
+            title: '带接收者 Lambda',
+            tag: '换 this',
+            desc: '`T.() -> Unit` 把实例注入闭包作为隐式 `this`，是 Compose / Gradle KTS 等 DSL 的母体语法。',
+            diagram: `你写的：
+    fun setupHttpClient(block: HttpClientConfig.() -> Unit): HttpClientConfig {
+        val config = HttpClientConfig()
+        config.block()      // 在 config 的作用域里执行用户代码
+        return config
+    }
+
+    setupHttpClient {
+        baseUrl = "https://api.example.com"   // 没有前缀！
+        header("Authorization", "Bearer xxx")
+    }
+
+编译器视角：
+    block 的真实签名是 (HttpClientConfig) -> Unit
+    实例被塞进第一个参数 ──▶ 花括号内的 this = 那个 config
+    于是 baseUrl = ... 实际是 this.baseUrl = ...`,
+            stateSnapshot: {
+              '记忆钩子': '换 this —— 进门自动换鞋，作用域里的 this 变了',
+              '普通闭包': '() -> Unit 拿不到调用方上下文，必须手写前缀',
+              '带接收者': 'T.() -> Unit 隐式注入 this = T',
+              '生态实例': 'Compose 组件树 · Gradle KTS · buildString · apply',
+            },
+          },
+          {
+            title: 'inline 三兄弟',
+            tag: '平铺',
+            desc: 'Lambda 函数体被复制到调用处，省掉匿名类分配；**非局部返回的坑正是平铺的副产品**。',
+            diagram: `inline fun <T> measureDuration(tag: String, block: () -> T): T {
+    val start = now(); val result = block(); log(now() - start); return result
+}
+
+调用点被展开成：
+    val start = now()
+    << block 的函数体原地平铺，没有任何匿名类对象 >>
+    log(now() - start)
+
+因为平铺了 ⇒ 闭包里的 return 属于「外层函数」（非局部返回）
+    ├─ 这个 Lambda 要存起来 / 传给 Handler  ──▶  noinline
+    └─ 这个 Lambda 会跨线程、异步执行       ──▶  crossinline（禁止 return 逃逸）`,
+            stateSnapshot: {
+              '记忆钩子': '平铺 —— 把工人的活直接搬到现场干，不再派对象过来',
+              'inline': '消除匿名类与虚调用开销，适合高频小函数',
+              'noinline': '「这个 Lambda 我要当对象用」',
+              'crossinline': '「这个 Lambda 会异步跑，不许直接 return」',
+              '别滥用': '函数体大 + 调用点多 ⇒ 字节码膨胀',
+            },
+          },
+          {
+            title: 'reified',
+            tag: '回填',
+            desc: '只能用在 `inline` 函数上：展开时把 `T` 换成真实 Class，击穿 JVM 类型擦除。',
+            diagram: `inline fun <reified T : Activity> Context.startActivity(block: Intent.() -> Unit = {}) {
+    val intent = Intent(this, T::class.java)
+    intent.block(); startActivity(intent)
+}
+
+调用：   context.startActivity<DetailActivity> { putExtra("id", "1") }
+
+展开后： Intent(context, DetailActivity.class)
+                          ▲ T 已被替换成真实类，不再是被擦除的 Object
+
+对照：非 inline 函数里写 T::class.java / item is T ──▶ 直接编译失败
+      因为没有调用点展开，真实类型无处回填`,
+            stateSnapshot: {
+              '记忆钩子': '回填 —— 开工前就把图纸上的型号填成真的',
+              '为什么必须 inline': '类型只在调用点展开时回填，非内联函数没有展开点',
+              '解锁能力': 'T::class.java · item is T · 泛型 JSON 解析',
+              '典型用途': 'startActivity<T>() · filterIsInstance<T>() · fromJson<T>()',
+            },
+          },
+        ],
+        diagram: `═══════════════════════════════════════════════════════════════════════════
+  主线：这 5 个特性都在编译期改写代码，运行时零魔法
+  口诀：转发 · 外挂 · 换 this · 平铺 · 回填
+  记法：只背「你写的 ──▶ 脱糖成」这一层映射，边界全是它的推论
+═══════════════════════════════════════════════════════════════════════════
+
+① 委托 by ─────────────────────────────────────────── 转发 ──
+   你写的   val x by lazy { ... }   /   var s by MyDelegate()
+   脱糖成   生成 x$delegate 字段，读写改写为 delegate.getValue() / setValue()
+   故边界   只按函数名查找，不必实现任何接口（ReadWriteProperty 仅为提效）
+   故边界   类委托 : List by inner ──▶ 编译器生成全部转发方法，只覆写要拦截的
+
+② 扩展 fun / val ──────────────────────────────────── 外挂 ──
+   你写的   fun View.gone()   /   val Context.screenWidth
+   脱糖成   静态方法 ViewExtKt.gone(View recv)，接收者变成第一个入参
+   故边界   无多态：按声明类型静态分派，不看运行时类型
+   故边界   无幕后字段（属性必须写 get()）· 无私有访问（只能走 public）
+
+③ 带接收者 Lambda ────────────────────────────────── 换 this ──
+   你写的   block: Config.() -> Unit   +   setup { baseUrl = "..." }
+   脱糖成   签名实为 (Config) -> Unit，实例进首参；this.baseUrl = "..."
+   故边界   花括号内 this = 该实例，故可省掉全部前缀
+   故边界   这就是 Compose 组件树 / Gradle KTS / apply 的同一套母体语法
+
+④ inline 三兄弟 ──────────────────────────────────── 平铺 ──
+   你写的   inline fun m(block: () -> T)  ├─ noinline  └─ crossinline
+   脱糖成   block 函数体被复制平铺到调用处，不再创建匿名类对象
+   故边界   闭包内 return 属于外层函数（非局部返回）
+   故边界   要当对象存 ──▶ noinline；会异步跑 ──▶ crossinline；滥用则字节码膨胀
+
+⑤ reified ────────────────────────────────────────── 回填 ──
+   你写的   inline fun <reified T> ... Intent(this, T::class.java)
+   脱糖成   展开时 T 换成调用点真实类：Intent(ctx, DetailActivity.class)
+   故边界   必须搭 inline，否则没有展开点可回填，编译直接失败
+   故边界   擦除被击穿 ──▶ T::class.java 与 item is T 才可用
+
+═══════════════════════════════════════════════════════════════════════════`,
         caseStudy: `### 一、委托：属性委托与类委托（状态托管与无样板装饰器）
+
+> 记忆钩子 ——**转发**：\`by\` 的意思是「这活我不干，转给它干」；编译器只按函数名 \`getValue\` / \`setValue\` 找人，不看接口。
 
 - **1. 属性委托（Property Delegation）演进三步曲**：
   - **核心本质**：通过 \`by delegate\` 将属性的 \`get()\` 和 \`set()\` 转发给托管对象，省去重复的样板代码。其演进与使用分为清晰的三步：
@@ -44,8 +253,8 @@ var myName: String by CustomStringDelegate()
     - 既然不强制实现接口，官方为何提供这两个接口？它们是**选修的开发提效工具**：① 免手写很长的参数签名（IDE 自动补全）；② 提供泛型安全约束，方便结合生命周期打造工业级工具：
 
 \`\`\`kotlin
-// ⚡ 第三步：基于官方 ReadOnlyProperty 接口封装生命周期感知委托，离开页面自动置空防泄漏
-class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment, T> {
+// ⚡ 第三步：基于官方 ReadWriteProperty 接口封装生命周期感知委托，离开页面自动置空防泄漏
+class AutoClearedValue<T : Any>(fragment: Fragment) : ReadWriteProperty<Fragment, T> {
     private var value: T? = null
     init {
         fragment.viewLifecycleOwnerLiveData.observe(fragment) { owner ->
@@ -58,7 +267,11 @@ class AutoClearedValue<T : Any>(fragment: Fragment) : ReadOnlyProperty<Fragment,
     }
     override fun getValue(thisRef: Fragment, property: KProperty<*>): T =
         value ?: throw IllegalStateException("不能在 onDestroyView 之后访问 Binding")
-    fun setValue(newValue: T) { value = newValue }
+
+    // ⚡ 必须是 override 的三参签名，才能被 var ... by 识别为可写委托
+    override fun setValue(thisRef: Fragment, property: KProperty<*>, value: T) {
+        this.value = value
+    }
 }
 
 // 声明用法：一行代码搞定 Fragment 内存安全
@@ -88,6 +301,8 @@ class TrackedList<T>(
 \`\`\`
 
 ### 二、扩展函数与属性：对既有类的非侵入式能力装配
+
+> 记忆钩子 ——**外挂**：扩展进不了原类，编译后只是首参为接收者的静态方法，所以无多态、无私有访问、无幕后字段。
 
 - **解决痛点与机制**：不再需要编写死板难用的 \`ViewUtils.setVisibility(view, ...)\` 静态工具类。扩展机制允许在不修改类源码、不继承子类的情况下，直接为 Android 原生控件或第三方类型注入符合业务语意的成员方法与计算属性，调用体验如同原生 API。
 - **高频场景与工程实战**：
@@ -128,6 +343,8 @@ public final class UserExtKt {
 
 ### 三、带接收者的 Lambda：打造类型安全的流畅领域 DSL
 
+> 记忆钩子 ——**换 this**：\`T.() -> Unit\` 把实例注入闭包作用域，花括号里的 \`this\` 就是它，于是所有前缀都省掉了。
+
 - **解决痛点与机制**：普通闭包 \`() -> Unit\` 无法直接访问调用方上下文。带接收者的闭包 \`T.() -> Unit\` 将对象实例隐式注入为闭包内部的 \`this\`，使得在花括号作用域内可以直接调用该对象的所有公开属性与方法。这是 Jetpack Compose 声明式组件树、Gradle 构建脚本以及现代流畅配置 DSL 的底层母体语法。
 - **工程实战**：构建极简优雅的网络客户端配置器。
 
@@ -161,6 +378,8 @@ val client = setupHttpClient {
 
 ### 四、内联函数生态：inline / noinline / crossinline 的性能优化与安全避坑
 
+> 记忆钩子 ——**平铺**：代码被复制到调用处所以省掉了匿名类；也正因为平铺，闭包里的 \`return\` 属于外层函数，异步执行必须 \`crossinline\`。
+
 - **解决痛点与机制**：
   - 在高阶函数中每次传递 Lambda，底层都会在堆内存新建匿名内部类对象，高频调用时引发频繁 GC；\`inline\` 告诉编译器**直接把 Lambda 代码复制平铺到调用处**，彻底消除对象分配与虚方法栈帧开销；
   - **避坑红线**：内联函数的 Lambda 默认支持非局部返回（Non-local \`return\` 会直接跳出外层封闭函数）。若将 Lambda 传递到子线程、协程池或异步任务中执行，非局部返回会导致致命的线程栈崩溃。此时必须使用 \`crossinline\` 构筑安全防线。
@@ -188,6 +407,8 @@ inline fun runAsyncTask(
 \`\`\`
 
 ### 五、泛型具现化 reified：击穿 JVM 编译期类型擦除
+
+> 记忆钩子 ——**回填**：展开时把 \`T\` 换成真实 Class，所以 \`reified\` 离不开 \`inline\`。
 
 - **解决痛点与机制**：Java 泛型采用类型擦除（Type Erasure），编译后泛型信息全部变成 \`Object\`，无法在运行时直接通过 \`T::class.java\` 获取类元数据，也无法使用 \`item is T\` 进行类型判断。在 \`inline\` 函数中为泛型加上 \`reified\`，编译器由于在调用点将函数展开，**能够直接将 \`T\` 替换为调用处的真实 Class 常量**，使运行时重新具备类型感知能力。
 - **工程实战**：页面极简跳转语法糖，以及异构数据集合安全类型过滤。

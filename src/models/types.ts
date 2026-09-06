@@ -32,9 +32,18 @@ export interface PipelineStep {
   category?: 'theory' | 'engineering'; // 'theory' (理论与策略层) | 'engineering' (工程与运行时层)
 }
 
+/** Overrides the renderer's default section headings when a module reuses a slot differently. */
+export interface DeepDiveSectionTitles {
+  stepper?: string;
+  diagram?: string;
+  diagramCaption?: string;
+  caseStudy?: string;
+}
+
 export interface DeepDiveModule {
   tag: string;           // e.g. '底层机制', '性能调优', '架构陷阱', '调试利器'
   title: string;         // Module title
+  sectionTitles?: DeepDiveSectionTitles;
   pipeline?: PipelineStep[];   // Optional Theory-to-Engineering pipeline chain diagram
   metaphor?: DeepDiveMetaphor; // Optional cognitive metaphor & golden memory formula
   explanation?: string;  // Optional deep dive explanation (supports rich structured paragraphs)
