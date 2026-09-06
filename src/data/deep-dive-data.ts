@@ -7,52 +7,14 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
         tag: '现代语言',
         title: 'Kotlin 核心特性：委托、扩展与内联具现化',
         sectionTitles: {
-          stepper: '五大特性脱糖对照（交互式记忆卡）',
-          diagram: '一图总览：语法糖 ➔ 脱糖形态 ➔ 硬性边界',
-          diagramCaption: '编译期改写全景图 · 语法糖与字节码本质对照',
+          diagram: '一图记住全部：意图 ➔ 脱糖形态 ➔ 硬性边界',
+          diagramCaption: '编译期改写全景图',
+          stepper: '逐个看脱糖过程（交互式记忆卡）',
           caseStudy: '核心实战与用法指南',
         },
-        metaphor: {
-          title: '编译器代笔：五种样板代码的省写术',
-          formula: '委托=转发 · 扩展=静态方法 · 接收者=换 this · inline=代码平铺 · reified=类型回填',
-          metaphorDesc: '把这五个特性想成同一个助理在替你抄样板：**你只写意图，编译器在编译期把重复代码补齐，运行时零魔法**。所以每个特性"能做什么、不能做什么"都不必硬背——只要记住它最终被抄成什么形态，边界自然推得出来。口诀五个动作：**转发 · 外挂 · 换 this · 平铺 · 回填**。',
-        },
-        explanation: `### 一、先记一条主线：五个特性都在编译期替你抄样板
+        explanation: `五个特性共用一条主线：**你只写意图，编译器在编译期把重复代码补齐，运行时零魔法**。因此只需记住每个特性"被抄成什么形态"，所有能力边界都是它的推论。
 
-- 这五个特性看似彼此无关，其实共用一条主线：**你写意图，编译器补样板**。整章真正需要记住的只有 5 个"脱糖形态"。
-
-| 特性 | 你写的意图 | 编译器抄成什么 | 一句话记住 |
-|---|---|---|---|
-| 委托 \`by\` | 这活我不干，转出去 | 生成 \`xxx$delegate\` 字段，读写转成 \`getValue\` / \`setValue\` 调用 | **转发** |
-| 扩展 \`fun View.x()\` | 给既有类加语义化 API | 首参是接收者的静态方法 | **外挂** |
-| 带接收者 Lambda \`T.() -> Unit\` | 让花括号里少写前缀 | 把实例塞进闭包，作用域内 \`this\` 就是它 | **换 this** |
-| \`inline\` | 别为每个 Lambda 新建对象 | 把 Lambda 函数体复制平铺到调用处 | **平铺** |
-| \`reified\` | 运行时还想知道 T 是谁 | 展开时把 \`T\` 换成真实 Class 常量 | **回填** |
-
-### 二、能力边界不用背：全都能从"脱糖成什么"推出来
-
-- **扩展没有多态、拿不到 \`private\`、扩展属性没有幕后字段** ← 因为它只是个静态方法。静态方法自然不参与虚分派（按**声明类型**而非运行时类型分派）、没有类内访问权，也不可能凭空多出字段。
-- **\`reified\` 必须写在 \`inline\` 函数上** ← 因为真实类型是在**调用点展开时**回填的；不内联就没有展开点，也就无处可填。
-- **为什么需要 \`crossinline\`** ← 因为 \`inline\` 把闭包代码平铺进了调用处，闭包里的 \`return\` 就变成**外层函数**的 return（非局部返回）；这段代码一旦被扔到子线程或异步回调里执行，就会跳错栈。
-- **属性委托只认 \`getValue\` / \`setValue\` 这几个名字、不认接口** ← 因为它走编译期**约定（convention）**，与操作符重载是同一套机制；\`ReadWriteProperty\` 只是帮你补签名的提效工具，不是必需的父接口。
-
-> 一句话收束：背 5 个脱糖形态，剩下所有"为什么不能这样写"都是它的推论。
-
-### 三、易混四兄弟：inline / noinline / crossinline / reified
-
-| 关键字 | 解决的问题 | 判断依据（什么时候用它） |
-|---|---|---|
-| \`inline\` | 高频调用时 Lambda 反复在堆上新建匿名类对象 | 函数体小、调用点多、参数是 Lambda |
-| \`noinline\` | 平铺后的 Lambda 没有对象实体，无法被传递保存 | 这个 Lambda 要**存起来或交给别人**（如 \`Handler.post\`） |
-| \`crossinline\` | 平铺导致的非局部 return 跳错栈 | 这个 Lambda 会**异步或跨线程**执行 |
-| \`reified\` | JVM 类型擦除后运行时拿不到 \`T\` | 函数体里要写 \`T::class.java\` 或 \`item is T\` |
-
-### 四、自测三问（答得上就算真记住了）
-
-1. \`fun View.tag(): String\` 与 \`View\` 已有的同名成员方法冲突，调用时走哪个？——**成员永远优先**；扩展是静态方法，编译期就按声明类型定死了。
-2. \`fun <reified T> parse(json: String): T\` 为什么编译不过？——\`reified\` 离不开 \`inline\`，没有调用点展开就无法回填真实类型。
-3. 一个会被 \`post\` 到子线程执行的 Lambda 参数该标什么？——\`crossinline\`（禁止 return 逃逸）；若还需要把它当对象存起来，则用 \`noinline\`。
-`,
+口诀五个动作：**转发（by）· 外挂（扩展）· 换 this（带接收者）· 平铺（inline）· 回填（reified）**。`,
         stepper: [
           {
             title: '委托 by',
@@ -71,16 +33,15 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
     ──▶ 编译器逐个生成 size / add / remove / iterator ... 的转发方法
         你只覆写想拦截的那两三个`,
             stateSnapshot: {
-              '记忆钩子': '转发 —— by 就是「这活我不干，转给它干」',
+              '记忆钩子': '转发 —— 这活我不干，转给它干',
               '编译器认的名字': 'getValue / setValue / provideDelegate',
-              '不需要什么': '任何接口继承（ReadWriteProperty 只是提效工具）',
               '高频落地': 'by lazy · by viewModels() · by autoCleared()',
             },
           },
           {
             title: '扩展 fun / val',
             tag: '外挂',
-            desc: '不改源码、不继承，给既有类装配语义化 API；本质是**首参为接收者的静态方法**。',
+            desc: '不改源码给既有类装配 API；本质是**首参为接收者的静态方法**。',
             diagram: `你写的：
     fun View.visibleOrGone(visible: Boolean) {
         visibility = if (visible) View.VISIBLE else View.GONE
@@ -95,16 +56,15 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
     view.visibleOrGone(true)   ──▶   ViewExtKt.visibleOrGone(view, true)
                                      ▲ 接收者只是第一个普通入参`,
             stateSnapshot: {
-              '记忆钩子': '外挂 —— 贴在原类外面的挂件，进不去类内部',
-              '无多态': '静态绑定，按声明类型分派，不看运行时类型',
-              '无幕后字段': '扩展属性必须自己写 get()，不能有初始值',
-              '无私有访问': '只能调用目标类的 public 成员',
+              '记忆钩子': '外挂 —— 贴在原类外面，进不去类内部',
+              '三个"没有"': '无多态 · 无幕后字段 · 无私有访问',
+              '高频落地': 'View.gone() · Context.toast() · 屏幕尺寸属性',
             },
           },
           {
             title: '带接收者 Lambda',
             tag: '换 this',
-            desc: '`T.() -> Unit` 把实例注入闭包作为隐式 `this`，是 Compose / Gradle KTS 等 DSL 的母体语法。',
+            desc: '`T.() -> Unit` 把实例注入闭包作为隐式 `this`，是各类 DSL 的母体语法。',
             diagram: `你写的：
     fun setupHttpClient(block: HttpClientConfig.() -> Unit): HttpClientConfig {
         val config = HttpClientConfig()
@@ -122,10 +82,9 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
     实例被塞进第一个参数 ──▶ 花括号内的 this = 那个 config
     于是 baseUrl = ... 实际是 this.baseUrl = ...`,
             stateSnapshot: {
-              '记忆钩子': '换 this —— 进门自动换鞋，作用域里的 this 变了',
-              '普通闭包': '() -> Unit 拿不到调用方上下文，必须手写前缀',
-              '带接收者': 'T.() -> Unit 隐式注入 this = T',
-              '生态实例': 'Compose 组件树 · Gradle KTS · buildString · apply',
+              '记忆钩子': '换 this —— 进门换鞋，作用域里的 this 变了',
+              '对比': '() -> Unit 拿不到上下文；T.() -> Unit 有 this',
+              '高频落地': 'Compose 组件树 · Gradle KTS · buildString · apply',
             },
           },
           {
@@ -145,10 +104,8 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
     ├─ 这个 Lambda 要存起来 / 传给 Handler  ──▶  noinline
     └─ 这个 Lambda 会跨线程、异步执行       ──▶  crossinline（禁止 return 逃逸）`,
             stateSnapshot: {
-              '记忆钩子': '平铺 —— 把工人的活直接搬到现场干，不再派对象过来',
-              'inline': '消除匿名类与虚调用开销，适合高频小函数',
-              'noinline': '「这个 Lambda 我要当对象用」',
-              'crossinline': '「这个 Lambda 会异步跑，不许直接 return」',
+              '记忆钩子': '平铺 —— 把活搬到现场干，不再派对象过来',
+              '副产品': '闭包内 return 属于外层函数（非局部返回）',
               '别滥用': '函数体大 + 调用点多 ⇒ 字节码膨胀',
             },
           },
@@ -169,50 +126,34 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
 对照：非 inline 函数里写 T::class.java / item is T ──▶ 直接编译失败
       因为没有调用点展开，真实类型无处回填`,
             stateSnapshot: {
-              '记忆钩子': '回填 —— 开工前就把图纸上的型号填成真的',
-              '为什么必须 inline': '类型只在调用点展开时回填，非内联函数没有展开点',
+              '记忆钩子': '回填 —— 开工前把图纸上的型号填成真的',
               '解锁能力': 'T::class.java · item is T · 泛型 JSON 解析',
-              '典型用途': 'startActivity<T>() · filterIsInstance<T>() · fromJson<T>()',
+              '高频落地': 'startActivity<T>() · filterIsInstance<T>()',
             },
           },
         ],
-        diagram: `═══════════════════════════════════════════════════════════════════════════
-  主线：这 5 个特性都在编译期改写代码，运行时零魔法
-  口诀：转发 · 外挂 · 换 this · 平铺 · 回填
-  记法：只背「你写的 ──▶ 脱糖成」这一层映射，边界全是它的推论
-═══════════════════════════════════════════════════════════════════════════
+        diagram: `          你写的（意图）                             编译器脱糖后（真相）
+   ┌──────────────────────────┐        ┌─────────────────────────────────────┐
+   │ val x by lazy { ... }    │ ─────> │ x$delegate.getValue(this, ::x)      │  ① 转发
+   │ fun View.gone()          │ ─────> │ static ViewExtKt.gone(View recv)    │  ② 外挂
+   │ block: Config.() -> Unit │ ─────> │ (Config) -> Unit,  this = config    │  ③ 换 this
+   │ inline fun m(block)      │ ─────> │ << block body pasted at callsite >> │  ④ 平铺
+   │ inline fun <reified T>   │ ─────> │ T  ==>  DetailActivity.class        │  ⑤ 回填
+   └──────────────────────────┘        └─────────────────────────────────────┘
+                                        ▲ 只背这一列，下面全是它的推论
 
-① 委托 by ─────────────────────────────────────────── 转发 ──
-   你写的   val x by lazy { ... }   /   var s by MyDelegate()
-   脱糖成   生成 x$delegate 字段，读写改写为 delegate.getValue() / setValue()
-   故边界   只按函数名查找，不必实现任何接口（ReadWriteProperty 仅为提效）
-   故边界   类委托 : List by inner ──▶ 编译器生成全部转发方法，只覆写要拦截的
 
-② 扩展 fun / val ──────────────────────────────────── 外挂 ──
-   你写的   fun View.gone()   /   val Context.screenWidth
-   脱糖成   静态方法 ViewExtKt.gone(View recv)，接收者变成第一个入参
-   故边界   无多态：按声明类型静态分派，不看运行时类型
-   故边界   无幕后字段（属性必须写 get()）· 无私有访问（只能走 public）
+   右列形态推出全部硬性边界，都不必单独背：
+   static method         ──▶  无多态 · 无幕后字段 · 无私有访问
+   pasted at callsite    ──▶  return 属于外层函数，异步执行必须 crossinline
+   callsite expansion    ──▶  reified 必须搭 inline，否则无处可填
+   name convention       ──▶  属性委托不需要实现任何接口
 
-③ 带接收者 Lambda ────────────────────────────────── 换 this ──
-   你写的   block: Config.() -> Unit   +   setup { baseUrl = "..." }
-   脱糖成   签名实为 (Config) -> Unit，实例进首参；this.baseUrl = "..."
-   故边界   花括号内 this = 该实例，故可省掉全部前缀
-   故边界   这就是 Compose 组件树 / Gradle KTS / apply 的同一套母体语法
-
-④ inline 三兄弟 ──────────────────────────────────── 平铺 ──
-   你写的   inline fun m(block: () -> T)  ├─ noinline  └─ crossinline
-   脱糖成   block 函数体被复制平铺到调用处，不再创建匿名类对象
-   故边界   闭包内 return 属于外层函数（非局部返回）
-   故边界   要当对象存 ──▶ noinline；会异步跑 ──▶ crossinline；滥用则字节码膨胀
-
-⑤ reified ────────────────────────────────────────── 回填 ──
-   你写的   inline fun <reified T> ... Intent(this, T::class.java)
-   脱糖成   展开时 T 换成调用点真实类：Intent(ctx, DetailActivity.class)
-   故边界   必须搭 inline，否则没有展开点可回填，编译直接失败
-   故边界   擦除被击穿 ──▶ T::class.java 与 item is T 才可用
-
-═══════════════════════════════════════════════════════════════════════════`,
+   ④ 三兄弟怎么选？看这个 Lambda 会被怎样使用：
+   inline                ──▶  当场执行就好，消除匿名类分配
+   noinline              ──▶  要存起来、当对象传给别人
+   crossinline           ──▶  会异步 / 跨线程跑，禁止 return 逃逸
+   reified               ──▶  函数体里要认出 T（必须搭 inline）`,
         caseStudy: `### 一、委托：属性委托与类委托（状态托管与无样板装饰器）
 
 > 记忆钩子 ——**转发**：\`by\` 的意思是「这活我不干，转给它干」；编译器只按函数名 \`getValue\` / \`setValue\` 找人，不看接口。

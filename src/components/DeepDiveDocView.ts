@@ -131,24 +131,7 @@ function renderSingleChapterView(
   let nextSectionNumber = hasFirstSection ? 2 : 1;
   const numToChinese = ['一', '二', '三', '四', '五', '六'];
 
-  // Section: Interactive Step-by-Step State Stepper (if present)
-  if (mod.stepper && mod.stepper.length > 0) {
-    const stepperSection = document.createElement('section');
-    stepperSection.className = 'chapter-content-section';
-    const sectionNumStr = numToChinese[nextSectionNumber - 1] || `${nextSectionNumber}`;
-    nextSectionNumber++;
-
-    stepperSection.innerHTML = `
-      <div class="section-header" style="margin-top:24px;">
-        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-        <h2 class="section-header-title">${sectionNumStr}、${mod.sectionTitles?.stepper ?? '执行时序与状态机动态演进 (交互式步进)'}</h2>
-      </div>
-    `;
-    stepperSection.appendChild(renderStepperComponent(mod.stepper, platform));
-    container.appendChild(stepperSection);
-  }
-
-  // Section: Architecture / Sequence Diagram (if present)
+  // Section: Architecture / Sequence Diagram (if present) — visual overview comes first
   if (mod.diagram) {
     const diagramSection = document.createElement('section');
     diagramSection.className = 'chapter-content-section';
@@ -191,6 +174,23 @@ function renderSingleChapterView(
     });
 
     container.appendChild(diagramSection);
+  }
+
+  // Section: Interactive Step-by-Step Stepper (if present)
+  if (mod.stepper && mod.stepper.length > 0) {
+    const stepperSection = document.createElement('section');
+    stepperSection.className = 'chapter-content-section';
+    const sectionNumStr = numToChinese[nextSectionNumber - 1] || `${nextSectionNumber}`;
+    nextSectionNumber++;
+
+    stepperSection.innerHTML = `
+      <div class="section-header" style="margin-top:24px;">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">${sectionNumStr}、${mod.sectionTitles?.stepper ?? '执行时序与状态机动态演进 (交互式步进)'}</h2>
+      </div>
+    `;
+    stepperSection.appendChild(renderStepperComponent(mod.stepper, platform));
+    container.appendChild(stepperSection);
   }
 
   // Extended Top-Down Deep Dive Section (if present)
