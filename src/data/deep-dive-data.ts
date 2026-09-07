@@ -1743,7 +1743,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
           explanation: '网络通信（OkHttp）：核心原理与实战管线',
           caseStudy: '二、本地存储（Room）：核心实战与离线流水线',
         },
-        explanation: `### 一、Dispatcher 分发器与高并发队列调度机制
+        explanation: `### Dispatcher 分发器与高并发队列调度机制
 
 - **高并发阀门痛点**：大量网络请求无序并发会迅速耗尽客户端 Socket 资源与文件描述符，或者瞬时打满服务端带宽。OkHttp 通过 \`Dispatcher\` 统筹调度，保障高吞吐与有序背压。
 - **调度核心原理（双队列与动态提升）**：
@@ -1754,7 +1754,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
      - \`runningSyncCalls\`：同步阻塞式请求队列；
   3. **任务提升触发（promoteAndExecute）**：新异步任务入队时，或任意请求完成回调 \`finished()\` 释放并发配额时，分发器自动从 \`readyAsyncCalls\` 头部筛选符合条件的 Call 移入 \`runningAsyncCalls\`，并提交给内置的 \`ExecutorService\`（零核心线程、无界缓冲的 CachedThreadPool）并发执行。
 
-### 二、ConnectionPool 连接池与 Socket 多路复用机制
+### ConnectionPool 连接池与 Socket 多路复用机制
 
 - **建连开销痛点**：TCP 三次握手与 TLS 密钥协商物理延迟极大（通常耗时 100~300ms）。频繁新建与销毁 Socket 会严重损耗网络性能与电量。
 - **连接池复用与防泄漏原理**：
@@ -1762,7 +1762,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
   2. **后台守护清理线程（cleanupRunnable）**：采用类似垃圾回收的弱引用计数算法（\`List<Reference<RealCall>>\`）；遍历发现某个连接的引用计数为 0 且空闲时间超标，后台线程自动触发 \`socket.closeQuietly()\` 关闭物理通道并移出连接池；
   3. **防泄漏机制**：若业务层消费完数据未显式调用 \`response.close()\` 或 \`response.body.close()\`，OkHttp 内部会在下一次清理周期通过未回收的弱引用感知到泄漏，强行关闭并回收底层 Socket。
 
-### 三、责任链拦截器管线（RealInterceptorChain）执行全流程
+### 责任链拦截器管线（RealInterceptorChain）执行全流程
 
 - **切面解耦思想**：通过责任链模式将重试、重定向、公共标头、协议协商、缓存与物理 I/O 拆分为独立的拦截器切面，每个拦截器只需调用 \`chain.proceed(request)\` 驱动下一棒，并对拿到的响应执行后置加工。
 - **五大内置核心拦截器协同顺序**：
@@ -1772,7 +1772,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
   4. \`ConnectInterceptor\`：核心寻址与物理连接建立，从 \`ConnectionPool\` 捞取空闲连接或握手新建 \`RealConnection\`，并创建网络通信编解码器 \`HttpCodec\`；
   5. \`CallServerInterceptor\`：终点拦截器，真正向物理网络 I/O 字节流写入 Request 报文（请求行、头、体），并读取远程服务端的 Response 字节流（状态行、头、体）。
 
-### 四、OkHttp 工业级实战：Token 无感自动刷新拦截器
+### OkHttp Token 无感自动刷新拦截器实战
 
 - **场景解释**：API 采用双 Token 机制（短期 AccessToken + 长期 RefreshToken）。当多个并发网络请求同时遇到 401 Unauthorized 时，必须确保**只发起一次 RefreshToken 换票请求**，换到新 Token 后唤醒所有等待的请求重新发起，避免并发换票死锁或重复失效。
 
@@ -1824,7 +1824,7 @@ class TokenAuthenticator(
 }
 \`\`\`
 
-### 五、OkHttp 工业级实战：全链路网络耗时监控与防篡改签名拦截器
+### 全链路网络耗时监控与防篡改签名拦截器实战
 
 - **场景解释**：金融级接口要求防重放攻击与防数据篡改，自动为请求体按字典序拼接私钥生成 HMAC-SHA256 签名；同时借助 \`EventListener\` 精确采集 DNS 解析、TCP 建连、TLS 握手及首包到达（TTFB）耗时。
 
@@ -1870,7 +1870,7 @@ class MetricEventListener : EventListener() {
     }
 }
 \`\`\``,
-        caseStudy: `### 一、数据库安全升级与跨版本平滑迁移实战（AutoMigration 与复杂临时表三步法）
+        caseStudy: `### 数据库安全升级与跨版本平滑迁移实战（AutoMigration 与复杂临时表三步法）
 
 - **解决痛点与实战规范**：应用版本迭代时，本地 SQLite 表结构变更（新增字段、重命名列）极易引发用户端崩盘。严禁在线上开启 \`fallbackToDestructiveMigration()\`，必须严格遵循可追溯的迁移规范。
 - **两大迁移姿势**：
@@ -1906,7 +1906,7 @@ abstract class AppDatabase : RoomDatabase() {
 }
 \`\`\`
 
-### 二、一对多与多对多声明式关系建模（@Embedded、@Relation 与交叉表 Junction）
+### 一对多与多对多声明式关系建模（@Embedded、@Relation 与交叉表 Junction）
 
 - **解决痛点与实战规范**：打破传统手动手写多表联查 SQL 并繁琐映射实体的旧模式。利用 Room 声明式关系注解，自动分步查库并装配出完整的领域对象树。
 - **两种高频关系模型**：
@@ -1944,7 +1944,7 @@ interface OrderDao {
 }
 \`\`\`
 
-### 三、强一致性事务管理（@Transaction 声明式与 withTransaction 编程式）
+### 强一致性事务管理（@Transaction 声明式与 withTransaction 编程式）
 
 - **解决痛点与实战规范**：在多表批量读写、或者“先清空旧数据后插入新数据”场景下，必须保证原子性（Atomicity）。中间任何一步失败，全量数据自动回滚，杜绝脏数据。
 - **两种事务控制手段**：
@@ -1978,7 +1978,7 @@ class InventoryRepository(private val db: AppDatabase) {
 }
 \`\`\`
 
-### 四、离线优先单一真实数据源（SOT）架构协同流水线（OkHttp + Room）
+### 离线优先单一真实数据源（SOT）架构协同流水线（OkHttp + Room）
 
 - **解决痛点与实战规范**：现代移动端极致体验原则——“UI 永远只观察本地数据库（秒开且无网络时可读），后台静默发起网络拉取，利用事务写入数据库，自动触发上层 Flow 刷新”，构建不可破败的单一可信数据源（SOT）。
 

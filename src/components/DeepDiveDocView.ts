@@ -113,10 +113,13 @@ function renderSingleChapterView(
       principleSection.className = 'chapter-content-section';
       const hasSubPanels = mod.explanation.includes('### ');
 
+      const expTitle = mod.sectionTitles?.explanation ?? '核心原理解析与底层机制';
+      const headingText = /^[一二三四五六七八九十\d]+[、\.]/.test(expTitle) ? expTitle : `一、${expTitle}`;
+
       principleSection.innerHTML = `
         <div class="section-header">
           <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
-          <h2 class="section-header-title">一、${mod.sectionTitles?.explanation ?? '核心原理解析与底层机制'}</h2>
+          <h2 class="section-header-title">${headingText}</h2>
         </div>
         ${hasSubPanels
           ? `<div class="case-study-list ${platform === 'ios' ? 'deepdive-ios' : ''}">${formatCaseStudyHtml(mod.explanation, platform)}</div>`
@@ -761,6 +764,8 @@ function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'and
 
     if (firstLine.startsWith('### ')) {
       title = firstLine.replace(/^###\s+/, '').trim();
+      // Clean duplicate leading index (e.g. "一、", "1. ", "01. ") since badgeNumber already renders "01", "02"...
+      title = title.replace(/^(?:[一二三四五六七八九十]+|\d+)[、\.]\s*/, '');
       bodyText = lines.slice(1).join('\n').trim();
     } else {
       bodyText = sec;
