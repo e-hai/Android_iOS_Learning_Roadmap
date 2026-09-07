@@ -1771,6 +1771,80 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
   3. \`CacheInterceptor\`：严格遵循 RFC 7234 HTTP 缓存规范，根据 Cache-Control 决定是直接返回本地磁盘缓存还是发起网络请求，命中 304 时智能合并响应头；
   4. \`ConnectInterceptor\`：核心寻址与物理连接建立，从 \`ConnectionPool\` 捞取空闲连接或握手新建 \`RealConnection\`，并创建网络通信编解码器 \`HttpCodec\`；
   5. \`CallServerInterceptor\`：终点拦截器，真正向物理网络 I/O 字节流写入 Request 报文（请求行、头、体），并读取远程服务端的 Response 字节流（状态行、头、体）。
+- **Dispatcher 调度 ➔ 责任链 ➔ 连接池协同全景执行图**：
+
+\`\`\`text
+                    client.newCall(request).enqueue(callback)
+                                       │
+                                       ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ 【第一阶段：Dispatcher 分发器队列调度与前置背压】                                      │
+│                                                                                        │
+│   并发条件判断:                                                                        │
+│   runningAsyncCalls.size < 64 (总并发) 并且 callsPerHost(host) < 5 (单域名并发) ?      │
+│            │                                                    │                      │
+│          [YES] (配额允许)                                     [NO] (触发背压)          │
+│            ▼                                                    ▼                      │
+│   移入 runningAsyncCalls 队列                          压入 readyAsyncCalls 缓冲等待队列│
+│            │                                                    ▲                      │
+│            ▼                                                    │ 释放配额后动态提升   │
+│   提交给 ThreadPoolExecutor                                     │ promoteAndExecute()  │
+│   (0 核心 + SynchronousQueue 手递手无缓冲队列)                  │                      │
+│            │                                                    │                      │
+│            ▼                                                    │                      │
+│   Worker 线程启动，执行 AsyncCall.executeOn()                    │                      │
+│   (请求完成后回调 finished() 释放并发配额) ─────────────────────┘                      │
+└────────────┬───────────────────────────────────────────────────────────────────────────┘
+             │
+             ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ 【第二阶段：RealInterceptorChain 责任链拦截器管线（递归推进模型）】                    │
+│                                                                                        │
+│   chain.proceed(request) 驱动责任链逐级向下，每层拦截器处理「前置请求」与「后置响应」  │
+│                                                                                        │
+│   ┌────────────────────────────────┐                                                   │
+│   │ 1. Application Interceptors    │ 业务全局切面: 统一加签、全局 Header、Token 注入   │
+│   └───────────────┬────────────────┘                                                   │
+│                   ▼ chain.proceed()                                                    │
+│   ┌────────────────────────────────┐                                                   │
+│   │ 2. RetryAndFollowUpInterceptor │ 容灾重试与重定向: 网络异常自动重试、3xx 自动重定向│
+│   └───────────────┬────────────────┘                                                   │
+│                   ▼ chain.proceed()                                                    │
+│   ┌────────────────────────────────┐                                                   │
+│   │ 3. BridgeInterceptor           │ 协议桥接: 补充 Host/Keep-Alive、Gzip 压缩/解压    │
+│   └───────────────┬────────────────┘                                                   │
+│                   ▼ chain.proceed()                                                    │
+│   ┌────────────────────────────────┐                                                   │
+│   │ 4. CacheInterceptor            │ HTTP 缓存: RFC 7234 磁盘缓存匹配，命中 304 快速合并│
+│   └───────────────┬────────────────┘                                                   │
+│                   ▼ 未命中缓存或需网络再验证                                           │
+│   ┌────────────────────────────────┐                                                   │
+│   │ 5. ConnectInterceptor          │ 核心寻址与物理建连:                               │
+│   │                                │  ├─ 优先从 ConnectionPool 捞取已存活 Socket 管道   │
+│   │                                │  └─ 无复用则发起 TCP 三次握手 + TLS 密钥协商建连 │
+│   └───────────────┬────────────────┘                                                   │
+│                   ▼ chain.proceed()                                                    │
+│   ┌────────────────────────────────┐                                                   │
+│   │ 6. Network Interceptors        │ 物理传输监控: 抓包、Stetho、监控实际发包字节流耗时│
+│   └───────────────┬────────────────┘                                                   │
+│                   ▼ chain.proceed()                                                    │
+│   ┌────────────────────────────────┐                                                   │
+│   │ 7. CallServerInterceptor       │ 终点 I/O 读写:                                    │
+│   │                                │  ├─ 向 HttpCodec Socket 写入 Request 报文 (头+体) │
+│   │                                │  └─ 从 Socket 字节流读取 Response 报文 (状态+体)  │
+│   └───────────────┬────────────────┘                                                   │
+└───────────────────┼────────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼ 拿到 Response 报文，沿责任链反向逆序逐级向上传递（解压缩、写入缓存等）
+┌───────────────────┴────────────────────────────────────────────────────────────────────┐
+│ 【第三阶段：响应回传与队列推进】                                                       │
+│                                                                                        │
+│   1. 回调业务层: callback.onResponse(call, response) 或 callback.onFailure(call, e)    │
+│   2. 异步线程执行结束，触发 Dispatcher.finished(this)                                  │
+│   3. Dispatcher 从 runningAsyncCalls 移除该任务，并发配额 -1                           │
+│   4. 立即调用 promoteAndExecute()，从 readyAsyncCalls 头部捞取新任务塞入线程池执行     │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+\`\`\`
 
 ### OkHttp Token 无感自动刷新拦截器实战
 
