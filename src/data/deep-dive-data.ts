@@ -1517,7 +1517,8 @@ fun NativeVideoPlayer(
   1. **强类型路由契约（NavKey）**：所有页面路由均声明为实现 \`NavKey\` 的 Kotlin \`@Serializable\` 数据类/对象，参数空安全与类型系统由编译器强制约束；
   2. **entryProvider 泛型 DSL 架构**：从初期的 \`when(route)\` 表达式升级为现代 \`entryProvider { entry<T> { ... } }\` 模式，支持按路由 Class 模块化独立注册，杜绝巨型单文件路由表；
   3. **纯数据驱动状态栈**：回退栈退化为由 \`rememberNavBackStack(initialKey)\` 托管的响应式列表，跳转即 \`add()\`，返回即 \`pop()\`，清栈即直接切片，与 iOS SwiftUI \`NavigationStack(path: \$path)\` 架构完全对齐；
-  4. **原生多层 Overlay 与预测性返回手势**：1.2.0 重点重构了 \`SceneState\` 与 \`OverlayScene\`，彻底修复了模态底部弹窗（\`ModalBottomSheet\`）在多层嵌套快速返回时动画残留与状态复用异常，无缝契合 Android 14/15 预测性返回。
+  4. **原生多层 Overlay 与预测性返回手势**：1.2.0 重点重构了 \`SceneState\` 与 \`OverlayScene\`，彻底修复了模态底部弹窗（\`ModalBottomSheet\`）在多层嵌套快速返回时动画残留与状态复用异常，无缝契合 Android 14/15 预测性返回；
+  5. **最新官方结果回传体系（ResultEventBus）**：彻底废弃旧版 \`previousBackStackEntry.savedStateHandle\`，通过 \`rememberResultEventBusNavEntryDecorator()\` 挂载装饰器，发送端调用 \`LocalResultEventBus.current.sendResult(data)\`，接收端通过 \`ResultEffect<T>\` 声明式单次安全消费。
 
 \`\`\`kotlin
 // 1. Gradle 依赖配置 (模块级 build.gradle.kts)
@@ -1527,7 +1528,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 }
 
-// 2. 强类型路由节点（实现 NavKey 标记接口）
+// 2. 强类型路由与回传领域实体 (纯数据契约，严格不可变)
 @Serializable
 sealed interface AppRoute : NavKey {
     @Serializable
@@ -1536,34 +1537,48 @@ sealed interface AppRoute : NavKey {
     @Serializable
     data class ProductDetail(val productId: String, val fromSearch: Boolean = false) : AppRoute
 
-    // 支持全屏页面与 ModalBottomSheet 模态弹窗统一节点
+    // 模态弹窗面板统一纳管为路由节点
     @Serializable
     data class CouponPicker(val currentCouponId: String?) : AppRoute
 }
 
-// 3. 现代纯数据驱动导航架构中心 (1.2.0-alpha06 最新用法)
+// 跨页面返回的数据载体（强类型且支持序列化）
+@Serializable
+data class SelectedCoupon(val id: String, val name: String, val discountPrice: Double)
+
+// 3. 现代纯数据驱动导航架构与最新结果回传闭环 (1.2.0-alpha06 官方最新范式)
 @Composable
 fun Nav3ModernApp() {
     // ⚡ 状态即路由栈：可持久化可观测，初始节点为商品列表
     val backStack = rememberNavBackStack<AppRoute>(AppRoute.ProductList)
-    
-    // 跨页结果回传承载：直接使用 Compose 状态提升，告别 savedStateHandle hack
-    var activeCouponName by remember { mutableStateOf<String?>(null) }
 
     // ⚡ NavDisplay：将当前数据栈投影为 UI，内置预测性返回手势监听
     NavDisplay(
         backstack = backStack,
-        onBack = { backStack.pop() }, // 系统返回键统一拦截与出栈
+        onBack = { backStack.removeLastOrNull() },
+        // ⚡ 核心机制 ①：挂载官方装饰器链（状态恢复 + 跨页结果总线）
+        entryDecorators = listOf(
+            rememberSaveableStateHolderNavEntryDecorator(),
+            rememberResultEventBusNavEntryDecorator()
+        ),
         entryProvider = entryProvider {
-            // 模块 A：商品列表主入口
+            // 模块 A：商品列表主入口（结果接收端）
             entry<AppRoute.ProductList> {
+                var activeCoupon by remember { mutableStateOf<SelectedCoupon?>(null) }
+
+                // ⚡ 核心机制 ②：官方 ResultEffect 单次安全监听，精准消费一次，重组/旋转绝不重复触发！
+                ResultEffect<SelectedCoupon> { coupon ->
+                    activeCoupon = coupon
+                    Log.d("Nav3", "已接收到跨页回传优惠券: \${coupon.name}")
+                }
+
                 ProductListScreen(
-                    selectedCoupon = activeCouponName,
+                    selectedCoupon = activeCoupon,
                     onNavigateToDetail = { id ->
                         backStack.add(AppRoute.ProductDetail(productId = id))
                     },
                     onOpenCouponPicker = {
-                        backStack.add(AppRoute.CouponPicker(currentCouponId = activeCouponName))
+                        backStack.add(AppRoute.CouponPicker(currentCouponId = activeCoupon?.id))
                     }
                 )
             }
@@ -1573,24 +1588,27 @@ fun Nav3ModernApp() {
                 ProductDetailScreen(
                     productId = detailRoute.productId,
                     fromSearch = detailRoute.fromSearch,
-                    onBack = { backStack.pop() }, // 单步出栈返回
+                    onBack = { backStack.removeLastOrNull() },
                     onPopToRoot = {
                         // 一键清栈回首页：直接操作列表切片，告别晦涩的 popUpTo 语法
-                        while (backStack.size > 1) backStack.pop()
+                        while (backStack.size > 1) backStack.removeLastOrNull()
                     }
                 )
             }
 
-            // 模块 C：优惠券选择模态面板 (1.2.0 优化了多层 OverlayScene 动画与生命周期)
+            // 模块 C：优惠券选择模态面板 (结果生产端)
             entry<AppRoute.CouponPicker> { pickerRoute ->
+                // ⚡ 核心机制 ③：获取当前 NavEntry 作用域内的 LocalResultEventBus
+                val resultBus = LocalResultEventBus.current
+
                 CouponPickerBottomSheet(
                     currentCouponId = pickerRoute.currentCouponId,
-                    onCouponSelected = { couponName ->
-                        // ⚡ 核心闭环：选定结果回传，并立即出栈返回上级页面
-                        activeCouponName = couponName
-                        backStack.pop()
+                    onCouponSelected = { coupon ->
+                        // ⚡ 核心机制 ④：直接向总线发送强类型对象并即刻出栈，彻底告别 savedStateHandle！
+                        resultBus.sendResult<SelectedCoupon>(result = coupon)
+                        backStack.removeLastOrNull()
                     },
-                    onDismiss = { backStack.pop() }
+                    onDismiss = { backStack.removeLastOrNull() }
                 )
             }
         }
