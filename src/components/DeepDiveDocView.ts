@@ -113,7 +113,7 @@ function renderSingleChapterView(
     if (mod.explanation && mod.explanation.trim()) {
       const principleSection = document.createElement('section');
       principleSection.className = 'chapter-content-section';
-      const hasSubPanels = mod.explanation.includes('### ');
+      const hasSubPanels = mod.explanation.includes('### ') || mod.explanation.includes('```');
 
       const expTitle = mod.sectionTitles?.explanation ?? '核心原理解析与底层机制';
       const headingText = /^[一二三四五六七八九十\d]+[、\.]/.test(expTitle) ? expTitle : `一、${expTitle}`;
@@ -437,6 +437,9 @@ function truncateText(text: string, maxLen: number): string {
 
 function formatExplanationHtml(rawText: string): string {
   if (!rawText) return '';
+  if (rawText.includes('```')) {
+    return formatCaseStudyBody(rawText);
+  }
   const paragraphs = rawText.split(/\n\n+/);
   return paragraphs.map((p) => {
     const trimmed = p.trim();

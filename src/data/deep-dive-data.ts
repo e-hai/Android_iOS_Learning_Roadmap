@@ -1583,10 +1583,13 @@ fun NativeVideoPlayer(
    调用 entry.viewModelStore.clear() ➔ 触发 onCleared() 释放内存
 \`\`\`
 
-- **核心原则速查**：
-  1. **屏幕旋转**：Activity 实例虽销毁，但 \`ActivityClientRecord\` 随进程常驻，ViewModel 指针零拷贝直接交接给新实例；
-  2. **进程被杀**：堆内存全清，依赖 \`SavedStateHandle\` 跨进程由系统 Bundle 快照托管并在冷启动自动回填；
-  3. **导航作用域**：单页 Entry 出栈即 \`clear()\` 销毁协程，跨多页业务流共享则使用 \`NavGraph Scope\`。`,
+### 核心架构：为什么 ViewModel 能在屏幕旋转中存活，却不能抗进程杀死？
+
+- **本质差异**：**组件生命周期**（Activity 销毁）与 **进程生命周期**（Linux 进程终止）的分离设计。
+
+1. **屏幕旋转（NonConfigurationInstances）**：Activity 实例虽被销毁重建，但 Linux 宿主进程持续存活。系统通过宿主 \`ActivityClientRecord.lastNonConfigurationInstances\` 完整保留了包含 \`ViewModelStore\` 的 JVM 堆内存指针。新 Activity 启动后零拷贝取回，数据流与协程栈完好无损。
+2. **进程被杀（SavedStateHandle）**：当系统后台内存吃紧（LMK）或配置“不保留活动”时，宿主 Linux 进程被彻底杀死，JVM 堆内存被操作系统全部清空。此时必须依赖 \`SavedStateHandle\` 经由系统 \`ActivityTaskManager\` 跨进程托管的 Bundle 快照，在进程冷启动重建时自动回填。
+3. **导航作用域（NavGraph Scope）**：Compose / Navigation 树状作用域中，单页 Entry 出栈立即调用 \`clear()\` 释放协程；跨多页业务流（如购物车➔结算➔支付）通过 \`NavGraph Scope\` 共享同一个 ViewModel，业务流结束整个 Graph 出栈时统一释放。`,
         caseStudy: `### 一、SavedStateHandle 复杂对象持久化与进程被杀热恢复
 
 - **场景解释**：电商搜索页中，用户输入了关键词并勾选了复杂的筛选器。当用户切去微信聊天导致 App 被系统后台杀死后，重新返回时必须无感恢复原有的搜索状态，绝不能白屏回滚。
