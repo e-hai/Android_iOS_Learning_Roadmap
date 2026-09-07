@@ -1510,85 +1510,91 @@ fun NativeVideoPlayer(
 }
 \`\`\`
 
-### 十、现代类型安全路由：Navigation 3 纯数据驱动与跨页结果回传
+### 十、现代类型安全路由：Navigation 3 (1.2.0-alpha06 最新演进规范)
 
-- **场景解释与痛点**：传统 Navigation 2.x 深度依赖字符串路由拼接（如 \`"user/{id}?source={src}"\`），编译期无类型检查，重构极易崩溃；且 \`NavController\` 为沉重黑盒，跨页回传结果必须通过 \`previousBackStackEntry.savedStateHandle\` 复杂 hack。
-- **Nav3 架构革新**：
-  1. **纯数据驱动栈**：导航回退栈本质就是普通的响应式列表（\`SnapshotStateList<Any>\`），压栈即 \`add()\`，出栈即 \`pop()\`，清栈回首页即 \`clear()\`，与 SwiftUI \`NavigationStack(path: \$path)\` 统一心智；
-  2. **强类型路由契约**：路由节点全部使用 Kotlin \`@Serializable\` 数据类/对象，参数类型与空安全由编译器严格守护；
-  3. **NavDisplay 场景解耦**：将“导航数据状态”与“UI 展示器”完全解耦，支持零成本适配手机单栏与平板/折叠屏双栏（TwoPane）布局。
+- **版本定位**：基于官方最新发布的 \`androidx.navigation3:1.2.0-alpha06\`，彻底摒弃旧版 Navigation 2.x 的字符串路径拼接（\`"detail/{id}"\`）与沉重黑盒 \`NavController\`，转向**纯数据驱动（State as SSOT）**与**声明式场景投影（NavDisplay）**。
+- **1.2.0-alpha06 核心突破与设计哲学**：
+  1. **强类型路由契约（NavKey）**：所有页面路由均声明为实现 \`NavKey\` 的 Kotlin \`@Serializable\` 数据类/对象，参数空安全与类型系统由编译器强制约束；
+  2. **entryProvider 泛型 DSL 架构**：从初期的 \`when(route)\` 表达式升级为现代 \`entryProvider { entry<T> { ... } }\` 模式，支持按路由 Class 模块化独立注册，杜绝巨型单文件路由表；
+  3. **纯数据驱动状态栈**：回退栈退化为由 \`rememberNavBackStack(initialKey)\` 托管的响应式列表，跳转即 \`add()\`，返回即 \`pop()\`，清栈即直接切片，与 iOS SwiftUI \`NavigationStack(path: \$path)\` 架构完全对齐；
+  4. **原生多层 Overlay 与预测性返回手势**：1.2.0 重点重构了 \`SceneState\` 与 \`OverlayScene\`，彻底修复了模态底部弹窗（\`ModalBottomSheet\`）在多层嵌套快速返回时动画残留与状态复用异常，无缝契合 Android 14/15 预测性返回。
 
 \`\`\`kotlin
-import androidx.navigation3.NavDisplay
-import androidx.navigation3.rememberNavBackStack
-import kotlinx.serialization.Serializable
+// 1. Gradle 依赖配置 (模块级 build.gradle.kts)
+dependencies {
+    implementation("androidx.navigation3:navigation3-runtime:1.2.0-alpha06")
+    implementation("androidx.navigation3:navigation3-ui:1.2.0-alpha06")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
+}
 
-// ⚡ 1. 强类型路由节点（全编译期类型检查，彻底告别字符串拼接）
+// 2. 强类型路由节点（实现 NavKey 标记接口）
 @Serializable
-sealed interface AppRoute {
+sealed interface AppRoute : NavKey {
     @Serializable
     data object ProductList : AppRoute
 
     @Serializable
     data class ProductDetail(val productId: String, val fromSearch: Boolean = false) : AppRoute
 
+    // 支持全屏页面与 ModalBottomSheet 模态弹窗统一节点
     @Serializable
-    data class CouponPicker(val currentSelectedId: String?) : AppRoute
+    data class CouponPicker(val currentCouponId: String?) : AppRoute
 }
 
-// ⚡ 2. 现代纯数据驱动导航调度中心
+// 3. 现代纯数据驱动导航架构中心 (1.2.0-alpha06 最新用法)
 @Composable
-fun MainNavigationApp() {
-    // 回退栈退化为纯状态列表（Single Source of Truth），初始页为商品列表
+fun Nav3ModernApp() {
+    // ⚡ 状态即路由栈：可持久化可观测，初始节点为商品列表
     val backStack = rememberNavBackStack<AppRoute>(AppRoute.ProductList)
     
-    // 跨页结果回传承载（也可用 LocalResultEventBus 或 ViewModel 观察）
-    var selectedCouponName by remember { mutableStateOf<String?>(null) }
+    // 跨页结果回传承载：直接使用 Compose 状态提升，告别 savedStateHandle hack
+    var activeCouponName by remember { mutableStateOf<String?>(null) }
 
-    // NavDisplay 充当投影仪：将 backStack 顶层状态实时投影为对应 Composable 界面
+    // ⚡ NavDisplay：将当前数据栈投影为 UI，内置预测性返回手势监听
     NavDisplay(
         backstack = backStack,
-        onBack = { backStack.pop() } // 系统返回键统一拦截与出栈
-    ) { route ->
-        when (route) {
-            is AppRoute.ProductList -> {
+        onBack = { backStack.pop() }, // 系统返回键统一拦截与出栈
+        entryProvider = entryProvider {
+            // 模块 A：商品列表主入口
+            entry<AppRoute.ProductList> {
                 ProductListScreen(
-                    selectedCoupon = selectedCouponName,
+                    selectedCoupon = activeCouponName,
                     onNavigateToDetail = { id ->
-                        // 压栈跳转：直接向状态列表 add 新路由对象
                         backStack.add(AppRoute.ProductDetail(productId = id))
                     },
                     onOpenCouponPicker = {
-                        backStack.add(AppRoute.CouponPicker(currentSelectedId = selectedCouponName))
+                        backStack.add(AppRoute.CouponPicker(currentCouponId = activeCouponName))
                     }
                 )
             }
 
-            is AppRoute.ProductDetail -> {
+            // 模块 B：商品详情页 (泛型推导自动解包 route 参数)
+            entry<AppRoute.ProductDetail> { detailRoute ->
                 ProductDetailScreen(
-                    productId = route.productId,
-                    fromSearch = route.fromSearch,
+                    productId = detailRoute.productId,
+                    fromSearch = detailRoute.fromSearch,
                     onBack = { backStack.pop() }, // 单步出栈返回
-                    onPopToRoot = { 
+                    onPopToRoot = {
                         // 一键清栈回首页：直接操作列表切片，告别晦涩的 popUpTo 语法
-                        while (backStack.size > 1) backStack.pop() 
+                        while (backStack.size > 1) backStack.pop()
                     }
                 )
             }
 
-            is AppRoute.CouponPicker -> {
-                CouponPickerScreen(
-                    currentSelectedId = route.currentSelectedId,
+            // 模块 C：优惠券选择模态面板 (1.2.0 优化了多层 OverlayScene 动画与生命周期)
+            entry<AppRoute.CouponPicker> { pickerRoute ->
+                CouponPickerBottomSheet(
+                    currentCouponId = pickerRoute.currentCouponId,
                     onCouponSelected = { couponName ->
                         // ⚡ 核心闭环：选定结果回传，并立即出栈返回上级页面
-                        selectedCouponName = couponName
+                        activeCouponName = couponName
                         backStack.pop()
                     },
                     onDismiss = { backStack.pop() }
                 )
             }
         }
-    }
+    )
 }
 \`\`\``,
       },
