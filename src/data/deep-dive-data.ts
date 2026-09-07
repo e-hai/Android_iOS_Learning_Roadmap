@@ -1901,49 +1901,73 @@ class TokenAuthenticator(
 }
 \`\`\`
 
-### 全链路网络耗时监控与防篡改签名拦截器实战
+### 接口请求加密与响应解密一体化拦截器实战
 
-- **场景解释**：金融级接口要求防重放攻击与防数据篡改，自动为请求体按字典序拼接私钥生成 HMAC-SHA256 签名；同时借助 \`EventListener\` 精确采集 DNS 解析、TCP 建连、TLS 握手及首包到达（TTFB）耗时。
+- **场景解释**：金融与高安全级接口要求全链路报文密文传输。在单个拦截器中，以 \`chain.proceed(request)\` 为分水岭：**前置**读取请求明文并加密重构 \`RequestBody\`，**后置**读取服务端密文流并解密重构 \`ResponseBody\`。无需复杂条件判断，直接完成端到端透明加解密，下游业务层与 Retrofit 保持纯明文对象交互。
 
 \`\`\`kotlin
-// 1. 防篡改与加签拦截器（Application Interceptor）
-class SignatureInterceptor(private val secretKey: String) : Interceptor {
+// 全链路报文加解密一体化拦截器（Application Interceptor）
+class CryptoInterceptor(private val secretKey: String) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val original = chain.request()
-        val timestamp = System.currentTimeMillis().toString()
-        val nonce = UUID.randomUUID().toString()
+        val request = chain.request()
 
-        // 按字典序拼接 query 与 timestamp 计算签名
-        val signature = computeHmacSha256(
-            payload = "\${original.url.encodedPath}?time=\$timestamp&nonce=\$nonce",
-            key = secretKey
-        )
+        // ═══════════════════════════════════════════════════════
+        // 1. 【去程 / 请求阶段】加密 RequestBody
+        // ═══════════════════════════════════════════════════════
+        val encryptedRequest = if (request.body != null) {
+            // (1) 将原请求体写入内存 Buffer 读取明文
+            val buffer = Buffer()
+            request.body!!.writeTo(buffer)
+            val plainText = buffer.readUtf8()
 
-        val signedRequest = original.newBuilder()
-            .header("X-Timestamp", timestamp)
-            .header("X-Nonce", nonce)
-            .header("X-Signature", signature)
-            .build()
+            // (2) 执行加密，并用密文字符串重构 RequestBody
+            val cipherText = encrypt(plainText, secretKey)
+            val newBody = cipherText.toRequestBody(request.body!!.contentType())
 
-        return chain.proceed(signedRequest)
+            // (3) 重构 Request，替换原 Body
+            request.newBuilder()
+                .method(request.method, newBody)
+                .build()
+        } else {
+            request // GET 请求等无 Body 场景直接放行
+        }
+
+        // ═══════════════════════════════════════════════════════
+        // 2. 【分水岭】同步阻塞等待网络 IO 完毕并拿到服务端响应
+        // ═══════════════════════════════════════════════════════
+        val response = chain.proceed(encryptedRequest)
+
+        // ═══════════════════════════════════════════════════════
+        // 3. 【返程 / 返回阶段】解密 ResponseBody
+        // ═══════════════════════════════════════════════════════
+        val responseBody = response.body
+        if (responseBody != null) {
+            // (1) 读取服务端返回的密文字符串（此时底层流已消费完毕）
+            val cipherText = responseBody.string()
+
+            // (2) 执行解密，还原为明文字符串
+            val plainText = decrypt(cipherText, secretKey)
+
+            // (3) ⚡ 核心避坑点：用明文重构全新的 ResponseBody，避免 stream closed 崩溃
+            val newResponseBody = plainText.toResponseBody(responseBody.contentType())
+
+            // (4) 返回包含明文 Body 的全新 Response 供下游 Retrofit/Gson 解析
+            return response.newBuilder()
+                .body(newResponseBody)
+                .build()
+        }
+
+        return response
     }
-}
 
-// 2. 全链路耗时打点 EventListener
-class MetricEventListener : EventListener() {
-    private var dnsStartTime = 0L
-    private var connectStartTime = 0L
-
-    override fun dnsStart(call: Call, domainName: String) { dnsStartTime = System.currentTimeMillis() }
-    override fun dnsEnd(call: Call, domainName: String, inetAddressList: List<InetAddress>) {
-        Log.d("OkHttpMetric", "DNS 解析耗时: \${System.currentTimeMillis() - dnsStartTime} ms")
+    private fun encrypt(plainText: String, key: String): String {
+        // 对称加密算法实现（如 AES-GCM / SM4）
+        return plainText // 生产环境替换为真实加密逻辑
     }
 
-    override fun connectStart(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy) {
-        connectStartTime = System.currentTimeMillis()
-    }
-    override fun connectEnd(call: Call, inetSocketAddress: InetSocketAddress, proxy: Proxy, protocol: Protocol?) {
-        Log.d("OkHttpMetric", "TCP 建连耗时: \${System.currentTimeMillis() - connectStartTime} ms")
+    private fun decrypt(cipherText: String, key: String): String {
+        // 对称解密算法实现（如 AES-GCM / SM4）
+        return cipherText // 生产环境替换为真实解密逻辑
     }
 }
 \`\`\``,
