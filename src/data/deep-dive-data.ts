@@ -1829,6 +1829,26 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
          ④ promoteAndExecute() 自动从 readyAsyncCalls 头部捞取下一请求提升执行！
 \`\`\`
 
+### 核心架构深度剖析：为什么 OkHttp 默认线程池采用零核心无界的 SynchronousQueue 设计？
+
+- **黄金架构原则**：\`Dispatcher\` 负责“有界控流与精细排队”，线程池负责“无界并发与即刻执行”。通过 \`SynchronousQueue\` 消除二次排队延迟，通过 \`core=0 + 60s\` 兼顾低功耗与高弹性。
+
+1. **关注点分离（排队与控流前置）**：
+   - 普通线程池若配置有界队列（如 \`ArrayBlockingQueue(100)\`），队列只能盲目 FIFO，**无法感知业务维度（如当前请求所属域名 Host、该域名已有几个并发）**。
+   - OkHttp 将排队和控流前置在 Dispatcher 的 \`readyAsyncCalls\` 与 \`runningAsyncCalls\` 中。凡是被提交给线程池的任务，都已通过 \`runningAsyncCalls.size < 64 && callsPerHost(host) < 5\` 的严格门闸审批，具备“即刻执行资格”，因此线程池内部无需再设二次排队。
+
+2. **SynchronousQueue 实现零排队延迟的“手递手传球”**：
+   - \`SynchronousQueue\` 是容量为 0 的阻塞队列，每次插入必须等待另一个线程获取（手递手直接交付）。
+   - 若线程池有空闲线程则立即复用，**任务零排队延迟直接执行**；若所有现有线程都在忙，由于 \`max = Int.MAX_VALUE\`，线程池会立即创建新线程投入执行，绝不把任务积压在队列里，也不会抛出拒绝异常。
+
+3. **core=0 + 60s 存活：自适应移动端突发流量，实现“零常驻内存”**：
+   - 移动端网络请求呈现高波动性的**突发性（Burst）**特征（滑动列表或刷新时瞬间并发高，静置阅读时长时间无网络）。
+   - 高峰期按需快速弹性伸缩线程，吞吐量拉满；闲置超过 60 秒后所有线程自动销毁回收（JVM 每个线程栈占用 512KB~1MB 内存），无网络活动时**常驻线程数为 0**，对移动端内存与电量极其友好。
+
+4. **消除传统 CachedThreadPool 的 OOM 隐患（Dispatcher 前置护城河）**：
+   - 业界通常告诫“慎用 \`Executors.newCachedThreadPool()\`，因其无界并发可能导致瞬时创建几千个线程引发 OOM”。
+   - 但在 OkHttp 中，即使业务层瞬间并发调用 10,000 次 \`enqueue()\`，Dispatcher 也会死死卡住门闸：**只有前 64 个任务（且每个域名最多 5 个）能提交给线程池**，其余 9,936 个请求全部在 \`readyAsyncCalls\` 队列中安全等待，绝不会无界膨胀，Dispatcher 充当了线程池坚不可摧的前置护城河。
+
 ### OkHttp Token 无感自动刷新拦截器实战
 
 - **场景解释**：API 采用双 Token 机制（短期 AccessToken + 长期 RefreshToken）。当多个并发网络请求同时遇到 401 Unauthorized 时，必须确保**只发起一次 RefreshToken 换票请求**，换到新 Token 后唤醒所有等待的请求重新发起，避免并发换票死锁或重复失效。
