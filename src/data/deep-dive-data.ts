@@ -2033,34 +2033,63 @@ abstract class AppDatabase : RoomDatabase() {
 
 ### 一对多与多对多声明式关系建模（@Embedded、@Relation 与交叉表 Junction）
 
-- **解决痛点与实战规范**：打破传统手动手写多表联查 SQL 并繁琐映射实体的旧模式。利用 Room 声明式关系注解，自动分步查库并装配出完整的领域对象树。
-- **两种高频关系模型**：
-  1. **一对多关系（One-to-Many）**：用户与名下多个订单；使用 \`@Embedded\` 嵌套主表，配合 \`@Relation(parentColumn = "userId", entityColumn = "ownerId")\`；
-  2. **多对多关系（Many-to-Many）**：订单与多种商品；引入中间交叉表（Junction Table），声明复合主键并通过 \`associateBy = Junction(...)\` 进行多对多关联。
+- **解决痛点**：无需手写复杂 JOIN 查询，Room 会在单个 \`@Transaction\` 事务中自动分步查表并装配出完整的领域对象树。
+
+#### 1. 一对多关系（One-to-Many）：用户与名下多个订单
+
+- **实现要点**：主表用 \`@Embedded\` 嵌套，子表列表用 \`@Relation(parentColumn, entityColumn)\` 绑定外键。
 
 \`\`\`kotlin
-// 1. 实体与多对多中间交叉表定义
+@Entity(tableName = "users")
+data class UserEntity(@PrimaryKey val userId: String, val name: String)
+
+@Entity(tableName = "orders")
+data class OrderEntity(@PrimaryKey val orderId: String, val ownerId: String, val amount: Long)
+
+// ⚡ 一对多关系模型：无需中间表，直接外键绑定
+data class UserWithOrders(
+    @Embedded val user: UserEntity,
+    @Relation(
+        parentColumn = "userId",
+        entityColumn = "ownerId"
+    )
+    val orders: List<OrderEntity>
+)
+
+@Dao
+interface UserDao {
+    @Transaction // ⚡ 声明式关联查询必须加 @Transaction 保证原子性
+    @Query("SELECT * FROM users WHERE userId = :userId")
+    fun getUserWithOrders(userId: String): Flow<UserWithOrders>
+}
+\`\`\`
+
+#### 2. 多对多关系（Many-to-Many）：订单与多种商品
+
+- **实现要点**：引入中间交叉表（Junction Table）存储双主键映射，并在 \`@Relation\` 中声明 \`associateBy = Junction(...)\`。
+
+\`\`\`kotlin
 @Entity(tableName = "orders")
 data class OrderEntity(@PrimaryKey val orderId: String, val createTime: Long)
 
 @Entity(tableName = "products")
 data class ProductEntity(@PrimaryKey val productId: String, val title: String, val price: Long)
 
+// ⚡ 中间交叉表：声明复合主键
 @Entity(tableName = "order_product_cross_ref", primaryKeys = ["orderId", "productId"])
 data class OrderProductCrossRef(val orderId: String, val productId: String)
 
-// 2. 嵌套数据关系模型（声明式关联）
+// ⚡ 多对多关系模型：通过 associateBy 关联交叉表
 data class OrderWithProducts(
     @Embedded val order: OrderEntity,
     @Relation(
         parentColumn = "orderId",
         entityColumn = "productId",
-        associateBy = Junction(OrderProductCrossRef::class) // ⚡ 声明通过交叉表进行多对多映射
+        associateBy = Junction(OrderProductCrossRef::class)
     )
     val products: List<ProductEntity>
 )
 
-// 3. DAO 声明式关联查询
 @Dao
 interface OrderDao {
     @Transaction
