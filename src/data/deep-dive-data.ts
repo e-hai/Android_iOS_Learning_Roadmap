@@ -1945,7 +1945,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
         title: '数据层',
         sectionTitles: {
           explanation: '网络通信（OkHttp）：核心原理与实战管线',
-          caseStudy: '二、本地存储（Room）：核心实战与离线流水线',
+          caseStudy: '二、本地存储（Room 与 DataStore）：核心实战与离线流水线',
         },
         explanation: `\`\`\`okhttp-pipeline
                       okHttpClient.newCall(request)
@@ -2380,6 +2380,61 @@ class FeedRepository(
             db.feedDao().clearAll()
             db.feedDao().insertAll(remoteData.map { it.toEntity() })
             db.syncLogDao().recordSyncTime(System.currentTimeMillis())
+        }
+    }
+}
+\`\`\`
+
+### 轻量键值存储：Preferences DataStore 快速上手指南
+
+- **定位与场景**：Jetpack DataStore 是 Google 官方推荐替代传统 \`SharedPreferences\` 的现代轻量键值存储方案。适用于存储用户偏好设置（如深色模式开关、引导页展示标记）、简单鉴权凭证（如 Token）等非关系型配置数据。
+- **核心操作三步法**：
+  1. **属性委托单例声明**：通过 \`preferencesDataStore\` 在顶级作用域单例创建；
+  2. **读取数据（响应式 Flow）**：通过 \`dataStore.data\` 返回只读 \`Flow<T>\`，天然支持异步响应式观测与默认值回退；
+  3. **写入数据（挂起事务）**：通过挂起函数 \`dataStore.edit { ... }\` 进行事务性写入。
+
+\`\`\`kotlin
+// 1. 在 Context 上通过属性委托声明全局单例（建议放在顶级文件）
+private val Context.userPreferencesDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "user_settings"
+)
+
+// 2. 封装简单的偏好设置存储仓库
+class UserPreferencesRepository(private val context: Context) {
+    companion object {
+        // 定义强类型 Key
+        val KEY_IS_DARK_MODE = booleanPreferencesKey("is_dark_mode")
+        val KEY_USER_TOKEN = stringPreferencesKey("user_token")
+    }
+
+    // ⚡ 3. 响应式读取：通过 Flow 暴露配置流（提供初始默认值）
+    val isDarkModeFlow: Flow<Boolean> = context.userPreferencesDataStore.data
+        .map { preferences ->
+            preferences[KEY_IS_DARK_MODE] ?: false // 默认浅色
+        }
+
+    val userTokenFlow: Flow<String?> = context.userPreferencesDataStore.data
+        .map { preferences ->
+            preferences[KEY_USER_TOKEN]
+        }
+
+    // ⚡ 4. 异步写入：通过挂起函数 edit 进行写入修改
+    suspend fun setDarkMode(enabled: Boolean) {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences[KEY_IS_DARK_MODE] = enabled
+        }
+    }
+
+    suspend fun saveToken(token: String) {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences[KEY_USER_TOKEN] = token
+        }
+    }
+
+    // ⚡ 5. 清理配置（例如用户退出登录）
+    suspend fun clearSettings() {
+        context.userPreferencesDataStore.edit { preferences ->
+            preferences.clear()
         }
     }
 }
