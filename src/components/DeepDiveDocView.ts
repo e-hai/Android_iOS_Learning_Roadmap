@@ -113,7 +113,7 @@ function renderSingleChapterView(
     if (mod.explanation && mod.explanation.trim()) {
       const principleSection = document.createElement('section');
       principleSection.className = 'chapter-content-section';
-      const hasSubPanels = mod.explanation.includes('### ') || mod.explanation.includes('```');
+      const hasSubPanels = /(?:^|\n)#{3}(?!#)[ \t]+/.test(mod.explanation) || mod.explanation.includes('```');
 
       const expTitle = mod.sectionTitles?.explanation ?? '核心原理解析与底层机制';
       const headingText = /^[一二三四五六七八九十\d]+[、\.]/.test(expTitle) ? expTitle : `一、${expTitle}`;
@@ -634,7 +634,7 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
   container.appendChild(bridge);
 
   // Split by markdown H3 heading
-  const sections = rawText.split(/(?=###\s+)/g).map((s) => s.trim()).filter(Boolean);
+  const sections = rawText.split(/(?=(?:^|\n)#{3}(?!#)[ \t]+)/g).map((s) => s.trim()).filter(Boolean);
 
   sections.forEach((sec, idx) => {
     const lines = sec.split('\n').map((l) => l.trim()).filter(Boolean);
@@ -682,7 +682,7 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
 function formatExtendedDeepDiveHtml(rawText: string): string {
   if (!rawText) return '';
   // Split by "### "
-  const blocks = rawText.split(/(?=###\s+)/g).map((b) => b.trim()).filter(Boolean);
+  const blocks = rawText.split(/(?=(?:^|\n)#{3}(?!#)[ \t]+)/g).map((b) => b.trim()).filter(Boolean);
 
   return blocks.map((block, idx) => {
     const lines = block.split('\n');
@@ -752,7 +752,7 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
 function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'android'): string {
   if (!rawText) return '';
 
-  const hasH3 = rawText.includes('### ');
+  const hasH3 = /(?:^|\n)#{3}(?!#)[ \t]+/.test(rawText);
   if (!hasH3) {
     return `
       <div class="case-study-panel ${platform === 'ios' ? 'deepdive-ios' : ''}">
@@ -763,7 +763,7 @@ function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'and
     `;
   }
 
-  const sections = rawText.split(/(?=###\s+)/g).map((s) => s.trim()).filter(Boolean);
+  const sections = rawText.split(/(?=(?:^|\n)#{3}(?!#)[ \t]+)/g).map((s) => s.trim()).filter(Boolean);
   let cardIndex = 1;
 
   return sections.map((sec) => {
@@ -772,7 +772,7 @@ function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'and
     let title = '';
     let bodyText = '';
 
-    if (firstLine.startsWith('### ')) {
+    if (/^###(?![#])\s+/.test(firstLine)) {
       title = firstLine.replace(/^###\s+/, '').trim();
       // Clean duplicate leading index (e.g. "一、", "1. ", "01. ") since badgeNumber already renders "01", "02"...
       title = title.replace(/^(?:[一二三四五六七八九十]+|\d+)[、\.]\s*/, '');
