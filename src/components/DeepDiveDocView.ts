@@ -2,6 +2,7 @@ import { deepDiveDomains } from '../data/deep-dive-data';
 import { DeepDiveDomain, DeepDiveModule, PipelineStep, StepperStep } from '../models/types';
 import { i18n } from '../services/i18n';
 import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
+import { renderViewModelVisual } from './ViewModelVisual';
 
 export function renderDeepDiveDocView(
   currentStageId: string,
@@ -714,6 +715,8 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
 
       if (lang === 'okhttp-pipeline' || code.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
         contentHtml += renderOkHttpPipelineVisual(code);
+      } else if (lang === 'viewmodel-diagram' || code.includes('NonConfigurationInstances 零拷贝复用')) {
+        contentHtml += renderViewModelVisual(code);
       } else if (lang === 'diagram' || lang === 'ascii' || lang === 'text') {
         contentHtml += `<pre class="layer-diagram-box"><code>${escapeHtml(code)}</code></pre>`;
       } else {
@@ -842,6 +845,8 @@ function formatCaseStudyBody(rawText: string): string {
         const codeTrimmed = codeContent.trim();
         if (currentCodeLang === 'okhttp-pipeline' || codeTrimmed.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
           html += renderOkHttpPipelineVisual(codeTrimmed);
+        } else if (currentCodeLang === 'viewmodel-diagram' || codeTrimmed.includes('NonConfigurationInstances 零拷贝复用')) {
+          html += renderViewModelVisual(codeTrimmed);
         } else {
           html += `<pre class="layer-code-box case-code-box"><code>${escapeHtml(codeTrimmed)}</code></pre>`;
         }

@@ -1513,15 +1513,17 @@ fun NativeVideoPlayer(
       {
         tag: '表现逻辑',
         title: '逻辑层：ViewModel 机制与状态基座',
-        explanation: `### 一、跨配置变更存活时序图解（NonConfigurationInstances 零拷贝复用）
+        explanation: `\`\`\`viewmodel-diagram
+========================================================================================
+     ViewModel 跨配置变更存活、进程被杀恢复与树状导航生命周期全景图解
+========================================================================================
 
-\`\`\`text
+【图解 1】跨配置变更存活时序（NonConfigurationInstances 零拷贝复用）
        【屏幕旋转 / 配置变更事件发生】
                      │
                      ▼
   ┌────────────────────────────────────────────────────────┐
   │ 1. 旧 Activity 实例销毁阶段 (onDestroy)                  │
-  │    • 用户界面即将重构，但系统底层已标记为 configurationChange   │
   │    • 触发: onRetainNonConfigurationInstance()          │
   └──────────────────────────┬─────────────────────────────┘
                              │ 将 ViewModelStore 指针存入宿主记录
@@ -1545,13 +1547,8 @@ fun NativeVideoPlayer(
       循环走步骤 1 ~ 3 零开销复用             调用 viewModelStore.clear()
                                               └── 触发 viewModel.onCleared()
                                               └── 取消 viewModelScope 协程栈
-\`\`\`
 
-- **核心存活原则**：Activity 实例虽然销毁，但 **\`ActivityClientRecord\` 随进程常驻**；ViewModel 实例从未被重新创建，只是把指针从旧 Activity 交接给了新 Activity。
-
-### 二、进程被杀（LMK）vs 屏幕旋转恢复全景对比图解
-
-\`\`\`text
+【图解 2】进程被杀（LMK）vs 屏幕旋转恢复全景对比
 ┌──────────────────────────────────────┬──────────────────────────────────────┐
 │       场景 A：屏幕旋转 / 配置变更     │        场景 B：切后台系统杀死进程 (LMK) │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
@@ -1560,28 +1557,14 @@ fun NativeVideoPlayer(
 │  • 数据存活载体：ViewModelStore       │  • 数据存活载体：SavedStateHandle     │
 └──────────────────┬───────────────────┴──────────────────┬───────────────────┘
                    │                                      │
-                   ▼                                      ▼
-  ┌─────────────────────────────────┐   ┌─────────────────────────────────┐
-  │ 内存指针复用 (零拷贝微秒级)       │   │ 系统进程托管 (跨进程 Bundle 快照)  │
-  │ 依赖 NonConfigurationInstances  │   │ 依赖 onSaveInstanceState(Bundle)│
-  │ 保持 ViewModel 实例及其协程不变 │   │ 杀死前将核心 Key-Value 提交系统托管 │
-  └────────────────┬────────────────┘   └────────────────┬────────────────┘
-                   │                                      │
-                   ▼ 重建直接取回                         ▼ 冷启动重建回填
+                   ▼ 内存指针复用 (零拷贝微秒级)            ▼ 系统进程托管 (跨进程 Bundle 快照)
   ┌─────────────────────────────────┐   ┌─────────────────────────────────┐
   │ 新 Activity 直接接管原 ViewModel │   │ 重新生成全新 ViewModel 实例      │
   │ 大对象、缓存列表、进行中任务零损失│   │ 通过 SavedStateViewModelFactory │
   │                                 │   │ 自动从 Bundle 回填恢复状态       │
   └─────────────────────────────────┘   └─────────────────────────────────┘
-\`\`\`
 
-- **关键选型原则**：
-  1. **瞬态大对象、UI 数据流、异步网络任务** ➔ 交由普通 \`ViewModel\` 内存持有，抗屏幕旋转；
-  2. **用户关键输入（如搜索词、草稿、当前选中 Tab ID）** ➔ 写入 \`SavedStateHandle\`，抗切后台被杀恢复。
-
-### 三、现代 Compose / Navigation 树状作用域与生命周期图解
-
-\`\`\`text
+【图解 3】现代 Compose / Navigation 树状作用域与生命周期
                        【宿主 Activity】
                 (持根 ViewModelStore，抗屏幕旋转)
                                 │
@@ -1594,18 +1577,16 @@ fun NativeVideoPlayer(
  ┌─────────────────────────────┐             ┌─────────────────────────────┐
  │ NavBackStackEntry (Page A)  │             │ NavBackStackEntry (SubGraph)│
  │ • 拥有独立局部 ViewModelStore │             │ • 跨步骤共享登录/下单流程状态 │
- │ • viewModel() 默认绑定此层   │             └──────────────┬──────────────┘
- └──────────────┬──────────────┘                            │
-                │ 用户点击返回 (Pop 出栈)                     ▼ 页面 B 入栈
-                ▼                             ┌─────────────────────────────┐
-   调用 entry.viewModelStore.clear()          │ NavBackStackEntry (Page B)  │
-   └── 触发该页面 ViewModel.onCleared()       │ • 绑定当前页面私有状态       │
-   └── 立即释放内存，杜绝单 Activity 内存泄漏    └─────────────────────────────┘
+ └──────────────┬──────────────┘             └─────────────────────────────┘
+                │ 用户点击返回 (Pop 出栈)
+                ▼
+   调用 entry.viewModelStore.clear() ➔ 触发 onCleared() 释放内存
 \`\`\`
 
-- **作用域核心**：
-  - **默认单页级**：\`viewModel()\` 绑定在当前页面 \`NavBackStackEntry\` 上，页面 Pop 出栈即销毁并取消协程；
-  - **跨页共享级**：\`navController.getBackStackEntry("flow_route")\` 绑定在嵌套图上，多个页面流转时共享同一 ViewModel。`,
+- **核心原则速查**：
+  1. **屏幕旋转**：Activity 实例虽销毁，但 \`ActivityClientRecord\` 随进程常驻，ViewModel 指针零拷贝直接交接给新实例；
+  2. **进程被杀**：堆内存全清，依赖 \`SavedStateHandle\` 跨进程由系统 Bundle 快照托管并在冷启动自动回填；
+  3. **导航作用域**：单页 Entry 出栈即 \`clear()\` 销毁协程，跨多页业务流共享则使用 \`NavGraph Scope\`。`,
         caseStudy: `### 一、SavedStateHandle 复杂对象持久化与进程被杀热恢复
 
 - **场景解释**：电商搜索页中，用户输入了关键词并勾选了复杂的筛选器。当用户切去微信聊天导致 App 被系统后台杀死后，重新返回时必须无感恢复原有的搜索状态，绝不能白屏回滚。
