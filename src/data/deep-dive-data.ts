@@ -1738,7 +1738,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
       },
       {
         tag: '数据层',
-        title: '数据层',
+        title: '数据层：OkHttp 核心原理与网络管线',
         explanation: `### 一、Dispatcher 分发器与高并发队列调度机制
 
 - **高并发阀门痛点**：大量网络请求无序并发会迅速耗尽客户端 Socket 资源与文件描述符，或者瞬时打满服务端带宽。OkHttp 通过 \`Dispatcher\` 统筹调度，保障高吞吐与有序背压。
@@ -1864,9 +1864,12 @@ class MetricEventListener : EventListener() {
         Log.d("OkHttpMetric", "TCP 建连耗时: \${System.currentTimeMillis() - connectStartTime} ms")
     }
 }
-\`\`\`
-
-### 三、Room 数据库平滑迁移实战（AutoMigration 与复杂临时表三步法）
+\`\`\``,
+      },
+      {
+        tag: '数据层',
+        title: '数据层：Room 数据库实战与 SOT 离线流水线',
+        caseStudy: `### 一、数据库安全升级与跨版本平滑迁移实战（AutoMigration 与复杂临时表三步法）
 
 - **解决痛点与实战规范**：应用版本迭代时，本地 SQLite 表结构变更（新增字段、重命名列）极易引发用户端崩盘。严禁在线上开启 \`fallbackToDestructiveMigration()\`，必须严格遵循可追溯的迁移规范。
 - **两大迁移姿势**：
@@ -1902,23 +1905,69 @@ abstract class AppDatabase : RoomDatabase() {
 }
 \`\`\`
 
-### 四、Room 声明式关系建模与事务控制（@Relation 与 withTransaction）
+### 二、一对多与多对多声明式关系建模（@Embedded、@Relation 与交叉表 Junction）
 
-- **解决痛点与实战规范**：利用 Room 声明式关系注解避免手动拼接多表联查 SQL。同时针对多表原子写入或“先清空后插入”场景，利用事务杜绝脏数据。
+- **解决痛点与实战规范**：打破传统手动手写多表联查 SQL 并繁琐映射实体的旧模式。利用 Room 声明式关系注解，自动分步查库并装配出完整的领域对象树。
+- **两种高频关系模型**：
+  1. **一对多关系（One-to-Many）**：用户与名下多个订单；使用 \`@Embedded\` 嵌套主表，配合 \`@Relation(parentColumn = "userId", entityColumn = "ownerId")\`；
+  2. **多对多关系（Many-to-Many）**：订单与多种商品；引入中间交叉表（Junction Table），声明复合主键并通过 \`associateBy = Junction(...)\` 进行多对多关联。
 
 \`\`\`kotlin
-// 1. 声明式关系：多对多映射
+// 1. 实体与多对多中间交叉表定义
+@Entity(tableName = "orders")
+data class OrderEntity(@PrimaryKey val orderId: String, val createTime: Long)
+
+@Entity(tableName = "products")
+data class ProductEntity(@PrimaryKey val productId: String, val title: String, val price: Long)
+
+@Entity(tableName = "order_product_cross_ref", primaryKeys = ["orderId", "productId"])
+data class OrderProductCrossRef(val orderId: String, val productId: String)
+
+// 2. 嵌套数据关系模型（声明式关联）
 data class OrderWithProducts(
     @Embedded val order: OrderEntity,
     @Relation(
         parentColumn = "orderId",
         entityColumn = "productId",
-        associateBy = Junction(OrderProductCrossRef::class)
+        associateBy = Junction(OrderProductCrossRef::class) // ⚡ 声明通过交叉表进行多对多映射
     )
     val products: List<ProductEntity>
 )
 
-// 2. 编程式挂起事务：多 DAO 跨表强一致性原子写入
+// 3. DAO 声明式关联查询
+@Dao
+interface OrderDao {
+    @Transaction
+    @Query("SELECT * FROM orders WHERE orderId = :orderId")
+    fun getOrderWithProducts(orderId: String): Flow<OrderWithProducts>
+}
+\`\`\`
+
+### 三、强一致性事务管理（@Transaction 声明式与 withTransaction 编程式）
+
+- **解决痛点与实战规范**：在多表批量读写、或者“先清空旧数据后插入新数据”场景下，必须保证原子性（Atomicity）。中间任何一步失败，全量数据自动回滚，杜绝脏数据。
+- **两种事务控制手段**：
+  1. **DAO 声明式（@Transaction）**：适用于 DAO 方法内部的多步查询或复合写入；
+  2. **Repository 编程式挂起事务（roomDb.withTransaction）**：适用于跨多个 DAO、或结合协程异步编排的复杂业务事务。
+
+\`\`\`kotlin
+@Dao
+interface ProductDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertProducts(items: List<ProductEntity>)
+
+    @Query("DELETE FROM products WHERE category = :category")
+    suspend fun clearCategory(category: String)
+
+    // ⚡ 1. 声明式事务：确保清空旧分类与插入新列表在单个 SQLite 事务中完成
+    @Transaction
+    suspend fun replaceCategory(category: String, newItems: List<ProductEntity>) {
+        clearCategory(category)
+        insertProducts(newItems)
+    }
+}
+
+// ⚡ 2. 编程式挂起事务：跨多 DAO 协同事务
 class InventoryRepository(private val db: AppDatabase) {
     suspend fun updateStockAndOrder(order: OrderEntity, products: List<ProductEntity>) = db.withTransaction {
         db.orderDao().insertOrder(order)
@@ -1928,7 +1977,7 @@ class InventoryRepository(private val db: AppDatabase) {
 }
 \`\`\`
 
-### 五、离线优先单一事实源（SOT）架构协同流水线（OkHttp + Room）
+### 四、离线优先单一真实数据源（SOT）架构协同流水线（OkHttp + Room）
 
 - **解决痛点与实战规范**：现代移动端极致体验原则——“UI 永远只观察本地数据库（秒开且无网络时可读），后台静默发起网络拉取，利用事务写入数据库，自动触发上层 Flow 刷新”，构建不可破败的单一可信数据源（SOT）。
 
