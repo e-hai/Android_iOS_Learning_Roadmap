@@ -1831,7 +1831,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
 
 ### 核心架构：为什么默认线程池是零核心无界的 SynchronousQueue 设计？
 
-- **核心原则**：\`Dispatcher\` 负责“前置限流排队”，线程池只负责“即刻并发执行”。
+- **核心原则**：\`Dispatcher\` 负责“任务队列”，线程池只负责“并发”。
 
 1. **无需二次排队**：进入线程池的任务已获准执行（\`size < 64 && perHost < 5\`），无需在线程池队列中二次滞留。
 2. **手递手零延迟**：\`SynchronousQueue\` 容量为 0，有空闲线程秒复用，无空闲线程秒建新线程（\`max = MAX_VALUE\`）。
