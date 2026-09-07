@@ -1614,6 +1614,59 @@ fun Nav3ModernApp() {
         }
     )
 }
+\`\`\`
+
+#### 多页面并发监听陷阱与定向 RequestKey 避坑防冒领
+
+- **底层陷阱（Channel 抢占与幽灵冒领）**：
+  \`LocalResultEventBus\` 底层是带缓冲的 \`Channel(capacity = BUFFERED)\`。\`Channel\` 遵循点对点队列语义，多个页面同时监听同一种数据类型时，属于**竞争消费者（Fan-out 抢占模型）**。
+  - **典型事故场景**：A、B、C 页面均监听图片返回。C 页面打开相册后，因某些原因（如用户按返回、业务重置或后台内存清理）导致 C 页面在相册返回前被移出回退栈；相册选择完毕后派发结果，回退栈露出的顶层页面为 B；**B 页面将直接从 Channel 缓冲区冒领本属于 C 的图片**，导致 B 页面的数据被错误篡改！
+- **破局法则：定向 RequestKey（Targeted Request Key）**：
+  路由节点中显式携带发起方的专属 \`requestKey\`，派发与监听均按此 Key 精准寻址，杜绝任何页面冒领。
+- **RequestKey 的 3 种正确生成方式**：
+  1. **业务确定性派生（⭐⭐⭐⭐⭐ 零开销首选）**：若页面有业务主键，直接结合业务特征拼接：\`val reqKey = "req_order_image_\${route.orderId}"\`，天然抗屏幕旋转与进程被杀；
+  2. **rememberSaveable 托管随机凭证（⭐⭐⭐⭐ 无主键推荐）**：严禁裸写 \`UUID.randomUUID()\`（重组会导致 Key 频繁变动而失配），必须使用 \`val reqKey = rememberSaveable { "req_gallery_\${UUID.randomUUID()}" }\`，确保屏幕旋转和进程被杀后依然从 Bundle 还原同一凭证；
+  3. **ViewModel / SavedStateHandle 托管（⭐⭐⭐⭐ MVVM 规范）**：由 ViewModel 状态机在 \`savedStateHandle.getOrPut("req_key") { UUID.randomUUID().toString() }\` 中暂存管理。
+
+\`\`\`kotlin
+// 4. 定向 RequestKey 生产级实战：杜绝多页面冒领
+@Serializable
+data class TargetedGalleryRoute(val requestKey: String) : NavKey
+
+@Composable
+fun OrderAuditScreen(orderId: String, backStack: MutableList<Any>) {
+    // ⚡ 做法 1：基于业务主键生成绝对幂等稳定的定向 Key
+    val requestKey = "req_audit_order_\$orderId"
+
+    // ⚡ 严格只监听本业务的专属通道，即便其他页面也在选图，也绝不会发生竞争冒领！
+    ResultEffect<SelectedCoupon>(resultKey = requestKey) { result ->
+        viewModel.onOrderReceiptUploaded(orderId, result)
+    }
+
+    Button(onClick = {
+        // 将专属凭证随路由注入目标页面
+        backStack.add(TargetedGalleryRoute(requestKey = requestKey))
+    }) {
+        Text("选择凭据")
+    }
+}
+
+// 做法 2：无主键场景使用 rememberSaveable 保证抗重组与抗旋转恢复
+@Composable
+fun CreatePostScreen(backStack: MutableList<Any>) {
+    // ⚡ 严禁裸写 UUID.randomUUID()；必须用 rememberSaveable 封锁在 Bundle 快照中
+    val postPhotoKey = rememberSaveable { "req_post_\${UUID.randomUUID()}" }
+
+    ResultEffect<SelectedCoupon>(resultKey = postPhotoKey) { result ->
+        viewModel.addPostAttachment(result)
+    }
+
+    Button(onClick = {
+        backStack.add(TargetedGalleryRoute(requestKey = postPhotoKey))
+    }) {
+        Text("添加动态配图")
+    }
+}
 \`\`\``,
       },
       {
