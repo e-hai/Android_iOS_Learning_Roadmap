@@ -755,8 +755,9 @@ function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'and
   }
 
   const sections = rawText.split(/(?=###\s+)/g).map((s) => s.trim()).filter(Boolean);
+  let cardIndex = 1;
 
-  return sections.map((sec, idx) => {
+  return sections.map((sec) => {
     const lines = sec.split('\n');
     const firstLine = lines[0].trim();
     let title = '';
@@ -771,7 +772,18 @@ function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'and
       bodyText = sec;
     }
 
-    const badgeNumber = String(idx + 1).padStart(2, '0');
+    // If section has no H3 title (e.g. top-level flowchart/overview before any ###), render as a clean top card without badge number
+    if (!title) {
+      return `
+        <div class="case-study-panel ${platform === 'ios' ? 'deepdive-ios' : ''}" style="margin-bottom: 20px;">
+          <div class="case-study-panel-body">
+            ${formatCaseStudyBody(bodyText)}
+          </div>
+        </div>
+      `;
+    }
+
+    const badgeNumber = String(cardIndex++).padStart(2, '0');
 
     return `
       <div class="case-study-panel ${platform === 'ios' ? 'deepdive-ios' : ''}">

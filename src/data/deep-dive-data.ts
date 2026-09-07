@@ -1743,65 +1743,41 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
           explanation: '网络通信（OkHttp）：核心原理与实战管线',
           caseStudy: '二、本地存储（Room）：核心实战与离线流水线',
         },
-        explanation: `### Dispatcher 分发器与高并发队列调度机制
-
-- **高并发阀门痛点**：大量网络请求无序并发会迅速耗尽客户端 Socket 资源与文件描述符，或者瞬时打满服务端带宽。OkHttp 通过 \`Dispatcher\` 统筹调度，保障高吞吐与有序背压。
-- **调度核心原理（双队列与动态提升）**：
-  1. **并发阈值配置**：默认 \`maxRequests = 64\`（客户端最大并发总数）、\`maxRequestsPerHost = 5\`（单个 Host 最大并发数，防止单域名垄断网络带宽）；
-  2. **三大双向队列（Deque）**：
-     - \`readyAsyncCalls\`：就绪等待队列（缓冲就餐区）；
-     - \`runningAsyncCalls\`：正在执行的异步请求队列；
-     - \`runningSyncCalls\`：同步阻塞式请求队列；
-  3. **任务提升触发（promoteAndExecute）**：新异步任务入队时，或任意请求完成回调 \`finished()\` 释放并发配额时，分发器自动从 \`readyAsyncCalls\` 头部筛选符合条件的 Call 移入 \`runningAsyncCalls\`，并提交给内置的 \`ExecutorService\`（零核心线程、无界缓冲的 CachedThreadPool）并发执行。
-
-### ConnectionPool 连接池与 Socket 多路复用机制
-
-- **建连开销痛点**：TCP 三次握手与 TLS 密钥协商物理延迟极大（通常耗时 100~300ms）。频繁新建与销毁 Socket 会严重损耗网络性能与电量。
-- **连接池复用与防泄漏原理**：
-  1. **连接池复用策略**：默认最多保持 5 个空闲物理连接，空闲存活时长为 5 分钟。在 HTTP/2 协议下，相同 Host:Port 的所有请求自动共享同一个已握手的物理 TCP 管道（多路复用 Multiplexing）；
-  2. **后台守护清理线程（cleanupRunnable）**：采用类似垃圾回收的弱引用计数算法（\`List<Reference<RealCall>>\`）；遍历发现某个连接的引用计数为 0 且空闲时间超标，后台线程自动触发 \`socket.closeQuietly()\` 关闭物理通道并移出连接池；
-  3. **防泄漏机制**：若业务层消费完数据未显式调用 \`response.close()\` 或 \`response.body.close()\`，OkHttp 内部会在下一次清理周期通过未回收的弱引用感知到泄漏，强行关闭并回收底层 Socket。
-
-### 责任链拦截器管线（RealInterceptorChain）执行全流程
-
-- **切面解耦思想**：通过责任链模式将重试、重定向、公共标头、协议协商、缓存与物理 I/O 拆分为独立的拦截器切面，每个拦截器只需调用 \`chain.proceed(request)\` 驱动下一棒，并对拿到的响应执行后置加工。
-- **五大内置核心拦截器协同顺序**：
-  1. \`RetryAndFollowUpInterceptor\`：负责在网络超时、连接断开时自动重试，并解析 3xx 重定向与 407 代理鉴权；
-  2. \`BridgeInterceptor\`：将应用层高阶模型转换为标准 HTTP 帧，自动补充 \`Host\`、\`Keep-Alive\`、\`User-Agent\` 与 Cookie，透明处理 \`gzip\` 压缩与解压缩；
-  3. \`CacheInterceptor\`：严格遵循 RFC 7234 HTTP 缓存规范，根据 Cache-Control 决定是直接返回本地磁盘缓存还是发起网络请求，命中 304 时智能合并响应头；
-  4. \`ConnectInterceptor\`：核心寻址与物理连接建立，从 \`ConnectionPool\` 捞取空闲连接或握手新建 \`RealConnection\`，并创建网络通信编解码器 \`HttpCodec\`；
-  5. \`CallServerInterceptor\`：终点拦截器，真正向物理网络 I/O 字节流写入 Request 报文（请求行、头、体），并读取远程服务端的 Response 字节流（状态行、头、体）。
-- **Dispatcher 调度 ➔ 责任链 ➔ 连接池协同全景执行图**：
-
-\`\`\`text
-                      client.newCall(request).enqueue(callback)
-                                         │
-                                         ▼
-   ╭───────────────────────────────────────────────────────────────────────────╮
-   │  阶段 ①：Dispatcher 调度器（并发限流与流量防洪闸）                          │
-   ╰───────────────────────────────────────────────────────────────────────────╯
-                                         │
-                    ┌────────────────────┴────────────────────┐
-                    ▼                                         ▼
-         【配额充裕：直接放行】                    【达到阈值：背压排队】
-    • 全局并发 runningCalls < 64               • 全局并发 >= 64 或
-    • 单域名 hostCalls < 5                     • 该域名 hostCalls >= 5
-                    │                                         │
-                    ▼                                         ▼
-         [ runningAsyncCalls ]                     [ readyAsyncCalls ]
-         (正在执行的异步任务队列)                   (缓冲等待的双向就绪队列)
-                    │                                         ▲
-                    ▼                                         │
-       提交给 ThreadPoolExecutor                              │ 动态提升任务
-       (0 核心 + SynchronousQueue 手递手派发)                 │ promoteAndExecute()
-                    │                                         │
-                    ▼                                         │
-       Worker 线程启动，进入责任链管线                        │
-                    │                                         │
-                    ▼                                         │
-   ╭──────────────────────────────────────────────────────────┴────────────────╮
-   │  阶段 ②：RealInterceptorChain 责任链执行管线（递归拦截切面）              │
-   ╰───────────────────────────────────────────────────────────────────────────╯
+        explanation: `\`\`\`text
+                      okHttpClient.newCall(request)
+                                   │
+                ┌──────────────────┴──────────────────┐
+                ▼                                     ▼
+    【异步轨道】call.enqueue(callback)       【同步轨道】call.execute()
+                │                                     │
+╭───────────────┴────────────────────────╮   ╭────────┴────────────────────────╮
+│ 阶段 ①-A：Dispatcher 异步并发门闸判定   │   │ 阶段 ①-B：Dispatcher 同步登记   │
+│                                        │   │                                 │
+│ [门闸条件]: runningAsyncCalls.size < 64│   │  synchronized {                 │
+│             && callsPerHost(host) < 5  │   │    runningSyncCalls.add(call)   │
+│                   │                    │   │  }                              │
+│          ┌────────┴────────┐           │   │                                 │
+│       NO │                 │ YES       │   │  • 不进线程池，当前线程阻塞执行  │
+│          ▼                 ▼           │   │  • 不受 64/5 阈值限流           │
+│  [ readyAsyncCalls ] [runningAsyncCalls│   │  • 登记用于 cancelAll() 全局取消│
+│  (就绪排队双向队列)   (运行中异步队列)  │   ╰────────────────┬────────────────╯
+│    • 零任务丢弃            │           │                    │
+│    • 等待配额释放          ▼           │                    │
+│          ▲         提交无界线程池      │                    │
+│          │         (0核心+手递手Queue) │                    │
+│          │                 │           │                    │
+│          │                 ▼           │                    │
+│          │         子线程并发执行      │                    │
+╰──────────┼─────────────────┬───────────╯                    │
+           │                 │                                │
+           │                 └────────────────┬───────────────┘
+           │                                  ▼
+           │                     【双轨殊途同归：直入责任链】
+           │                   getResponseWithInterceptorChain$okhttp()
+           │                                  │
+╭──────────┴──────────────────────────────────┴───────────────────────────────╮
+│  阶段 ②：RealInterceptorChain 责任链执行管线（递归拦截切面）                  │
+╰─────────────────────────────────────────────────────────────────────────────╯
                                          │
         ┌────────────────────────────────┴────────────────────────────────┐
         ▼ 请求前置加工 (Request)                                          ▲ 响应后置包装 (Response)
