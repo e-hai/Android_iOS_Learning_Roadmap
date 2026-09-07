@@ -1845,7 +1845,32 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
 1. **连接复用彻底瘫痪**：每次 \`new\` 都生成独立连接池，相同 Host 无法共享存活 Socket，每次请求白白重走 100~300ms TCP/TLS 握手。
 2. **并发限流全面失控**：64/5 阈值仅在单个实例内生效，频繁 \`new\` 会瞬间产生海量物理线程击穿系统限制，极易导致 IP 被封。
 3. **线程堆积诱发 OOM**：每个实例独占线程池与守护线程，短时间内未及时回收的大量线程堆积极易诱发内存溢出。
-4. **正确姿势（client.newBuilder）**：特殊场景（如大文件 60s 超时）用 \`client.newBuilder()\` 派生，**强行共享底层同一个连接池与分发器**。
+4. **正确姿势（client.newBuilder）**：特殊场景（如大文件 60s 超时、不同业务线配置不同拦截器）用 \`client.newBuilder()\` 派生，**强行共享底层同一个连接池与分发器**。
+
+\`\`\`kotlin
+// 1. 全局底座 Client（纯净无业务拦截器，仅持有共享连接池与分发器）
+val baseClient = OkHttpClient.Builder()
+    .connectionPool(ConnectionPool(5, 5, TimeUnit.MINUTES))
+    .dispatcher(Dispatcher())
+    .connectTimeout(10, TimeUnit.SECONDS)
+    .build()
+
+// 2. 用户中心 Client（浅拷贝共享连接池，按需注入 AES 加密）
+val userClient = baseClient.newBuilder()
+    .addInterceptor(AesCryptoInterceptor(secretKey = "USER_KEY"))
+    .build()
+
+// 3. 支付中心 Client（浅拷贝共享连接池，按需注入 SM4 国密加密）
+val payClient = baseClient.newBuilder()
+    .addInterceptor(Sm4CryptoInterceptor(secretKey = "PAY_KEY"))
+    .build()
+
+// 4. 大文件上传 Client（浅拷贝共享连接池，仅定制 60s 长超时）
+val uploadClient = baseClient.newBuilder()
+    .readTimeout(60, TimeUnit.SECONDS)
+    .writeTimeout(60, TimeUnit.SECONDS)
+    .build()
+\`\`\`
 
 ### OkHttp Token 无感自动刷新拦截器实战
 
