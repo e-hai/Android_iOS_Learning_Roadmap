@@ -1743,7 +1743,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
           explanation: '网络通信（OkHttp）：核心原理与实战管线',
           caseStudy: '二、本地存储（Room）：核心实战与离线流水线',
         },
-        explanation: `\`\`\`text
+        explanation: `\`\`\`okhttp-pipeline
                       okHttpClient.newCall(request)
                                    │
                 ┌──────────────────┴──────────────────┐

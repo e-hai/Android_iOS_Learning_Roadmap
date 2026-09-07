@@ -1,6 +1,7 @@
 import { deepDiveDomains } from '../data/deep-dive-data';
 import { DeepDiveDomain, DeepDiveModule, PipelineStep, StepperStep } from '../models/types';
 import { i18n } from '../services/i18n';
+import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 
 export function renderDeepDiveDocView(
   currentStageId: string,
@@ -711,7 +712,9 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
       const lang = (codeMatch[1] || '').toLowerCase();
       const code = codeMatch[2].trim();
 
-      if (lang === 'diagram' || lang === 'ascii' || lang === 'text') {
+      if (lang === 'okhttp-pipeline' || code.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
+        contentHtml += renderOkHttpPipelineVisual(code);
+      } else if (lang === 'diagram' || lang === 'ascii' || lang === 'text') {
         contentHtml += `<pre class="layer-diagram-box"><code>${escapeHtml(code)}</code></pre>`;
       } else {
         contentHtml += `<pre class="layer-code-box"><code>${escapeHtml(code)}</code></pre>`;
@@ -808,6 +811,7 @@ function formatCaseStudyBody(rawText: string): string {
   let html = '';
   let inCodeBlock = false;
   let codeContent = '';
+  let currentCodeLang = '';
   let inTable = false;
   let tableHeader: string[] = [];
   let tableRows: string[][] = [];
@@ -835,12 +839,19 @@ function formatCaseStudyBody(rawText: string): string {
     // Check code blocks
     if (trimmed.startsWith('```')) {
       if (inCodeBlock) {
-        html += `<pre class="layer-code-box case-code-box"><code>${escapeHtml(codeContent.trim())}</code></pre>`;
+        const codeTrimmed = codeContent.trim();
+        if (currentCodeLang === 'okhttp-pipeline' || codeTrimmed.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
+          html += renderOkHttpPipelineVisual(codeTrimmed);
+        } else {
+          html += `<pre class="layer-code-box case-code-box"><code>${escapeHtml(codeTrimmed)}</code></pre>`;
+        }
         inCodeBlock = false;
         codeContent = '';
+        currentCodeLang = '';
       } else {
         flushTable();
         inCodeBlock = true;
+        currentCodeLang = trimmed.slice(3).trim().toLowerCase();
         codeContent = '';
       }
       continue;
