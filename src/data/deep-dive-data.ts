@@ -1870,31 +1870,65 @@ class MetricEventListener : EventListener() {
     }
 }
 \`\`\``,
-        caseStudy: `### 数据库安全升级与跨版本平滑迁移实战（AutoMigration 与复杂临时表三步法）
+        caseStudy: `### 数据库平滑迁移选型决策与六大避坑红线
 
-- **解决痛点与实战规范**：应用版本迭代时，本地 SQLite 表结构变更（新增字段、重命名列）极易引发用户端崩盘。严禁在线上开启 \`fallbackToDestructiveMigration()\`，必须严格遵循可追溯的迁移规范。
-- **两大迁移姿势**：
-  1. **自动迁移（@AutoMigration）**：Room 2.4+ 支持通过注解声明差量迁移，遇到重命名或删除列歧义时，配置 \`@RenameColumn\` / \`@DeleteColumn\` 进行显式说明；
-  2. **手动复杂表迁移三步法**：SQLite 不支持直接 DROP COLUMN，涉及旧列删除或重构时，遵循“① 创建新临时表 ➔ ② 将旧表数据复制到新表 ➔ ③ DROP 旧表并重命名新表”。
+- **核心选型法则**：“只改表结构骨架（加表/加列/改名/删列），老数据原样保留或填静态默认值” ➔ **闭眼选自动迁移（@AutoMigration）**；“涉及老数据内容清洗/拆分/类型转换，或底层主外键约束重构” ➔ **坚决选手动迁移（Migration）**。
+
+| 迁移类型 | 业务场景 | 迁移方案 | 核心实现与要求 |
+| :--- | :--- | :---: | :--- |
+| **加表** | 新增业务实体表（新 \`@Entity\`） | **自动迁移** | 零代码，在 \`@Database(entities = [...])\` 追加，Room 自动建表 |
+| **加列/加字段** | 既有表新增可空字段或带默认值字段 | **自动迁移** | 实体类加字段（可空或配 \`@ColumnInfo(defaultValue = "...")\`），Room 自动加列 |
+| **改名** | 重命名数据表或字段列名 | **自动迁移** | 配置 \`AutoMigrationSpec\`，打上 \`@RenameTable\` 或 \`@RenameColumn\` 消除歧义 |
+| **删列/删表** | 废弃旧业务字段或整张过期表 | **自动迁移** | 配置 \`AutoMigrationSpec\`，打上 \`@DeleteColumn\` 或 \`@DeleteTable\`（防误删安全锁） |
+| **数据清洗转换** | 字段拆分/合并（如 \`fullName\` 拆为姓与名） | **手动迁移** | 手写 \`Migration(from, to)\`，执行带字符串/逻辑函数的 SQL 语句回填老数据 |
+| **字段类型变更** | 数据类型演进（如 \`status\` 从 \`TEXT\` 改为 \`INTEGER\`） | **手动迁移** | 手写迁移，通过 \`CAST(col AS INTEGER)\` 转换旧数据并回填 |
+| **主键重构** | 修改单一主键或变更为复合主键 | **手动迁移** | 手写迁移，执行临时表三步法重建主键索引与唯一约束 |
+| **跨表拆分合并** | 单表拆分或多表归一（数据库范式重构） | **手动迁移** | 手写迁移，通过 \`INSERT INTO new_table SELECT ... FROM old_table\` 迁移数据 |
+
+- **生产级六大避坑红线**：
+  1. **新增非空字段必须声明 defaultValue**：老存量数据无法凭空生成非空值。未配默认值时 Room 编译期直接拦截报错；若绕过则线上建表抛 \`SQLiteException\` 崩溃闪退；
+  2. **Schema 导出文件必须提交进 Git**：\`@AutoMigration\` 底层依赖比对 \`schemas/.../1.json\` 与 \`2.json\`。必须在 Gradle 配置 \`room.schemaLocation\`，且旧版本 JSON 文件绝不能忽略；
+  3. **改名与删列必须配 Spec**：Room 无法凭空猜测是“改名”还是“删旧增新”。删除操作为防止误抹历史数据，强制要求开发者显式声明 \`@DeleteColumn\`；
+  4. **严禁在线上调用 fallbackToDestructiveMigration()**：任何线上版本严禁开启破坏性降级！一旦跨版本迁移缺失，Room 会直接 DROP 全表重建，造成用户本地离线数据彻底清空丢失；
+  5. **复杂手动表重构严格执行临时表三步法**：SQLite 历史版本不支持直接修改列。必须严格遵循“① 创建全新临时表 ➔ ② 拷贝旧表留存数据 ➔ ③ DROP 旧表并将临时表更名为正式表”；
+  6. **必须编写跨版本升级单元测试**：现实用户经常跳版本升级（如 1 ➔ 3）。必须引入 \`room-testing\` 的 \`MigrationTestHelper\`，验证跳级升级时的数据一致性。
+
+### 数据库安全迁移落地实战（AutoMigration 注解与复杂临时表三步法）
+
+- **实战场景演示**：涵盖自动迁移（加列默认值、改列名、删列）与手动迁移（复杂临时表三步法）。
 
 \`\`\`kotlin
+// 1. Entity 新增字段规范：可空字段或显式配置 defaultValue
+@Entity(tableName = "users")
+data class UserEntity(
+    @PrimaryKey val id: String,
+    val displayName: String,
+    // ⚡ 加列场景 1：新增可空列，老记录自动填 NULL，全自动处理无需配置 Spec
+    val avatarUrl: String? = null,
+    // ⚡ 加列场景 2：新增非空列，必须声明 defaultValue，否则老数据无法兼容直接编译报错！
+    @ColumnInfo(defaultValue = "0") val score: Int = 0
+)
+
+// 2. Database 自动迁移声明与歧义消除 Spec
 @Database(
     entities = [UserEntity::class],
     version = 3,
     autoMigrations = [
+        // 版本 1 ➔ 2：通过 Spec 显式声明改名与删列（消除“删旧建新”歧义并防误删）
         AutoMigration(from = 1, to = 2, spec = AppDatabase.Migration1To2Spec::class)
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
     @RenameColumn(tableName = "users", fromColumnName = "fullName", toColumnName = "displayName")
+    @DeleteColumn(tableName = "users", columnName = "oldTempToken")
     class Migration1To2Spec : AutoMigrationSpec
 
     companion object {
-        // ⚡ 复杂表重构三步法：删除旧列（版本 2 ➔ 3）
+        // ⚡ 版本 2 ➔ 3：手动复杂表重构三步法（深度重构或老数据清洗）
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // 第一步：创建包含新字段的全新临时表
-                db.execSQL("CREATE TABLE users_temp (id TEXT PRIMARY KEY NOT NULL, displayName TEXT NOT NULL, age INTEGER NOT NULL DEFAULT 0)")
+                // 第一步：创建包含新字段与新约束的全新临时表
+                db.execSQL("CREATE TABLE users_temp (id TEXT PRIMARY KEY NOT NULL, displayName TEXT NOT NULL, score INTEGER NOT NULL DEFAULT 0)")
                 // 第二步：将需要保留的旧表数据复制进临时表
                 db.execSQL("INSERT INTO users_temp (id, displayName) SELECT id, displayName FROM users")
                 // 第三步：删除旧表并将临时表更名为正式表
