@@ -1849,6 +1849,26 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
    - 业界通常告诫“慎用 \`Executors.newCachedThreadPool()\`，因其无界并发可能导致瞬时创建几千个线程引发 OOM”。
    - 但在 OkHttp 中，即使业务层瞬间并发调用 10,000 次 \`enqueue()\`，Dispatcher 也会死死卡住门闸：**只有前 64 个任务（且每个域名最多 5 个）能提交给线程池**，其余 9,936 个请求全部在 \`readyAsyncCalls\` 队列中安全等待，绝不会无界膨胀，Dispatcher 充当了线程池坚不可摧的前置护城河。
 
+### 核心架构深度剖析：为什么 OkHttpClient 必须全局单例？非单例有何严重后果？
+
+- **黄金记忆准则**：\`OkHttpClient\` 中的 \`ConnectionPool\`（连接池）与 \`Dispatcher\`（分发器）是**实例级字段**而非静态全局单例。频繁重复创建客户端将导致连接复用彻底瘫痪、并发门闸失控与线程泄漏 OOM。个性化业务配置应始终使用 \`client.newBuilder()\` 派生。
+
+1. **连接池复用彻底失效（性能暴跌 100~300ms/次）**：
+   - 每次 \`new OkHttpClient()\` 都会在内存中创建全新的独立 \`ConnectionPool\` 实例。
+   - 请求 A 在 Client-1 的池中存活，请求 B 使用 Client-2 根本无法感知，导致每个发往相同 Host 的请求都必须重新经历 TCP 三次握手与 TLS 1.3 密钥协商，连接池彻底形同虚设。
+
+2. **Dispatcher 并发限流全面失控（击穿服务端防线）**：
+   - \`maxRequests = 64\` 与 \`maxRequestsPerHost = 5\` 的门闸计数仅在单一 Dispatcher 实例内生效。
+   - 若短时间内创建了 100 个 Client 实例并发调用，就会瞬间产生 100 个并发物理线程击穿系统限制，极易引发服务器限流封禁或本地网络拥塞。
+
+3. **线程与内存泄漏，诱发移动端 OOM 崩溃**：
+   - 每个客户端实例均附带一个独立的 \`executorService\` 线程池与后台清理守护线程（\`TaskRunner\`）。
+   - 频繁无节制创建 Client 实例会导致大量未及时销毁的线程堆积（每个 JVM 线程默认占 512KB~1MB 栈内存），极易造成移动端内存溢出（OOM）。
+
+4. **最佳工程解法：通过 \`client.newBuilder()\` 浅拷贝共享底层池**：
+   - 当遇到大文件上传需要 60s 超时、普通接口仅需 10s 超时的差异化场景时，严禁重复 \`new\`。
+   - 官方推荐调用 \`baseClient.newBuilder().readTimeout(60, TimeUnit.SECONDS).build()\`：该方法仅覆盖目标配置，底层**强行共享同一个 ConnectionPool、Dispatcher 线程池与 DNS**，兼具参数灵活性与连接池复用最大化。
+
 ### OkHttp Token 无感自动刷新拦截器实战
 
 - **场景解释**：API 采用双 Token 机制（短期 AccessToken + 长期 RefreshToken）。当多个并发网络请求同时遇到 401 Unauthorized 时，必须确保**只发起一次 RefreshToken 换票请求**，换到新 Token 后唤醒所有等待的请求重新发起，避免并发换票死锁或重复失效。
