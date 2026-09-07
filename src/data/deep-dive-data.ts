@@ -1738,7 +1738,7 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
       },
       {
         tag: '数据层',
-        title: '数据层：OkHttp 通信原理与 Room 离线持久化实战',
+        title: '数据层',
         explanation: `### 一、Dispatcher 分发器与高并发队列调度机制
 
 - **高并发阀门痛点**：大量网络请求无序并发会迅速耗尽客户端 Socket 资源与文件描述符，或者瞬时打满服务端带宽。OkHttp 通过 \`Dispatcher\` 统筹调度，保障高吞吐与有序背压。
