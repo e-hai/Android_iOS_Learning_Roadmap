@@ -2602,20 +2602,191 @@ class CustomNetworkInterceptor: URLProtocol {
   domain_02_arch: {
     android: [
       {
-        tag: '状态流转',
-        title: 'MVI 单向数据流建模与 UiEvent 一次性事件防重消费',
-        explanation: '在 MVI (Model-View-Intent) 架构中，UI 状态由单一不可变的 UiState data class 表示，任何业务变更都通过 copy() 产生新状态并由 StateFlow 分发。然而，导航跳转、弹窗提示、支付拉起等属于“一次性事件 (UiEvent)”。如果将 UiEvent 放在 StateFlow 中，横竖屏旋转或重新订阅时会导致事件被重复消费；业界最佳实践是使用 Channel(Channel.BUFFERED) 或具有生命周期感知的单次消费事件封装器。',
-        codeSnippet: `// ViewModel 中安全分发 State 与 一次性 Event
-data class MainUiState(val isLoading: Boolean = false, val data: List<String> = emptyList())
-sealed interface MainUiEffect {
-    data class ShowToast(val message: String) : MainUiEffect
-    data class NavigateToDetail(val id: String) : MainUiEffect
+        tag: '架构演进',
+        title: '移动端架构演进史与 MVI / UDF 响应式实战',
+        sectionTitles: {
+          explanation: '架构演进脉络：从 MVC 到 MVI 的范式转移',
+          diagram: 'MVC ➔ MVP ➔ MVVM ➔ MVI 核心数据流拓扑对比',
+          diagramCaption: '四大架构演进数据流图',
+          caseStudy: '架构演进避坑决策与 MVI 生产落地准则',
+        },
+        explanation: `移动端架构在过去十余年经历了四代核心演进，每一次变革的本质都是**为了解决上一代架构在 UI 复杂度爆炸时遇到的痛点**（如状态分散、耦合严重、可测性差、生命周期泄漏）：
+
+### 1. 第一代：传统 MVC（Controller 膨胀与混乱耦合）
+- **核心结构**：\`Activity / Fragment\` 在 Android 中既充当 View（持有 View 引用、处理动画）又充当 Controller（发起网络请求、处理生命周期、管理业务逻辑）。
+- **致命痛点**：Controller 极易膨胀为上千行的“上帝类” (God Class)；View 与 Model 双向交叉引用，由于紧密绑定 Android Framework SDK，业务逻辑极难编写脱离真机/模拟器的纯 JVM 单元测试。
+
+### 2. 第二代：MVP（接口解耦但契约臃肿与内存泄漏）
+- **核心结构**：将业务逻辑抽离至独立的 \`Presenter\`，View 与 Presenter 之间**完全通过 Interface 接口通信**。
+- **演进价值**：Presenter 成为纯 Java/Kotlin 类，不持有任何 Android UI 控件引用，彻底具备了纯 JVM 单元测试能力。
+- **遗留痛点**：
+  1. **接口爆炸**：每个页面都需要定义庞大的契约类（\`IView\`、\`IPresenter\`），改动一个 UI 细节往往需要修改多个接口定义；
+  2. **双向生命周期耦合与泄漏**：Presenter 长期持有 \`IView\` 接口引用，若异步请求完成时 Activity 已销毁而未及时解绑，极易发生内存泄漏甚至 NPE 闪退。
+
+### 3. 第三代：MVVM（数据绑定驱动与双向绑定的隐患）
+- **核心结构**：引入官方 \`ViewModel\` 配合响应式数据流（如 \`LiveData\` / \`StateFlow\`），View 单向观察 ViewModel，通过数据驱动 UI。
+- **演进价值**：彻底消除 Presenter 的 IView 接口，ViewModel 不持有 View 引用且能跨配置变更（旋转屏幕）天然存活，解除了生命周期强绑定。
+- **新痛点**：在复杂页面中，ViewModel 往往暴露多个离散的状态流（如 \`val user = MutableStateFlow(...)\`、\`val isVip = MutableStateFlow(...)\`、\`val order = MutableStateFlow(...)\`），多个异步任务并发修改不同状态时，极易产生**状态时序竞争（Race Condition）与不一致的中间态（State Inconsistency）**。
+
+### 4. 第四代：MVI / UDF（单一不可变状态源与单向数据流闭环）
+- **核心结构**：
+  - **Model (UiState)**：页面全量状态聚合为单一不可变的数据模型（\`data class UiState\`），任何变更必须通过不可变 copy 创建新状态；
+  - **View (Compose / 声明式 UI)**：根据最新 State 进行声明式重绘，只负责将用户交互转换为意图并抛出；
+  - **Intent (UiIntent)**：用户的一切点击、刷新、输入均建模为显式的 Intent/Action 枚举，状态机集中处理意图并单向发射新状态。
+- **核心优势**：单向闭环流动、状态唯一确定、可完全回溯与测试；配合 Channel 解耦弹窗/跳转等一次性副作用（UiEffect），成为现代 Compose 声明式 UI 的标准工业级基座。`,
+        diagram: `【第一代：MVC (Model-View-Controller)】
+  ┌───────────────┐          用户操作
+  │     View      │ ◀───────────────────────── User
+  └───────┬───────┘
+          │ (强耦合于同一 Activity)
+          ▼
+  ┌───────────────┐    请求数据    ┌───────────────┐
+  │  Controller   │ ────────────▶ │     Model     │
+  └───────┬───────┘               └───────┬───────┘
+          ▲                               │
+          └───────────────────────────────┘
+                     数据直接回调刷新 View
+
+【第二代：MVP (Model-View-Presenter)】
+  ┌───────────────┐      双向接口契约 (IView)       ┌───────────────┐
+  │     View      │ ◀─────────────────────────────▶ │   Presenter   │ (通过纯接口解耦)
+  └───────────────┘                                 └───────┬───────┘
+                                                            │ 调用仓储 / 模型
+                                                            ▼
+                                                    ┌───────────────┐
+                                                    │     Model     │
+                                                    └───────────────┘
+
+【第三代：MVVM (Model-View-ViewModel)】
+  ┌───────────────┐         发送交互操作            ┌───────────────┐
+  │     View      │ ──────────────────────────────▶ │   ViewModel   │
+  │               │ ◀- - - - - - - - - - - - - - -  │ (多离散流驱动)  │
+  └───────────────┘  异步观察多个 StateFlow (易竞争)   └───────┬───────┘
+                                                            │
+                                                            ▼
+                                                    ┌───────────────┐
+                                                    │  Repository   │
+                                                    └───────────────┘
+
+【第四代：现代 MVI / UDF (单向不可变状态闭环)】
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  【View 表现层】                                                         │
+  │    Compose 纯函数: 根据单一不可变 UiState 声明式渲染 UI                    │
+  └───────────────────────────────────┬─────────────────────────────────────┘
+                                      │ 1. 唯一流向：发送不可变意图 (UiIntent)
+                                      ▼
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │  【ViewModel 业务状态机】                                                │
+  │    • 状态机处理 Intent ──▶ 调度 Repository 领域用例                      │
+  │    • 不可变单一状态源: StateFlow<UiState> (通过 copy() 产生原子新状态)     │
+  │    • 一次性副作用总线: Channel<UiEffect> (Toast / 弹窗 / 导航跳转安全消费) │
+  └───────────────────────────────────┬─────────────────────────────────────┘
+                                      │ 2. 闭环流动：单向推送全量不可变状态 (UiState)
+                                      ▼
+                               【View 响应式更新】`,
+        caseStudy: `### 架构选型对照矩阵
+
+| 架构形态 | 核心驱动形式 | View 与业务层关系 | 单元测试难度 | 典型缺陷与适用边界 |
+| :--- | :--- | :--- | :--- | :--- |
+| **MVC** | 命令式操作 UI | Activity 兼顾 View 与 Controller | 极难（强依赖 Android Framework） | 极易形成数千行巨型上帝类，仅存见于极老旧遗留代码 |
+| **MVP** | 接口回调驱动 | Presenter 强引用 IView 接口 | 中等（需 Mock 庞大的 IView 接口） | 接口定义爆炸，若未及时置空容易造成生命周期内存泄漏 |
+| **MVVM** | 响应式数据流驱动 | View 观察 ViewModel 的多个数据流 | 容易（纯 JVM 无 Android UI 依赖） | 多个状态流并发更新时易产生状态不一致或时序竞争 |
+| **MVI** | 单向不可变状态与意图闭环 | UDF 单向流动，View 仅持有单一不可变 UiState | 极佳（输入 Intent，断言输出 State） | 样板代码略多，单次事件（UiEffect）必须规范防重消费 |
+
+### 生产环境 MVI 架构三大落地准则与避坑红线
+
+- **1. 状态必须保证不可变与单一聚合（Single Source of Truth）**：
+  - 严禁在 ViewModel 中向 UI 暴露多个分散的 \`MutableStateFlow\`；
+  - 必须聚合为一个不可变 \`data class UiState\`。更新状态只能通过 \`_uiState.update { it.copy(...) }\` 进行原子拷贝替换，杜绝多线程时序竞争。
+
+- **2. 彻底区分【状态 (UiState)】与【一次性副作用 (UiEffect)】**：
+  - **状态 (UiState)**：页面当前“是什么样”（如内容列表、加载菊花、选中 Tab）。具有**粘性与可重入性**，屏幕旋转、进程恢复后必须如实重现；
+  - **副作用 (UiEffect)**：一次性动作（如弹 Toast、拉起支付收银台、页面返回）。**绝不可**作为 Boolean 字段放入 \`UiState\` 中，否则会导致屏幕旋转后重复弹出！必须使用 \`Channel<UiEffect>(Channel.BUFFERED)\` 在生命周期的 \`repeatOnLifecycle\` 块中进行单次安全消费。
+
+- **3. 意图驱动（Intent/Action）隔离 View 与领域逻辑**：
+  - View 严禁直接调用 ViewModel 中细碎的方法（如 \`vm.fetchPage(1)\`、\`vm.trackClick()\`）；
+  - View 统一抛出强类型密封接口 \`UiIntent\`，由 ViewModel 统一进行防抖处理、日志埋点与业务编排。`,
+        codeSnippet: `// ═══════════════════════════════════════════════════════════════
+// 现代 MVI / UDF 工业级单向数据流最佳实践
+// ═══════════════════════════════════════════════════════════════
+
+// 1. 【单一不可变状态】当前页面视觉的全量快照
+data class FeedUiState(
+    val isLoading: Boolean = false,
+    val items: List<String> = emptyList(),
+    val error: String? = null
+)
+
+// 2. 【用户意图】用户交互发出的所有显式动作
+sealed interface FeedUiIntent {
+    data object Refresh : FeedUiIntent
+    data class LoadMore(val page: Int) : FeedUiIntent
+    data class ItemClicked(val id: String) : FeedUiIntent
 }
 
-class MainViewModel : ViewModel() {
-    val uiState: StateFlow<MainUiState> = ...
-    private val _effect = Channel<MainUiEffect>(Channel.BUFFERED)
-    val effect = _effect.receiveAsFlow() // View 侧在 repeatOnLifecycle 中 collect
+// 3. 【一次性副作用】弹窗、Toast、路由跳转等单次非粘性事件
+sealed interface FeedUiEffect {
+    data class ShowToast(val message: String) : FeedUiEffect
+    data class NavigateToDetail(val detailId: String) : FeedUiEffect
+}
+
+// 4. 【状态机 ViewModel】处理意图并单向分发状态与副作用
+class FeedViewModel(
+    private val repository: FeedRepository
+) : ViewModel() {
+
+    // ⚡ 单一状态源（只读向外部暴露）
+    private val _uiState = MutableStateFlow(FeedUiState(isLoading = true))
+    val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
+
+    // ⚡ 一次性副作用通道（Channel.BUFFERED 确保事件不丢失、不重放）
+    private val _effect = Channel<FeedUiEffect>(Channel.BUFFERED)
+    val effect: Flow<FeedUiEffect> = _effect.receiveAsFlow()
+
+    // 统一意图分发入口
+    fun sendIntent(intent: FeedUiIntent) {
+        viewModelScope.launch {
+            when (intent) {
+                is FeedUiIntent.Refresh -> handleRefresh()
+                is FeedUiIntent.LoadMore -> handleLoadMore(intent.page)
+                is FeedUiIntent.ItemClicked -> {
+                    _effect.send(FeedUiEffect.NavigateToDetail(intent.id))
+                }
+            }
+        }
+    }
+
+    private suspend fun handleRefresh() {
+        _uiState.update { it.copy(isLoading = true, error = null) }
+        repository.loadFeeds()
+            .onSuccess { list ->
+                _uiState.update { it.copy(isLoading = false, items = list) }
+            }
+            .onFailure { err ->
+                _uiState.update { it.copy(isLoading = false, error = err.message) }
+                _effect.send(FeedUiEffect.ShowToast("刷新失败: \${err.message}"))
+            }
+    }
+}
+
+// 5. 【Compose View 订阅端】生命周期安全收集
+@Composable
+fun FeedScreen(viewModel: FeedViewModel, onNavigate: (String) -> Unit) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    // ⚡ 一次性事件收集：只在 STARTED 状态及以上收集，页面销毁自动取消
+    LaunchedEffect(viewModel.effect) {
+        viewModel.effect.collect { effect ->
+            when (effect) {
+                is FeedUiEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                is FeedUiEffect.NavigateToDetail -> onNavigate(effect.detailId)
+            }
+        }
+    }
+
+    // 视图根据单一 state 声明式刷新，意图单向抛给 ViewModel
+    FeedContent(state = state, onRefresh = { viewModel.sendIntent(FeedUiIntent.Refresh) })
 }`,
       },
       {
@@ -2637,9 +2808,9 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
     ],
     ios: [
       {
-        tag: '状态机架构',
-        title: 'TCA (The Composable Architecture) 状态机与 Reducer 演进',
-        explanation: 'TCA 是 iOS 生态中最严谨的单向数据流与状态机框架。它将业务严格拆解为 State（纯值类型状态树）、Action（所有可能发生的用户交互与系统事件枚举）、Reducer（无副作用的纯函数，接收 State 与 Action 并返回下一个 State）以及 Effect（处理网络、定时器等异步副作用并转换回 Action）。TCA 从根本上保证了业务逻辑的可测试性、可追溯性与确定性。',
+        tag: '架构演进',
+        title: 'iOS 架构演进史（MVC ➔ VIPER ➔ MVVM）与 TCA 状态机实战',
+        explanation: 'iOS 开发同样经历了深度的架构范式转移：从最早 Apple 官方推崇的传统 MVC（被戏称为 Massive View Controller，即控制器兼管网络、布局与代理从而导致单个 VC 膨胀至数千行），到重度拆分 Router/Interactor 的 VIPER，再到引入 Combine / @Observable 驱动的响应式 MVVM。而在声明式 SwiftUI 时代，面对复杂业务与全局状态同步，TCA (The Composable Architecture) 成为了业界最严谨的单向数据流与状态机框架，从根本上保证了状态的可回溯与测试确定性。',
         codeSnippet: `// TCA 核心结构示例
 @Reducer
 struct CounterFeature {
