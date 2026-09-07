@@ -1738,7 +1738,11 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
       },
       {
         tag: '数据层',
-        title: '数据层：OkHttp 核心原理与网络管线',
+        title: '数据层',
+        sectionTitles: {
+          explanation: '网络通信（OkHttp）：核心原理与实战管线',
+          caseStudy: '二、本地存储（Room）：核心实战与离线流水线',
+        },
         explanation: `### 一、Dispatcher 分发器与高并发队列调度机制
 
 - **高并发阀门痛点**：大量网络请求无序并发会迅速耗尽客户端 Socket 资源与文件描述符，或者瞬时打满服务端带宽。OkHttp 通过 \`Dispatcher\` 统筹调度，保障高吞吐与有序背压。
@@ -1766,8 +1770,9 @@ suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
   2. \`BridgeInterceptor\`：将应用层高阶模型转换为标准 HTTP 帧，自动补充 \`Host\`、\`Keep-Alive\`、\`User-Agent\` 与 Cookie，透明处理 \`gzip\` 压缩与解压缩；
   3. \`CacheInterceptor\`：严格遵循 RFC 7234 HTTP 缓存规范，根据 Cache-Control 决定是直接返回本地磁盘缓存还是发起网络请求，命中 304 时智能合并响应头；
   4. \`ConnectInterceptor\`：核心寻址与物理连接建立，从 \`ConnectionPool\` 捞取空闲连接或握手新建 \`RealConnection\`，并创建网络通信编解码器 \`HttpCodec\`；
-  5. \`CallServerInterceptor\`：终点拦截器，真正向物理网络 I/O 字节流写入 Request 报文（请求行、头、体），并读取远程服务端的 Response 字节流（状态行、头、体）。`,
-        caseStudy: `### 一、OkHttp Token 无感自动刷新拦截器实战
+  5. \`CallServerInterceptor\`：终点拦截器，真正向物理网络 I/O 字节流写入 Request 报文（请求行、头、体），并读取远程服务端的 Response 字节流（状态行、头、体）。
+
+### 四、OkHttp 工业级实战：Token 无感自动刷新拦截器
 
 - **场景解释**：API 采用双 Token 机制（短期 AccessToken + 长期 RefreshToken）。当多个并发网络请求同时遇到 401 Unauthorized 时，必须确保**只发起一次 RefreshToken 换票请求**，换到新 Token 后唤醒所有等待的请求重新发起，避免并发换票死锁或重复失效。
 
@@ -1819,7 +1824,7 @@ class TokenAuthenticator(
 }
 \`\`\`
 
-### 二、全链路网络耗时监控与防篡改签名拦截器实战
+### 五、OkHttp 工业级实战：全链路网络耗时监控与防篡改签名拦截器
 
 - **场景解释**：金融级接口要求防重放攻击与防数据篡改，自动为请求体按字典序拼接私钥生成 HMAC-SHA256 签名；同时借助 \`EventListener\` 精确采集 DNS 解析、TCP 建连、TLS 握手及首包到达（TTFB）耗时。
 
@@ -1865,10 +1870,6 @@ class MetricEventListener : EventListener() {
     }
 }
 \`\`\``,
-      },
-      {
-        tag: '数据层',
-        title: '数据层：Room 数据库实战与 SOT 离线流水线',
         caseStudy: `### 一、数据库安全升级与跨版本平滑迁移实战（AutoMigration 与复杂临时表三步法）
 
 - **解决痛点与实战规范**：应用版本迭代时，本地 SQLite 表结构变更（新增字段、重命名列）极易引发用户端崩盘。严禁在线上开启 \`fallbackToDestructiveMigration()\`，必须严格遵循可追溯的迁移规范。
