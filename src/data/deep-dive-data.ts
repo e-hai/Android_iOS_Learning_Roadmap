@@ -2033,8 +2033,6 @@ abstract class AppDatabase : RoomDatabase() {
 
 ### 一对多与多对多声明式关系建模（@Embedded、@Relation 与交叉表 Junction）
 
-- **解决痛点**：无需手写复杂 JOIN 查询，Room 会在单个 \`@Transaction\` 事务中自动分步查表并装配出完整的领域对象树。
-
 #### 1. 一对多关系（One-to-Many）：用户与名下多个订单
 
 - **实现要点**：主表用 \`@Embedded\` 嵌套，子表列表用 \`@Relation(parentColumn, entityColumn)\` 绑定外键。
