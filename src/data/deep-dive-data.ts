@@ -2605,70 +2605,13 @@ class CustomNetworkInterceptor: URLProtocol {
         tag: '架构演进',
         title: '移动端架构演进史与 MVI / UDF 响应式实战',
         sectionTitles: {
-          explanation: '架构演进脉络：从 MVC 到 MVI 的范式转移',
-          diagram: 'MVC ➔ MVP ➔ MVVM ➔ MVI 核心数据流拓扑对比',
-          diagramCaption: '四大架构演进数据流图',
+          explanation: '声明式 UI 与单向数据流核心机制',
+          diagram: '现代 MVI / UDF 核心单向数据流拓扑',
+          diagramCaption: 'MVI / UDF 单向闭环数据流图',
           caseStudy: '架构演进深水区：MVVM vs MVI 声明式真相、状态切片与并发陷阱',
         },
-        explanation: `移动端架构在过去十余年经历了四代核心演进，每一次变革的本质都是**为了解决上一代架构在 UI 复杂度爆炸时遇到的痛点**（如状态分散、耦合严重、可测性差、生命周期泄漏）：
-
-### 第一代：传统 MVC（Controller 膨胀与混乱耦合）
-- **核心结构**：\`Activity / Fragment\` 在 Android 中既充当 View（持有 View 引用、处理动画）又充当 Controller（发起网络请求、处理生命周期、管理业务逻辑）。
-- **致命痛点**：Controller 极易膨胀为上千行的“上帝类” (God Class)；View 与 Model 双向交叉引用，由于紧密绑定 Android Framework SDK，业务逻辑极难编写脱离真机/模拟器的纯 JVM 单元测试。
-
-### 第二代：MVP（接口解耦但契约臃肿与内存泄漏）
-- **核心结构**：将业务逻辑抽离至独立的 \`Presenter\`，View 与 Presenter 之间**完全通过 Interface 接口通信**。
-- **演进价值**：Presenter 成为纯 Java/Kotlin 类，不持有任何 Android UI 控件引用，彻底具备了纯 JVM 单元测试能力。
-- **遗留痛点**：
-  1. **接口爆炸**：每个页面都需要定义庞大的契约类（\`IView\`、\`IPresenter\`），改动一个 UI 细节往往需要修改多个接口定义；
-  2. **双向生命周期耦合与泄漏**：Presenter 长期持有 \`IView\` 接口引用，若异步请求完成时 Activity 已销毁而未及时解绑，极易发生内存泄漏甚至 NPE 闪退。
-
-### 第三代：MVVM（数据绑定驱动与双向绑定的隐患）
-- **核心结构**：引入官方 \`ViewModel\` 配合响应式数据流（如 \`LiveData\` / \`StateFlow\`），View 单向观察 ViewModel，通过数据驱动 UI。
-- **演进价值**：彻底消除 Presenter 的 IView 接口，ViewModel 不持有 View 引用且能跨配置变更（旋转屏幕）天然存活，解除了生命周期强绑定。
-- **新痛点**：在复杂页面中，ViewModel 往往暴露多个离散的状态流（如 \`val user = MutableStateFlow(...)\`、\`val isVip = MutableStateFlow(...)\`、\`val order = MutableStateFlow(...)\`），多个异步任务并发修改不同状态时，极易产生**状态时序竞争（Race Condition）与不一致的中间态（State Inconsistency）**。
-
-### 第四代：MVI / UDF（单一不可变状态源与单向数据流闭环）
-- **核心结构**：
-  - **Model (UiState)**：页面全量状态聚合为单一不可变的数据模型（\`data class UiState\`），任何变更必须通过不可变 copy 创建新状态；
-  - **View (Compose / 声明式 UI)**：根据最新 State 进行声明式重绘，只负责将用户交互转换为意图并抛出；
-  - **Intent (UiIntent)**：用户的一切点击、刷新、输入均建模为显式的 Intent/Action 枚举，状态机集中处理意图并单向发射新状态。
-- **核心优势**：单向闭环流动、状态唯一确定、可完全回溯与测试；配合 Channel 解耦弹窗/跳转等一次性副作用（UiEffect），成为现代 Compose 声明式 UI 的标准工业级基座。`,
-        diagram: `【第一代：MVC (Model-View-Controller)】
-  ┌───────────────┐          用户操作
-  │     View      │ ◀───────────────────────── User
-  └───────┬───────┘
-          │ (强耦合于同一 Activity)
-          ▼
-  ┌───────────────┐    请求数据    ┌───────────────┐
-  │  Controller   │ ────────────▶ │     Model     │
-  └───────┬───────┘               └───────┬───────┘
-          ▲                               │
-          └───────────────────────────────┘
-                     数据直接回调刷新 View
-
-【第二代：MVP (Model-View-Presenter)】
-  ┌───────────────┐      双向接口契约 (IView)       ┌───────────────┐
-  │     View      │ ◀─────────────────────────────▶ │   Presenter   │ (通过纯接口解耦)
-  └───────────────┘                                 └───────┬───────┘
-                                                            │ 调用仓储 / 模型
-                                                            ▼
-                                                    ┌───────────────┐
-                                                    │     Model     │
-                                                    └───────────────┘
-
-【第三代：MVVM (Model-View-ViewModel)】
-  ┌───────────────┐         发送交互操作            ┌───────────────┐
-  │     View      │ ──────────────────────────────▶ │   ViewModel   │
-  │               │ ◀- - - - - - - - - - - - - - -  │ (多离散流驱动)  │
-  └───────────────┘  异步观察多个 StateFlow (易竞争)   └───────┬───────┘
-                                                            │
-                                                            ▼
-                                                    ┌───────────────┐
-                                                    │  Repository   │
-                                                    └───────────────┘
-
-【第四代：现代 MVI / UDF (单向不可变状态闭环)】
+        explanation: `现代声明式 UI（Jetpack Compose / SwiftUI）从根本上重塑了客户端表现层的驱动模型：UI 彻底成为状态的纯函数投影（\`UI = f(State)\`）。传统命令式时代的控制器臃肿与接口爆炸已随历史退场，当前工业界架构设计的核心矛盾，已全面转向**在单向数据流（UDF）闭环中，如何平衡全局单一状态的原子一致性与高频复杂交互下的局部重组性能**。`,
+        diagram: `【现代 MVI / UDF (单向不可变状态闭环拓扑)】
   ┌─────────────────────────────────────────────────────────────────────────┐
   │  【View 表现层】                                                         │
   │    Compose 纯函数: 根据单一不可变 UiState 声明式渲染 UI                    │
@@ -2684,18 +2627,7 @@ class CustomNetworkInterceptor: URLProtocol {
                                       │ 2. 闭环流动：单向推送全量不可变状态 (UiState)
                                       ▼
                                 【View 响应式更新】`,
-        caseStudy: `### 架构选型对照矩阵
-
-| 架构形态 | 核心驱动形式 | View 与业务层关系 | 单元测试难度 | 典型缺陷与适用边界 |
-| :--- | :--- | :--- | :--- | :--- |
-| **MVC** | 命令式操作 UI | Activity 兼顾 View 与 Controller | 极难（强依赖 Android Framework） | 极易形成数千行巨型上帝类，仅存见于极老旧遗留代码 |
-| **MVP** | 接口回调驱动 | Presenter 强引用 IView 接口 | 中等（需 Mock 庞大的 IView 接口） | 接口定义爆炸，若未及时置空容易造成生命周期内存泄漏 |
-| **MVVM** | 响应式数据流驱动 | View 观察 ViewModel 的多个数据流 | 容易（纯 JVM 无 Android UI 依赖） | 多个状态流并发更新时易产生状态不一致或时序竞争 |
-| **MVI** | 单向不可变状态与意图闭环 | UDF 单向流动，View 仅持有单一不可变 UiState | 极佳（输入 Intent，断言输出 State） | 样板代码略多，单次事件（UiEffect）必须规范防重消费 |
-
----
-
-### 架构演进深水区：声明式 UI 下 MVVM 与 MVI 的真相
+        caseStudy: `### 架构演进深水区：声明式 UI 下 MVVM 与 MVI 的真相
 
 很多人在从命令式 UI 转向 Jetpack Compose / SwiftUI 之后，常常产生一个疑问：
 > **“在声明式 UI 下，MVVM 也是单向数据流（UDF），如果公共函数按意图语义定义，那 MVVM 和 MVI 还有区别吗？复杂页面下单一 State 拆分切片后，是不是又退化成 MVVM 了？”**
