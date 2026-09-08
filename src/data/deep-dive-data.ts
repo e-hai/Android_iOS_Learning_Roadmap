@@ -2603,7 +2603,7 @@ class CustomNetworkInterceptor: URLProtocol {
     android: [
       {
         tag: '架构演进',
-        title: '移动端架构演进史与 MVI / UDF 响应式实战',
+        title: '移动端架构演进',
         sectionTitles: {
           explanation: '声明式 UI 与单向数据流核心机制',
           diagram: 'MVC ➔ MVP ➔ MVVM ➔ MVI 核心数据流拓扑对比',
@@ -2716,7 +2716,7 @@ class CustomNetworkInterceptor: URLProtocol {
 在很多团队的 MVI 实践中，开发者误以为只要使用了 \`MutableStateFlow.update { ... }\` 就绝对并发安全。这是一个极其危险的认知误区！
 **CAS 只能保证单次内存更新的原子性，但无法跨越 \`suspend\` 协程挂起点！**
 
-#### 致命 Bug 场景复盘：
+#### 1. 致命 Bug 场景复盘
 用户在发帖输入框打字，同时点击“发送”：
 \`\`\`kotlin
 // ❌ 致命隐患写法：跨挂起点的快照盲写
@@ -2736,7 +2736,7 @@ fun submitPost() {
 }
 \`\`\`
 
-#### 工业级避坑解法：防御性校验当前真实状态
+#### 2. 工业级避坑解法：防御性校验当前真实状态
 在挂起恢复后，必须**拿当前最新的内存值与挂起前的值进行对比**：
 \`\`\`kotlin
 // ✅ 工业级安全写法：挂起恢复后的条件化状态推进
