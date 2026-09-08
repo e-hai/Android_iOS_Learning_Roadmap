@@ -2638,7 +2638,121 @@ class CustomNetworkInterceptor: URLProtocol {
 | **输入通道** | **离散的方法调用**（如 \`vm.onSearch(key)\`、\`vm.refresh()\`） | **单一的意图分发通道**（\`vm.dispatch(Intent.Search(key))\`） |
 | **状态载体** | **多个细粒度可观察流**（各个流独立发射、独立变化） | **全局单一不可变快照**（每次变更通过 \`copy()\` 原子推进） |
 | **时序一致性** | 弱（多流异步联动时存在纳秒级数据不一致） | 强（任意时间切片下状态均具有原子一致性） |
-| **因果可溯性** | 难以拦截全局动作并回溯执行链路 | 意图数据化，天然支持埋点拦截、动作录制与时间旅行 |`,
+| **因果可溯性** | 难以拦截全局动作并回溯执行链路 | 意图数据化，天然支持埋点拦截、动作录制与时间旅行 |
+
+#### 4. 工业级 MVI 代码实战规范
+在声明式 UI（Compose / SwiftUI）中，一个工业级生产可用的 MVI 架构应包含：**单一聚合根不可变状态（UiState）**、**受限意图事件（Intent）**、**业务状态机（ViewModel）**与**细粒度局部切片监听（避免非必要重组）**：
+
+\`\`\`kotlin
+// 1. 【聚合根状态】全局单一不可变状态快照
+@Immutable
+data class ProfileUiState(
+    val header: HeaderState = HeaderState(),
+    val composer: ComposerState = ComposerState(),
+    val posts: ImmutableList<PostItem> = persistentListOf(),
+    val error: String? = null
+)
+
+@Immutable
+data class HeaderState(val username: String = "", val avatarUrl: String = "", val isFollowing: Boolean = false)
+
+@Immutable
+data class ComposerState(val draftText: String = "", val isPosting: Boolean = false)
+
+@Immutable
+data class PostItem(val id: String, val title: String, val likes: Int)
+
+// 2. 【类型化意图】将用户与系统的交互完全数据化
+sealed interface ProfileIntent {
+    data class UpdateDraft(val text: String) : ProfileIntent
+    data object SubmitPost : ProfileIntent
+    data class ToggleFollow(val userId: String) : ProfileIntent
+}
+
+// 3. 【状态机 ViewModel】：读侧状态切片 + 写侧跨切片原子事务
+class ProfileViewModel(
+    private val repo: ProfileRepository
+) : ViewModel() {
+
+    // ⚡ 内部唯一可变聚合状态源
+    private val _state = MutableStateFlow(ProfileUiState())
+    val state: StateFlow<ProfileUiState> = _state.asStateFlow()
+
+    // ⚡ 【读侧切片 (State Slicing)】：
+    // 通过 distinctUntilChanged() 导出细粒度局部流，彻底切断子组件对全局状态的非必要重组依赖！
+    val headerState: StateFlow<HeaderState> = _state
+        .map { it.header }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _state.value.header)
+
+    val composerState: StateFlow<ComposerState> = _state
+        .map { it.composer }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _state.value.composer)
+
+    val postsState: StateFlow<ImmutableList<PostItem>> = _state
+        .map { it.posts }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _state.value.posts)
+
+    // 统一意图分发入口
+    fun dispatch(intent: ProfileIntent) {
+        when (intent) {
+            is ProfileIntent.UpdateDraft -> {
+                _state.update { it.copy(composer = it.composer.copy(draftText = intent.text)) }
+            }
+            is ProfileIntent.SubmitPost -> handleSubmitPost()
+            is ProfileIntent.ToggleFollow -> handleToggleFollow(intent.userId)
+        }
+    }
+
+    // ⚡ 【并发防御】：跨 suspend 挂起点防御性校验，杜绝盲写冲掉用户输入
+    private fun handleSubmitPost() {
+        val draft = _state.value.composer.draftText
+        if (draft.isBlank()) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(composer = it.composer.copy(isPosting = true)) }
+            val newPost = repo.createPost(draft)
+
+            // 恢复后的【跨切片原子事务】：草稿清空与列表追加在一次 CAS 中完成
+            _state.update { current ->
+                current.copy(
+                    composer = current.composer.copy(
+                        isPosting = false,
+                        draftText = if (current.composer.draftText == draft) "" else current.composer.draftText
+                    ),
+                    posts = (persistentListOf(newPost) + current.posts).toPersistentList()
+                )
+            }
+        }
+    }
+
+    private fun handleToggleFollow(userId: String) {
+        viewModelScope.launch {
+            val nextFollow = !_state.value.header.isFollowing
+            _state.update { it.copy(header = it.header.copy(isFollowing = nextFollow)) }
+            repo.toggleFollow(userId, nextFollow).onFailure {
+                _state.update { it.copy(header = it.header.copy(isFollowing = !nextFollow)) }
+            }
+        }
+    }
+}
+
+// 4. 【Compose View 订阅端】：子组件仅订阅自身切片，跳过无关重组
+@Composable
+fun ProfileScreen(viewModel: ProfileViewModel) {
+    val header by viewModel.headerState.collectAsStateWithLifecycle()
+    val composer by viewModel.composerState.collectAsStateWithLifecycle()
+    val posts by viewModel.postsState.collectAsStateWithLifecycle()
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        ProfileHeaderSection(header = header, onToggleFollow = { viewModel.dispatch(ProfileIntent.ToggleFollow("user_1")) })
+        PostComposerSection(composer = composer, onDraftChange = { viewModel.dispatch(ProfileIntent.UpdateDraft(it)) }, onSubmit = { viewModel.dispatch(ProfileIntent.SubmitPost) })
+        PostListSection(posts = posts)
+    }
+}
+\`\`\``,
       },
       {
         tag: '组件治理',
