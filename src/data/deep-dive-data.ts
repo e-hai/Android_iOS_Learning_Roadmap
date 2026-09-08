@@ -2612,23 +2612,23 @@ class CustomNetworkInterceptor: URLProtocol {
         },
         explanation: `移动端架构在过去十余年经历了四代核心演进，每一次变革的本质都是**为了解决上一代架构在 UI 复杂度爆炸时遇到的痛点**（如状态分散、耦合严重、可测性差、生命周期泄漏）：
 
-### 1. 第一代：传统 MVC（Controller 膨胀与混乱耦合）
+### 第一代：传统 MVC（Controller 膨胀与混乱耦合）
 - **核心结构**：\`Activity / Fragment\` 在 Android 中既充当 View（持有 View 引用、处理动画）又充当 Controller（发起网络请求、处理生命周期、管理业务逻辑）。
 - **致命痛点**：Controller 极易膨胀为上千行的“上帝类” (God Class)；View 与 Model 双向交叉引用，由于紧密绑定 Android Framework SDK，业务逻辑极难编写脱离真机/模拟器的纯 JVM 单元测试。
 
-### 2. 第二代：MVP（接口解耦但契约臃肿与内存泄漏）
+### 第二代：MVP（接口解耦但契约臃肿与内存泄漏）
 - **核心结构**：将业务逻辑抽离至独立的 \`Presenter\`，View 与 Presenter 之间**完全通过 Interface 接口通信**。
 - **演进价值**：Presenter 成为纯 Java/Kotlin 类，不持有任何 Android UI 控件引用，彻底具备了纯 JVM 单元测试能力。
 - **遗留痛点**：
   1. **接口爆炸**：每个页面都需要定义庞大的契约类（\`IView\`、\`IPresenter\`），改动一个 UI 细节往往需要修改多个接口定义；
   2. **双向生命周期耦合与泄漏**：Presenter 长期持有 \`IView\` 接口引用，若异步请求完成时 Activity 已销毁而未及时解绑，极易发生内存泄漏甚至 NPE 闪退。
 
-### 3. 第三代：MVVM（数据绑定驱动与双向绑定的隐患）
+### 第三代：MVVM（数据绑定驱动与双向绑定的隐患）
 - **核心结构**：引入官方 \`ViewModel\` 配合响应式数据流（如 \`LiveData\` / \`StateFlow\`），View 单向观察 ViewModel，通过数据驱动 UI。
 - **演进价值**：彻底消除 Presenter 的 IView 接口，ViewModel 不持有 View 引用且能跨配置变更（旋转屏幕）天然存活，解除了生命周期强绑定。
 - **新痛点**：在复杂页面中，ViewModel 往往暴露多个离散的状态流（如 \`val user = MutableStateFlow(...)\`、\`val isVip = MutableStateFlow(...)\`、\`val order = MutableStateFlow(...)\`），多个异步任务并发修改不同状态时，极易产生**状态时序竞争（Race Condition）与不一致的中间态（State Inconsistency）**。
 
-### 4. 第四代：MVI / UDF（单一不可变状态源与单向数据流闭环）
+### 第四代：MVI / UDF（单一不可变状态源与单向数据流闭环）
 - **核心结构**：
   - **Model (UiState)**：页面全量状态聚合为单一不可变的数据模型（\`data class UiState\`），任何变更必须通过不可变 copy 创建新状态；
   - **View (Compose / 声明式 UI)**：根据最新 State 进行声明式重绘，只负责将用户交互转换为意图并抛出；

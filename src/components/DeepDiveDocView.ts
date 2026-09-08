@@ -792,13 +792,16 @@ function formatCaseStudyHtml(rawText: string, platform: 'android' | 'ios' = 'and
       `;
     }
 
-    const badgeNumber = String(cardIndex++).padStart(2, '0');
+    // Check if title already contains explicit generation numbering or is a matrix/comparison/overview card where "01" is redundant
+    const isMatrixOrGeneration = /^(?:第[一二三四五六七八九十\d]+代|架构选型对照矩阵|矩阵|对照|全景)/.test(title);
+    const shouldShowBadge = !isMatrixOrGeneration;
+    const badgeNumber = shouldShowBadge ? String(cardIndex++).padStart(2, '0') : '';
 
     return `
       <div class="case-study-panel ${platform === 'ios' ? 'deepdive-ios' : ''}">
         ${title ? `
           <div class="case-study-panel-header">
-            <span class="case-study-panel-badge">${badgeNumber}</span>
+            ${shouldShowBadge ? `<span class="case-study-panel-badge">${badgeNumber}</span>` : ''}
             <h3 class="case-study-panel-title">${formatInlineText(title)}</h3>
           </div>
         ` : ''}
