@@ -2634,12 +2634,11 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
 }
 \`\`\`
 
-##### 4.1 复杂长流程协同架构：管线编排、多列表并发与双轨 SSOT
-- **场景痛点**：跨越“手势点击 ➔ 隐私弹窗 ➔ 系统相册 ➔ 广告 ➔ 上传推理 ➔ 结果展示”的长链路流程；页面内发型（有广告）与美妆（免广告且顺序可颠倒）等多横向列表并存；后台点赞等数据库写入会导致全量数据推送，粗暴覆盖极易冲刷掉正在转圈的 loading 状态。
-- **三大核心架构解法**：
-  1. **管线配方架构（Pipeline Recipe）**：将各动作抽象为原子卡片（\`Privacy\`、\`PickPhoto\`、\`Ad\`、\`Upload\`），具体业务以步骤列表组装配方。ViewModel 仅通用推进 \`currentIndex + 1\`，彻底消除 \`if-else\` 迷宫；
-  2. **列表项上下文绑定（Context-binding）**：管线强绑定 \`targetItemId\`；进入耗时上传时立即解除全屏模态（\`activePipeline = null\`），仅目标 Item“就地转圈”，用户可继续自由滑动列表；
-  3. **单一可信源（SSOT）双轨流合并**：通过 \`combine(dao.observeAll(), _generatingKeys, _activePipeline)\` 将数据库持久数据与内存任务流实时编织，点赞刷新永不丢状态；生成完毕直接回写数据库形成持久化闭环。
+##### 4.1 复杂长流程协同架构：管线编排与多列表并发
+- **场景痛点**：跨越“手势点击 ➔ 隐私弹窗 ➔ 系统相册 ➔ 广告 ➔ 上传推理 ➔ 结果展示”的长链路流程；页面内存在发型（带广告）、美妆（免广告且顺序可颠倒）等多横向列表并行；各业务流混杂在单一页面极易引发状态交织与 \`if-else\` 迷宫。
+- **核心架构解法**：
+  1. **管线配方架构（Pipeline Recipe）**：将各动作抽象为原子卡片（\`Privacy\`、\`PickPhoto\`、\`Ad\`、\`Upload\`），具体业务以步骤列表组装配方。ViewModel 仅通用推进 \`currentIndex + 1\`，消除流程硬编码；
+  2. **列表项上下文绑定（Context-binding）**：管线强绑定 \`targetItemId\`；进入耗时上传时立即解除全屏模态（\`activePipeline = null\`），仅目标 Item 标记为正在生成（\`generatingKeys\`），用户可继续自由滑动或触发其他列表。
 
 \`\`\`kotlin
 // 1. 原子步骤与配方定义
@@ -2650,30 +2649,29 @@ sealed interface PipelineStep {
     data object UploadAndGenerate : PipelineStep
 }
 
-data class ActivePipeline(val steps: List<PipelineStep>, val currentIndex: Int = 0, val targetItemId: String)
+data class ActivePipeline(
+    val steps: List<PipelineStep>,
+    val currentIndex: Int = 0,
+    val targetItemId: String
+)
 
-// 2. ViewModel 双轨合并驱动（Room 只读持久流 + 内存正在生成 ID 集合）
+// 2. ViewModel 管线编排与状态流转
 class MasterPipelineViewModel(
-    private val templateDao: TemplateDao,
     private val repository: ImageRecognitionRepository
 ) : ViewModel() {
-    private val _generatingKeys = MutableStateFlow<Set<String>>(emptySet())
     private val _activePipeline = MutableStateFlow<ActivePipeline?>(null)
+    val activePipeline: StateFlow<ActivePipeline?> = _activePipeline.asStateFlow()
 
-    // 🌟 核心：combine 动态编织持久数据与内存状态，杜绝点赞刷新冲刷掉 loading！
-    val uiState: StateFlow<TemplateListUiState> = combine(
-        templateDao.observeAll(),
-        _generatingKeys,
-        _activePipeline
-    ) { dbList, genKeys, pipeline ->
-        TemplateListUiState(
-            items = dbList.map { entity ->
-                entity.toUiModel(isGenerating = entity.id in genKeys)
-            },
-            activePipeline = pipeline
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TemplateListUiState())
+    // 内存维护当前正在生成的列表项 ID 集合（支持多项并发生成）
+    private val _generatingKeys = MutableStateFlow<Set<String>>(emptySet())
+    val generatingKeys: StateFlow<Set<String>> = _generatingKeys.asStateFlow()
 
+    // 启动指定配方的管线
+    fun startPipeline(steps: List<PipelineStep>, targetItemId: String) {
+        _activePipeline.value = ActivePipeline(steps = steps, targetItemId = targetItemId)
+    }
+
+    // 推进当前管线的下一步
     fun onStepCompleted() {
         val pipeline = _activePipeline.value ?: return
         val nextIdx = pipeline.currentIndex + 1
@@ -2683,21 +2681,23 @@ class MasterPipelineViewModel(
                 executeUpload(pipeline.targetItemId)
             }
         } else {
-            _activePipeline.value = null
+            _activePipeline.value = null // 管线执行完毕，关闭弹层
         }
     }
 
     private fun executeUpload(targetId: String) {
-        _activePipeline.value = null // 全屏模态解除，用户可继续滑动
-        _generatingKeys.update { it + targetId } // 目标项就地转圈
+        _activePipeline.value = null // ⚡ 全屏模态立即解除，不阻塞用户操作
+        _generatingKeys.update { it + targetId } // ⚡ 目标列表项进入局部 loading
 
         viewModelScope.launch {
             repository.uploadAndGenerate(targetId)
                 .onSuccess { resultUrl ->
-                    templateDao.updateResult(targetId, resultUrl) // ⚡ 写回数据库形成闭环
+                    // 生成成功，通知更新并移除 loading
                     _generatingKeys.update { it - targetId }
                 }
-                .onFailure { _generatingKeys.update { it - targetId } }
+                .onFailure {
+                    _generatingKeys.update { it - targetId }
+                }
         }
     }
 }
