@@ -2894,9 +2894,15 @@ let package = Package(
   domain_03_perf: {
     android: [
       {
-        tag: '链路追踪',
-        title: 'Perfetto 系统级追踪分析与 Baseline Profiles 预编译优化',
-        explanation: 'Perfetto 是 Android 官方最强大的系统级性能剖析工具，通过 ftrace 捕获内核调度、 Choreographer 渲染帧、主线程 Lock 争用与 Binder IPC 调用耗时。Baseline Profiles（基准配置文件）允许开发者在 App 打包时预录制核心使用场景的 ART 字节码执行热点，在应用安装或空闲维护时直接由 dex2oat 预编译为机器码 (AOT)，免除冷启动运行时的解释执行与 JIT 编译开销，冷启动速度直接提升 30%~40%。',
+        tag: '性能工程',
+        title: '移动端性能工程闭环与调优攻坚',
+        sectionTitles: {
+          explanation: '性能工程全链路与自动化预编译原理',
+          diagram: '性能工程主流程与核心工具链闭环映射',
+          diagramCaption: '性能调优闭环流向全景图',
+        },
+        diagram: 'perf-loop',
+        explanation: '性能优化绝非零散的技巧堆砌，而是一套严谨的闭环工程（目标 ➔ 测量 ➔ 定位 ➔ 优化 ➔ 验证 ➔ 线上观察 ➔ 持续提升）。Perfetto 作为 Android 官方系统级性能剖析基石，通过 ftrace 抓取内核调度、Choreographer 渲染与主线程 Lock 锁争用；配合 Baseline Profiles 预录制 ART 热点代码实现安装期 AOT 机器码预编译，使应用启动免除 JIT 解释开销，形成从度量到落地的工业级优化闭环。',
         codeSnippet: `# 1. 抓取 Perfetto 性能 Trace (记录 10 秒)
 adb shell perfetto -o /data/misc/perfetto-traces/trace.perfetto-trace \
     -t 10s sched freq idle am wm gfx view binder_driver

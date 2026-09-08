@@ -1081,6 +1081,248 @@ input:focus-visible,
 }
 
 /* ==========================================================================
+   Perf Loop Diagram (性能工程主流程与工具链路图解)
+   ========================================================================== */
+.perf-loop-wrapper {
+  margin: 14px 0 24px 0;
+}
+
+.perf-loop-container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+  display: flex;
+  flex-direction: column;
+}
+
+.perf-loop-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 18px;
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.perf-loop-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.perf-loop-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-xs);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-ring);
+  letter-spacing: 0.3px;
+}
+
+.perf-loop-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.perf-loop-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 11.5px;
+  color: var(--color-ink-muted);
+}
+
+.perf-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.perf-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.dot-loop { background: var(--color-accent); }
+.dot-feedback { background: #e57373; }
+
+.perf-loop-track {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 20px;
+  gap: 0;
+}
+
+.perf-step-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) 48px minmax(260px, 1.8fr);
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  transition: all var(--transition-fast);
+}
+
+.perf-step-row:hover {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-hover);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Left: Flow Step Node */
+.perf-flow-node {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.perf-node-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.perf-badge-purple  { background: #ede7f6; color: #5e35b1; }
+.perf-badge-blue    { background: #e3f2fd; color: #1565c0; }
+.perf-badge-cyan    { background: #e0f7fa; color: #00838f; }
+.perf-badge-amber   { background: #fff8e1; color: #f57f17; }
+.perf-badge-emerald { background: #e8f5e9; color: #2e7d32; }
+.perf-badge-indigo  { background: #e8eaf6; color: #283593; }
+.perf-badge-rose    { background: #fce4ec; color: #c2185b; }
+
+[data-theme="dark"] .perf-badge-purple  { background: #261b3d; color: #b39ddb; }
+[data-theme="dark"] .perf-badge-blue    { background: #0d2340; color: #90caf9; }
+[data-theme="dark"] .perf-badge-cyan    { background: #072a2e; color: #80deea; }
+[data-theme="dark"] .perf-badge-amber   { background: #3d2c00; color: #ffe082; }
+[data-theme="dark"] .perf-badge-emerald { background: #0d2e18; color: #a5d6a7; }
+[data-theme="dark"] .perf-badge-indigo  { background: #1a1e3d; color: #9fa8da; }
+[data-theme="dark"] .perf-badge-rose    { background: #3d0d22; color: #f48fb1; }
+
+.perf-node-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.perf-node-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.perf-node-desc {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  line-height: 1.35;
+}
+
+/* Middle connector */
+.perf-connector {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-ink-faint);
+}
+
+.perf-connector-svg {
+  display: block;
+}
+
+/* Right: Tools / Method card */
+.perf-tool-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+}
+
+.perf-tool-name {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-accent);
+  font-family: var(--font-mono);
+}
+
+.perf-tool-detail {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  line-height: 1.4;
+}
+
+/* Down arrow connector between steps */
+.perf-down-arrow-row {
+  display: flex;
+  align-items: center;
+  padding-left: 20px;
+  height: 22px;
+  color: var(--color-ink-faint);
+}
+
+.perf-down-svg {
+  display: block;
+}
+
+/* Bottom feedback loop lane */
+.perf-feedback-loop {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--color-surface-sunken);
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.perf-feedback-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-accent);
+}
+
+.perf-feedback-icon {
+  flex-shrink: 0;
+  color: var(--color-accent);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .perf-step-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .perf-connector {
+    transform: rotate(90deg);
+    height: 18px;
+  }
+  .perf-down-arrow-row {
+    justify-content: center;
+    padding-left: 0;
+  }
+}
+
+/* ==========================================================================
    Unicode Box-drawing Architecture Diagrams
    ========================================================================== */
 .box-diagram-card {

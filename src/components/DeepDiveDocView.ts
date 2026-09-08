@@ -3,6 +3,7 @@ import { DeepDiveDomain, DeepDiveModule, PipelineStep, StepperStep } from '../mo
 import { i18n } from '../services/i18n';
 import { renderArchEvolutionDiagram } from './ArchEvolutionDiagram';
 import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
+import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
 
 export function renderDeepDiveDocView(
@@ -145,6 +146,7 @@ function renderSingleChapterView(
     nextSectionNumber++;
 
     const isArchEvolution = mod.diagram.startsWith('arch-evolution');
+    const isPerfLoop = mod.diagram.startsWith('perf-loop');
     diagramSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
@@ -152,6 +154,8 @@ function renderSingleChapterView(
       </div>
       ${isArchEvolution
         ? `<div class="arch-evo-wrapper">${renderArchEvolutionDiagram()}</div>`
+        : isPerfLoop
+        ? `<div class="perf-loop-wrapper">${renderPerfLoopDiagram()}</div>`
         : `<div class="box-diagram-card">
         <div class="box-diagram-header">
           <div class="box-diagram-dots">
