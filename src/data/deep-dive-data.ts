@@ -2667,64 +2667,79 @@ data class ItemUiModel(
 class TemplateListViewModel(
     private val repository: ImageRecognitionRepository
 ) : ViewModel() {
-    // 列表数据流
     private val _items = MutableStateFlow<List<ItemUiModel>>(emptyList())
     val items: StateFlow<List<ItemUiModel>> = _items.asStateFlow()
 
-    // 当前进行中的弹层管线（为 null 表示无阻断式弹窗）
+    // 为 null 表示无模态流程；有值则全屏承接当前步骤
     private val _activePipeline = MutableStateFlow<ActivePipeline?>(null)
     val activePipeline: StateFlow<ActivePipeline?> = _activePipeline.asStateFlow()
 
-    // 启动指定列表项的长流程（例如：隐私 -> 相册 -> 广告 -> 上传）
+    // 触发长流程：隐私 ➔ 选图 ➔ 广告 ➔ 上传
     fun onItemClick(itemId: String) {
-        val recipe = listOf(
-            PipelineStep.Privacy,
-            PipelineStep.PickPhoto,
-            PipelineStep.Ad(adUnitId = "rewarded_ad_01"),
-            PipelineStep.UploadAndGenerate
-        )
-        _activePipeline.value = ActivePipeline(steps = recipe, targetItemId = itemId)
+        val steps = listOf(PipelineStep.Privacy, PipelineStep.PickPhoto, PipelineStep.Ad("ad_01"), PipelineStep.UploadAndGenerate)
+        _activePipeline.value = ActivePipeline(steps, currentIndex = 0, targetItemId = itemId)
     }
 
-    // 推进当前管线的下一步（隐私同意、选图完成、广告播完通用回调）
+    // 步骤完成统一推进回调
     fun onStepCompleted() {
-        val pipeline = _activePipeline.value ?: return
-        val nextIdx = pipeline.currentIndex + 1
-        if (nextIdx < pipeline.steps.size) {
-            _activePipeline.value = pipeline.copy(currentIndex = nextIdx)
-            if (pipeline.steps[nextIdx] is PipelineStep.UploadAndGenerate) {
-                executeUpload(pipeline.targetItemId)
-            }
+        val p = _activePipeline.value ?: return
+        val nextIdx = p.currentIndex + 1
+        if (nextIdx < p.steps.size) {
+            _activePipeline.value = p.copy(currentIndex = nextIdx)
+            if (p.steps[nextIdx] is PipelineStep.UploadAndGenerate) executeUpload(p.targetItemId)
         } else {
-            _activePipeline.value = null // 流程闭环，关闭管线
+            _activePipeline.value = null
         }
     }
 
     private fun executeUpload(targetId: String) {
-        _activePipeline.value = null // ⚡ 全屏弹层立即关闭，用户可继续浏览列表
-        setItemGenerating(targetId, isGenerating = true) // ⚡ 目标列表项进入就地转圈
+        _activePipeline.value = null // ⚡ 模态立即退出，释放列表交互
+        updateItem(targetId) { it.copy(isGenerating = true) } // 目标项就地转圈
 
         viewModelScope.launch {
             repository.uploadAndGenerate(targetId)
-                .onSuccess { resultUrl ->
-                    // 更新列表项生成结果并解除 loading
-                    updateItemResult(targetId, resultUrl)
-                }
-                .onFailure {
-                    setItemGenerating(targetId, isGenerating = false)
-                }
+                .onSuccess { url -> updateItem(targetId) { it.copy(imageUrl = url, isGenerating = false) } }
+                .onFailure { updateItem(targetId) { it.copy(isGenerating = false) } }
         }
     }
 
-    private fun setItemGenerating(id: String, isGenerating: Boolean) {
-        _items.update { list ->
-            list.map { if (it.id == id) it.copy(isGenerating = isGenerating) else it }
+    private fun updateItem(id: String, transform: (ItemUiModel) -> ItemUiModel) {
+        _items.update { list -> list.map { if (it.id == id) transform(it) else it } }
+    }
+}
+
+// 4. Compose UI 界面层：列表常驻 + 管线弹层解耦
+@Composable
+fun TemplateListScreen(viewModel: TemplateListViewModel) {
+    val items by viewModel.items.collectAsStateWithLifecycle()
+    val activePipeline by viewModel.activePipeline.collectAsStateWithLifecycle()
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // ① 基础列表：始终可响应滑动与点击
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(items, key = { it.id }) { item ->
+                ListItemRow(item = item, onClick = { viewModel.onItemClick(item.id) })
+            }
+        }
+
+        // ② 管线承接器：根据当前步骤渲染对应弹层，用户交互完毕仅回调 onStepCompleted
+        activePipeline?.let { pipeline ->
+            when (pipeline.steps[pipeline.currentIndex]) {
+                is PipelineStep.Privacy -> PrivacyDialog(onAgree = viewModel::onStepCompleted)
+                is PipelineStep.PickPhoto -> PhotoPickerSheet(onPicked = viewModel::onStepCompleted)
+                is PipelineStep.Ad -> AdOverlay(onAdClosed = viewModel::onStepCompleted)
+                is PipelineStep.UploadAndGenerate -> Unit // 已转入列表项局部转圈，无阻断弹层
+            }
         }
     }
+}
 
-    private fun updateItemResult(id: String, newUrl: String) {
-        _items.update { list ->
-            list.map { if (it.id == id) it.copy(imageUrl = newUrl, isGenerating = false) else it }
+@Composable
+fun ListItemRow(item: ItemUiModel, onClick: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)) {
+        Text(text = item.title, modifier = Modifier.weight(1f))
+        if (item.isGenerating) {
+            CircularProgressIndicator(modifier = Modifier.size(24.dp)) // ⚡ 就地转圈
         }
     }
 }
