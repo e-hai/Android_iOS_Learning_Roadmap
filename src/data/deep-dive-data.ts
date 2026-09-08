@@ -2634,7 +2634,7 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
 }
 \`\`\`
 
-##### 4.1 复杂长流程协同架构：管线编排与列表项解耦
+#### 5. 实战进阶：复杂长流程管线编排与列表项解耦
 - **场景痛点**：跨越“点击列表项 ➔ 隐私弹窗 ➔ 系统相册 ➔ 激励广告 ➔ 上传推理 ➔ 刷新结果”的长链路流程；如果直接在单一 Activity / Screen 中堆叠布尔变量（\`showPrivacy\`、\`showAd\` 等），极易引发状态爆炸与庞大的 \`if-else\` 回调地狱；同时，若上传过程使用全屏遮罩强锁界面，会严重阻断用户浏览列表的体验。
 - **核心架构解法**：
   1. **管线配方架构（Pipeline Recipe）**：将流程中的弹窗、相册、广告抽象为原子卡片步骤（\`PipelineStep\`）。触发时组装一个顺序配方，ViewModel 仅需通用推进 \`currentIndex + 1\`，彻底消除硬编码与状态分散；
@@ -2726,55 +2726,6 @@ class TemplateListViewModel(
         _items.update { list ->
             list.map { if (it.id == id) it.copy(imageUrl = newUrl, isGenerating = false) else it }
         }
-    }
-}
-\`\`\`
-
-##### 4.2 生命周期与健壮性防线：屏幕旋转防抖与广告假死防御
-- **场景痛点**：屏幕旋转导致 Activity 销毁重建，新 Compose 树初次挂载容易导致 \`LaunchedEffect\` 二次调起相册或重复播放广告；第三方广告 SDK 偶发黑屏假死或吞掉关闭回调，导致用户被永久死锁在全屏遮罩中。
-- **两大防御法则与护城河**：
-  1. **“渲染归 State，动作归 Callback”法则**：
-     - 弹窗、进度条是 UI 呈现，由 \`State\` 驱动（旋转重建后自适应还原，弹窗不丢）；
-     - 拉相册、调支付等外部不可逆动作，**直接在用户点击回调（onClick）中调起**（物理上杜绝旋转自动触发）；
-     - 依赖异步凭证的动作（如预下单后唤起支付），由 ViewModel 准备好后通过 **\`Channel<Effect>\`** 发送（消费即焚，旋转不重放）；
-  2. **广告假死与吞回调的 4 道防御护城河**：
-     - **预检放行**：展示前 \`adManager.isReady\` 预检，未就绪直接免广告放行；
-     - **UI 逃生通道**：全屏遮罩 5 秒后延迟浮现“跳过”逃生按钮；
-     - **宿主生命周期回流（onResume 兜底）**：用户从广告界面返回主页面 500ms 后，若状态仍处于广告中，强制兜底放行；
-     - **协程超时熔断**：\`withTimeoutOrNull(40_000L)\` 强制设立超时死线，绝不允许广告阻断核心业务链路。
-
-\`\`\`kotlin
-// 1. 宿主生命周期回流（onResume 兜底防吞回调）
-@Composable
-fun AdLifecycleGuard(isAdShowing: Boolean, onForceDismiss: () -> Unit) {
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, isAdShowing) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && isAdShowing) {
-                // 回到前台 500ms 后若广告状态仍未解除，判定为 SDK 吞回调，自动强制放行！
-                CoroutineScope(Dispatchers.Main).launch {
-                    delay(500)
-                    onForceDismiss()
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-}
-
-// 2. 协程超时熔断：无论 SDK 内部如何假死，40 秒后保底进入下一步
-suspend fun showAdWithTimeout(adManager: AdManager): Boolean {
-    return withTimeoutOrNull(40_000L) {
-        suspendCancellableCoroutine { cont ->
-            adManager.showAd(
-                onCompleted = { cont.resume(true) },
-                onFailed = { cont.resume(false) }
-            )
-        }
-    } ?: run {
-        Log.e("AdGuard", "广告超时假死，触发熔断兜底放行")
-        false
     }
 }
 \`\`\``,
