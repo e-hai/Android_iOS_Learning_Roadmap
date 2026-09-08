@@ -762,6 +762,284 @@ input:focus-visible,
 }
 
 /* ==========================================================================
+   Arch Evolution Diagram (四代架构演进彩色图解)
+   ========================================================================== */
+.arch-evo-wrapper {
+  margin: 14px 0 24px 0;
+}
+
+.arch-evo-container {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+}
+
+/* Legend */
+.arch-evo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 10px 16px;
+  background: var(--color-surface-sunken);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.arch-evo-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--color-ink-muted);
+  font-weight: 500;
+}
+.arch-evo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot-mvc  { background: #e57373; }
+.dot-mvp  { background: #f0a05a; }
+.dot-mvvm { background: #7ab8f5; }
+.dot-mvi  { background: #57c48a; }
+
+/* Four-gen grid */
+.arch-evo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+
+/* Each gen card */
+.arch-gen-card {
+  border-right: 1px solid var(--color-border-subtle);
+  display: flex;
+  flex-direction: column;
+}
+.arch-gen-card:last-child {
+  border-right: none;
+}
+
+/* Card headers */
+.arch-gen-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 10px 8px 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+.arch-gen-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+.badge-mvc  { background: #ffebee; color: #c62828; }
+.badge-mvp  { background: #fff3e0; color: #bf360c; }
+.badge-mvvm { background: #e3f2fd; color: #1565c0; }
+.badge-mvi  { background: #e8f5e9; color: #1b5e20; }
+
+[data-theme="dark"] .badge-mvc  { background: #3d1212; color: #ef9a9a; }
+[data-theme="dark"] .badge-mvp  { background: #3d2000; color: #ffcc80; }
+[data-theme="dark"] .badge-mvvm { background: #0d2340; color: #90caf9; }
+[data-theme="dark"] .badge-mvi  { background: #0a2e14; color: #a5d6a7; }
+
+.arch-gen-name {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-ink);
+  letter-spacing: 0.2px;
+}
+.arch-gen-sub {
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  text-align: center;
+}
+
+/* Card body */
+.arch-gen-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 8px 10px;
+  gap: 6px;
+}
+.arch-flow-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+/* Nodes */
+.arch-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border-radius: 8px;
+  padding: 7px 6px;
+  text-align: center;
+  gap: 2px;
+}
+.arch-node-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+.arch-node-caption {
+  font-size: 10px;
+  color: var(--color-ink-muted);
+  line-height: 1.3;
+}
+.arch-node-icon {
+  font-size: 14px;
+}
+
+/* Node colors by gen */
+.node-user        { background: #f5f5f5; border: 1px solid #e0e0e0; }
+.node-mvc-view    { background: #ffebee; border: 1.5px dashed #e57373; }
+.node-model       { background: #f3f3f3; border: 1px solid #d0d0d0; }
+.node-mvp-view    { background: #fff3e0; border: 1px solid #f0a05a; }
+.node-mvp-presenter { background: #fff8f0; border: 1.5px solid #f0a05a; }
+.node-mvvm-view   { background: #e3f2fd; border: 1px solid #7ab8f5; }
+.node-mvvm-vm     { background: #e8f0fb; border: 1.5px solid #7ab8f5; }
+.node-mvi-view    { background: #e8f5e9; border: 1px solid #57c48a; }
+.node-mvi-vm      { background: #f0faf3; border: 1.5px solid #57c48a; }
+
+[data-theme="dark"] .node-user        { background: #2a2a2a; border-color: #444; }
+[data-theme="dark"] .node-model       { background: #252525; border-color: #3a3a3a; }
+[data-theme="dark"] .node-mvc-view    { background: #3d1212; border-color: #e57373; }
+[data-theme="dark"] .node-mvp-view    { background: #3d2000; border-color: #f0a05a; }
+[data-theme="dark"] .node-mvp-presenter { background: #2e1a00; border-color: #f0a05a; }
+[data-theme="dark"] .node-mvvm-view   { background: #0d2340; border-color: #7ab8f5; }
+[data-theme="dark"] .node-mvvm-vm     { background: #111d30; border-color: #7ab8f5; }
+[data-theme="dark"] .node-mvi-view    { background: #0a2e14; border-color: #57c48a; }
+[data-theme="dark"] .node-mvi-vm      { background: #0d2e18; border-color: #57c48a; }
+
+.node-mvc-ctrl    { font-size: 11px; font-weight: 600; color: #c62828; padding-top: 2px; }
+.node-coupled-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #e57373;
+  color: #fff;
+  letter-spacing: 0.3px;
+}
+
+/* ViewModel chips */
+.node-mvvm-vm, .node-mvi-vm {
+  gap: 5px;
+}
+.arch-node-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  justify-content: center;
+}
+.vm-chip {
+  font-size: 9px;
+  padding: 1.5px 6px;
+  border-radius: 4px;
+  background: #dce9fb;
+  color: #1565c0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.vm-chip-warn { background: #ffe0b2; color: #bf360c; }
+.chip-mvi  { background: #c8e6c9; color: #1b5e20; }
+.chip-effect { background: #ede7f6; color: #4527a0; font-size: 9px; }
+
+[data-theme="dark"] .vm-chip      { background: #1a2f50; color: #90caf9; }
+[data-theme="dark"] .vm-chip-warn { background: #3d1e00; color: #ffcc80; }
+[data-theme="dark"] .chip-mvi     { background: #1a3d20; color: #a5d6a7; }
+[data-theme="dark"] .chip-effect  { background: #2a1f40; color: #ce93d8; }
+
+/* Arrows */
+.arch-arrow { font-size: 13px; color: var(--color-ink-muted); line-height: 1; }
+.arch-arrow.arrow-down { font-size: 14px; }
+
+.arch-arrow-double, .arch-arrow-row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.arrow-left-right, .arrow-right, .arrow-left {
+  font-size: 11px;
+  color: var(--color-ink-muted);
+  font-family: var(--font-mono);
+  letter-spacing: -1px;
+}
+.arch-arrow-label {
+  font-size: 9px;
+  color: var(--color-ink-faint);
+  text-align: center;
+  line-height: 1.3;
+}
+.arch-observe-label { color: #e57373; }
+
+.arch-arrow-row { flex-direction: column; gap: 2px; width: 100%; }
+
+.arch-arrow-oneway-mvi {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  margin: 2px 0;
+}
+.mvi-arrow-color { color: #57c48a; }
+.mvi-label { color: #2e7d52; font-weight: 600; }
+[data-theme="dark"] .mvi-label { color: #81c784; }
+
+/* Pain / Gain tags at bottom */
+.arch-gen-pain, .arch-gen-gain {
+  margin-top: auto;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: center;
+  width: 100%;
+  justify-content: center;
+  line-height: 1.3;
+}
+.arch-gen-pain { background: #fff3f3; color: #b71c1c; }
+.arch-gen-gain { background: #f1faf4; color: #1b5e20; }
+[data-theme="dark"] .arch-gen-pain { background: #3d1010; color: #ef9a9a; }
+[data-theme="dark"] .arch-gen-gain { background: #0a2e12; color: #a5d6a7; }
+.pain-icon, .gain-icon { flex-shrink: 0; }
+
+/* Responsive: collapse to 2-col on narrow screens */
+@media (max-width: 820px) {
+  .arch-evo-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .arch-gen-card:nth-child(2) { border-right: none; }
+  .arch-gen-card:nth-child(1), .arch-gen-card:nth-child(2) {
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+}
+@media (max-width: 480px) {
+  .arch-evo-grid {
+    grid-template-columns: 1fr;
+  }
+  .arch-gen-card { border-right: none; border-bottom: 1px solid var(--color-border-subtle); }
+  .arch-gen-card:last-child { border-bottom: none; }
+}
+
+/* ==========================================================================
    Unicode Box-drawing Architecture Diagrams
    ========================================================================== */
 .box-diagram-card {

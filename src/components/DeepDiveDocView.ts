@@ -1,6 +1,7 @@
 import { deepDiveDomains } from '../data/deep-dive-data';
 import { DeepDiveDomain, DeepDiveModule, PipelineStep, StepperStep } from '../models/types';
 import { i18n } from '../services/i18n';
+import { renderArchEvolutionDiagram } from './ArchEvolutionDiagram';
 import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 import { renderViewModelVisual } from './ViewModelVisual';
 
@@ -143,12 +144,15 @@ function renderSingleChapterView(
     const sectionNumStr = numToChinese[nextSectionNumber - 1] || `${nextSectionNumber}`;
     nextSectionNumber++;
 
+    const isArchEvolution = mod.diagram.startsWith('arch-evolution');
     diagramSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
         <h2 class="section-header-title">${sectionNumStr}、${mod.sectionTitles?.diagram ?? '架构与执行时序图解'}</h2>
       </div>
-      <div class="box-diagram-card">
+      ${isArchEvolution
+        ? `<div class="arch-evo-wrapper">${renderArchEvolutionDiagram()}</div>`
+        : `<div class="box-diagram-card">
         <div class="box-diagram-header">
           <div class="box-diagram-dots">
             <span class="box-dot dot-red"></span>
@@ -164,7 +168,8 @@ function renderSingleChapterView(
         <div class="box-diagram-body">
           <pre class="box-diagram-code"><code>${escapeHtml(mod.diagram)}</code></pre>
         </div>
-      </div>
+      </div>`
+      }
     `;
 
     const copyDiagBtn = diagramSection.querySelector('#btn-copy-chapter-diag') as HTMLButtonElement;
