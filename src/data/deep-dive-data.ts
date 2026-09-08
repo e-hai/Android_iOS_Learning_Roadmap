@@ -2634,14 +2634,14 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
 }
 \`\`\`
 
-##### 4.1 复杂长流程协同架构：管线编排与多列表并发
-- **场景痛点**：跨越“手势点击 ➔ 隐私弹窗 ➔ 系统相册 ➔ 广告 ➔ 上传推理 ➔ 结果展示”的长链路流程；页面内存在发型（带广告）、美妆（免广告且顺序可颠倒）等多横向列表并行；各业务流混杂在单一页面极易引发状态交织与 \`if-else\` 迷宫。
+##### 4.1 复杂长流程协同架构：管线编排与列表项解耦
+- **场景痛点**：跨越“点击列表项 ➔ 隐私弹窗 ➔ 系统相册 ➔ 激励广告 ➔ 上传推理 ➔ 刷新结果”的长链路流程；如果直接在单一 Activity / Screen 中堆叠布尔变量（\`showPrivacy\`、\`showAd\` 等），极易引发状态爆炸与庞大的 \`if-else\` 回调地狱；同时，若上传过程使用全屏遮罩强锁界面，会严重阻断用户浏览列表的体验。
 - **核心架构解法**：
-  1. **管线配方架构（Pipeline Recipe）**：将各动作抽象为原子卡片（\`Privacy\`、\`PickPhoto\`、\`Ad\`、\`Upload\`），具体业务以步骤列表组装配方。ViewModel 仅通用推进 \`currentIndex + 1\`，消除流程硬编码；
-  2. **列表项上下文绑定（Context-binding）**：管线强绑定 \`targetItemId\`；进入耗时上传时立即解除全屏模态（\`activePipeline = null\`），仅目标 Item 标记为正在生成（\`generatingKeys\`），用户可继续自由滑动或触发其他列表。
+  1. **管线配方架构（Pipeline Recipe）**：将流程中的弹窗、相册、广告抽象为原子卡片步骤（\`PipelineStep\`）。触发时组装一个顺序配方，ViewModel 仅需通用推进 \`currentIndex + 1\`，彻底消除硬编码与状态分散；
+  2. **列表项上下文绑定与就地 Loading**：管线强绑定当前被点击项的 \`targetItemId\`；当流程推进到耗时的异步上传生成时，立即解除全屏模态管线（\`activePipeline = null\`），将状态转为该列表项“就地转圈”，用户无需等待可继续自由浏览列表。
 
 \`\`\`kotlin
-// 1. 原子步骤与配方定义
+// 1. 原子步骤卡片与管线定义
 sealed interface PipelineStep {
     data object Privacy : PipelineStep
     data object PickPhoto : PipelineStep
@@ -2655,23 +2655,38 @@ data class ActivePipeline(
     val targetItemId: String
 )
 
-// 2. ViewModel 管线编排与状态流转
-class MasterPipelineViewModel(
+// 2. 列表项 UI 状态模型
+data class ItemUiModel(
+    val id: String,
+    val title: String,
+    val imageUrl: String,
+    val isGenerating: Boolean = false
+)
+
+// 3. ViewModel 集中调度管线
+class TemplateListViewModel(
     private val repository: ImageRecognitionRepository
 ) : ViewModel() {
+    // 列表数据流
+    private val _items = MutableStateFlow<List<ItemUiModel>>(emptyList())
+    val items: StateFlow<List<ItemUiModel>> = _items.asStateFlow()
+
+    // 当前进行中的弹层管线（为 null 表示无阻断式弹窗）
     private val _activePipeline = MutableStateFlow<ActivePipeline?>(null)
     val activePipeline: StateFlow<ActivePipeline?> = _activePipeline.asStateFlow()
 
-    // 内存维护当前正在生成的列表项 ID 集合（支持多项并发生成）
-    private val _generatingKeys = MutableStateFlow<Set<String>>(emptySet())
-    val generatingKeys: StateFlow<Set<String>> = _generatingKeys.asStateFlow()
-
-    // 启动指定配方的管线
-    fun startPipeline(steps: List<PipelineStep>, targetItemId: String) {
-        _activePipeline.value = ActivePipeline(steps = steps, targetItemId = targetItemId)
+    // 启动指定列表项的长流程（例如：隐私 -> 相册 -> 广告 -> 上传）
+    fun onItemClick(itemId: String) {
+        val recipe = listOf(
+            PipelineStep.Privacy,
+            PipelineStep.PickPhoto,
+            PipelineStep.Ad(adUnitId = "rewarded_ad_01"),
+            PipelineStep.UploadAndGenerate
+        )
+        _activePipeline.value = ActivePipeline(steps = recipe, targetItemId = itemId)
     }
 
-    // 推进当前管线的下一步
+    // 推进当前管线的下一步（隐私同意、选图完成、广告播完通用回调）
     fun onStepCompleted() {
         val pipeline = _activePipeline.value ?: return
         val nextIdx = pipeline.currentIndex + 1
@@ -2681,23 +2696,35 @@ class MasterPipelineViewModel(
                 executeUpload(pipeline.targetItemId)
             }
         } else {
-            _activePipeline.value = null // 管线执行完毕，关闭弹层
+            _activePipeline.value = null // 流程闭环，关闭管线
         }
     }
 
     private fun executeUpload(targetId: String) {
-        _activePipeline.value = null // ⚡ 全屏模态立即解除，不阻塞用户操作
-        _generatingKeys.update { it + targetId } // ⚡ 目标列表项进入局部 loading
+        _activePipeline.value = null // ⚡ 全屏弹层立即关闭，用户可继续浏览列表
+        setItemGenerating(targetId, isGenerating = true) // ⚡ 目标列表项进入就地转圈
 
         viewModelScope.launch {
             repository.uploadAndGenerate(targetId)
                 .onSuccess { resultUrl ->
-                    // 生成成功，通知更新并移除 loading
-                    _generatingKeys.update { it - targetId }
+                    // 更新列表项生成结果并解除 loading
+                    updateItemResult(targetId, resultUrl)
                 }
                 .onFailure {
-                    _generatingKeys.update { it - targetId }
+                    setItemGenerating(targetId, isGenerating = false)
                 }
+        }
+    }
+
+    private fun setItemGenerating(id: String, isGenerating: Boolean) {
+        _items.update { list ->
+            list.map { if (it.id == id) it.copy(isGenerating = isGenerating) else it }
+        }
+    }
+
+    private fun updateItemResult(id: String, newUrl: String) {
+        _items.update { list ->
+            list.map { if (it.id == id) it.copy(imageUrl = newUrl, isGenerating = false) else it }
         }
     }
 }
