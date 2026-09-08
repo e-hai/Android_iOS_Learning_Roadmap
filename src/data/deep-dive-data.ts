@@ -2608,11 +2608,11 @@ class CustomNetworkInterceptor: URLProtocol {
           explanation: '声明式 UI 与单向数据流核心机制',
           diagram: 'MVC ➔ MVP ➔ MVVM ➔ MVI 核心数据流拓扑对比',
           diagramCaption: '四大架构演进数据流图',
-          caseStudy: '架构演进深水区：MVVM vs MVI 声明式真相、状态切片与并发陷阱',
+          caseStudy: 'MVVM vs MVI 声明式真相、状态切片与并发陷阱',
         },
         explanation: `现代声明式 UI（Jetpack Compose / SwiftUI）从根本上重塑了客户端表现层的驱动模型：UI 彻底成为状态的纯函数投影（\`UI = f(State)\`）。传统命令式时代的控制器臃肿与接口爆炸已随历史退场，当前工业界架构设计的核心矛盾，已全面转向**在单向数据流（UDF）闭环中，如何平衡全局单一状态的原子一致性与高频复杂交互下的局部重组性能**。`,
         diagram: `arch-evolution`,
-        caseStudy: `### 架构演进深水区：声明式 UI 下 MVVM 与 MVI 的真相
+        caseStudy: `### 声明式 UI 下 MVVM 与 MVI 的真相
 
 很多人在从命令式 UI 转向 Jetpack Compose / SwiftUI 之后，常常产生一个疑问：
 > **“在声明式 UI 下，MVVM 也是单向数据流（UDF），如果公共函数按意图语义定义，那 MVVM 和 MVI 还有区别吗？复杂页面下单一 State 拆分切片后，是不是又退化成 MVVM 了？”**
