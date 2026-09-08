@@ -2608,7 +2608,7 @@ class CustomNetworkInterceptor: URLProtocol {
           explanation: '架构演进脉络：从 MVC 到 MVI 的范式转移',
           diagram: 'MVC ➔ MVP ➔ MVVM ➔ MVI 核心数据流拓扑对比',
           diagramCaption: '四大架构演进数据流图',
-          caseStudy: '架构演进避坑决策与 MVI 生产落地准则',
+          caseStudy: '架构演进深水区：MVVM vs MVI 声明式真相、状态切片与并发陷阱',
         },
         explanation: `移动端架构在过去十余年经历了四代核心演进，每一次变革的本质都是**为了解决上一代架构在 UI 复杂度爆炸时遇到的痛点**（如状态分散、耦合严重、可测性差、生命周期泄漏）：
 
@@ -2683,7 +2683,7 @@ class CustomNetworkInterceptor: URLProtocol {
   └───────────────────────────────────┬─────────────────────────────────────┘
                                       │ 2. 闭环流动：单向推送全量不可变状态 (UiState)
                                       ▼
-                               【View 响应式更新】`,
+                                【View 响应式更新】`,
         caseStudy: `### 架构选型对照矩阵
 
 | 架构形态 | 核心驱动形式 | View 与业务层关系 | 单元测试难度 | 典型缺陷与适用边界 |
@@ -2693,100 +2693,220 @@ class CustomNetworkInterceptor: URLProtocol {
 | **MVVM** | 响应式数据流驱动 | View 观察 ViewModel 的多个数据流 | 容易（纯 JVM 无 Android UI 依赖） | 多个状态流并发更新时易产生状态不一致或时序竞争 |
 | **MVI** | 单向不可变状态与意图闭环 | UDF 单向流动，View 仅持有单一不可变 UiState | 极佳（输入 Intent，断言输出 State） | 样板代码略多，单次事件（UiEffect）必须规范防重消费 |
 
-### 生产环境 MVI 架构三大落地准则与避坑红线
+---
 
-- **1. 状态必须保证不可变与单一聚合（Single Source of Truth）**：
-  - 严禁在 ViewModel 中向 UI 暴露多个分散的 \`MutableStateFlow\`；
-  - 必须聚合为一个不可变 \`data class UiState\`。更新状态只能通过 \`_uiState.update { it.copy(...) }\` 进行原子拷贝替换，杜绝多线程时序竞争。
+### 架构演进深水区：声明式 UI 下 MVVM 与 MVI 的真相
 
-- **2. 彻底区分【状态 (UiState)】与【一次性副作用 (UiEffect)】**：
-  - **状态 (UiState)**：页面当前“是什么样”（如内容列表、加载菊花、选中 Tab）。具有**粘性与可重入性**，屏幕旋转、进程恢复后必须如实重现；
-  - **副作用 (UiEffect)**：一次性动作（如弹 Toast、拉起支付收银台、页面返回）。**绝不可**作为 Boolean 字段放入 \`UiState\` 中，否则会导致屏幕旋转后重复弹出！必须使用 \`Channel<UiEffect>(Channel.BUFFERED)\` 在生命周期的 \`repeatOnLifecycle\` 块中进行单次安全消费。
+很多人在从命令式 UI 转向 Jetpack Compose / SwiftUI 之后，常常产生一个疑问：
+> **“在声明式 UI 下，MVVM 也是单向数据流（UDF），如果公共函数按意图语义定义，那 MVVM 和 MVI 还有区别吗？复杂页面下单一 State 拆分切片后，是不是又退化成 MVVM 了？”**
 
-- **3. 意图驱动（Intent/Action）隔离 View 与领域逻辑**：
-  - View 严禁直接调用 ViewModel 中细碎的方法（如 \`vm.fetchPage(1)\`、\`vm.trackClick()\`）；
-  - View 统一抛出强类型密封接口 \`UiIntent\`，由 ViewModel 统一进行防抖处理、日志埋点与业务编排。`,
+#### 1. 声明式 UI 下的“边界消融”：UI 渲染端感知无差异
+在传统的 Android XML (DataBinding) 或 WPF 时代，MVVM 允许真正的**双向绑定**（\`android:text="@={vm.userName}"\`，即 View 的用户输入会隐式反写 ViewModel，破坏单向流）。
+但在 Compose / SwiftUI 中，**双向绑定在语法与运行时层面根本不存在**：
+- 无论是 MVVM 还是 MVI，UI 永远都是纯函数投影：\`UI = f(State)\`；
+- 所有输入控件都是受控组件（如 \`TextField(value = text, onValueChange = { ... })\`），修改永远只能经由逻辑层；
+- 因此：**在 UI 渲染端，MVVM 与 MVI 均是严格的单向数据流（UDF）**。
+
+#### 2. 本质差异：入口与出口的“结构约束”与“因果可追溯性”
+既然渲染层无差异，两者的分水岭在 **ViewModel 的契约形状与工程约束**：
+
+| 对比维度 | 纯正 MVVM (函数式驱动) | 现代 MVI / UDF (意图流驱动) | 架构本质影响 |
+| :--- | :--- | :--- | :--- |
+| **出口（输出状态）** | 多个离散的 \`StateFlow<A>\`, \`StateFlow<B>\` | 唯一的 \`StateFlow<UiState>\` (全量不可变快照) | MVI 保证任意时间截面状态的**原子一致性**，消灭多流组合时的“幽灵中间态” |
+| **入口（输入意图）** | 多个开放的方法调用：\`vm.onSearch()\`, \`vm.loadMore()\` | 单一入口：\`vm.dispatch(intent: Intent)\` | MVI 将**事件数据化**，具备天然的因果链路追踪与时间旅行回放能力 |
+| **契约可穷尽性** | 无穷的方法签名，难以编译期穷尽检查 | \`sealed interface Intent\`，编译器强校验 \`when\` 分支覆盖 | 保证团队协作中新增事件无遗漏 |
+| **防抖与拦截链** | 需在各个函数内部手工防御（如各种标志位判断） | 可在 Intent 分发管道上统一挂载挂载拦截器（如日志、埋点、防抖、权限阻断） | AOP 切面治理成本极低 |
+
+---
+
+### 复杂页面治理：状态切片（State Slicing）与读写不对称真相
+
+在淘宝、抖音等巨型复杂页面上，若将成百上千个业务字段塞入一个 \`UiState\`，每次微小的输入都会产生全新状态。
+**如何避免全页面大面积无效重组？** 答案是**状态切片（State Slicing）**。但要清醒认识切片的真相：
+
+#### 1. 读侧切片：为什么说它在读侧“等同于 MVVM”？
+通过 \`state.map { it.subState }.distinctUntilChanged().stateIn(...)\` 将单一状态在内存中切成多个只读局部流暴露给子组件：
+- **Compose 订阅端**：子组件只订阅自己的子 StateFlow，其他切片变化时，由于 \`distinctUntilChanged()\` 与 \`@Immutable\`，Compose 的 Smart Recomposition 会直接跳过未变更的组件（Skip Rate 达 90%+）；
+- **批判性认知**：在**读侧（Read Path）**，如果页面全切片了，从 Composable 的视角来看，它观察的确实就是多个离散的流，这在形式上与 MVVM 的暴露方式毫无二致。
+
+#### 2. 写侧不对称：MVI 的真正不可替代价值在于【跨切片原子写】
+既然读侧类似，为什么不直接写成多个独立的 \`MutableStateFlow\`？因为**写侧（Write Path）存在本质差异**：
+- **MVVM 多流困局**：若一个操作需要**同时更新两个切片**（例如：关注主播成功，既需要更新 \`HeaderState.isFollowed = true\`，又需要往 \`FeedState.posts\` 插入一条系统推荐动态），MVVM 必须先后触发两个 \`_stateA.value = ...\` 和 \`_stateB.value = ...\`。在这两行代码执行的纳秒级微隙，下游会短暂收集到一个“只关注了但动态还没出来”的**中间撕裂态（Torn State）**！
+- **MVI 跨切片原子事务**：
+  \`\`\`kotlin
+  _uiState.update { current ->
+      current.copy(
+          header = current.header.copy(isFollowed = true),
+          feed = current.feed.copy(posts = current.feed.posts + newPost)
+      )
+  }
+  \`\`\`
+  在 MVI 中，无论是单切片写还是跨切片联动，状态修改永远是**一次 CAS 内存事务**，下游永远不可能观测到数据不一致的瞬态！
+
+---
+
+### 并发安全深水区陷阱：跨 suspend 挂起点的快照盲写丢数据
+
+在很多团队的 MVI 实践中，开发者误以为只要使用了 \`MutableStateFlow.update { ... }\` 就绝对并发安全。这是一个极其危险的认知误区！
+**CAS 只能保证单次内存更新的原子性，但无法跨越 \`suspend\` 协程挂起点！**
+
+#### 致命 Bug 场景复盘：
+用户在发帖输入框打字，同时点击“发送”：
+\`\`\`kotlin
+// ❌ 致命隐患写法：跨挂起点的快照盲写
+fun submitPost() {
+    viewModelScope.launch {
+        // 1. 挂起前读取快照（假设此时用户输入是 "Hello"）
+        val draft = _uiState.value.composer.draftText
+        
+        // 2. 发生网络耗时挂起（耗时 1.5 秒）
+        val result = api.post(draft)
+        
+        // 3. 挂起恢复后盲目重置！
+        // 🚨 灾难发生：在这 1.5 秒内，用户可能在输入框又追加了 " World!"
+        // 但这里直接用写死或预期的空对象粗暴覆盖，用户刚打的 " World!" 凭空丢失！
+        _uiState.update { it.copy(composer = ComposerState(draftText = "")) }
+    }
+}
+\`\`\`
+
+#### 工业级避坑解法：防御性校验当前真实状态
+在挂起恢复后，必须**拿当前最新的内存值与挂起前的值进行对比**：
+\`\`\`kotlin
+// ✅ 工业级安全写法：挂起恢复后的条件化状态推进
+val draft = _uiState.value.composer.draftText
+_uiState.update { it.copy(composer = it.composer.copy(isPosting = true)) }
+
+val success = repository.submit(draft)
+
+_uiState.update { current ->
+    current.copy(
+        composer = current.composer.copy(
+            isPosting = false,
+            // 只有当用户没有继续输入新内容时才清空，否则保留用户在网络请求期间追加的新输入！
+            draftText = if (current.composer.draftText == draft) "" else current.composer.draftText
+        )
+    )
+}
+\`\`\``,
         codeSnippet: `// ═══════════════════════════════════════════════════════════════
-// 现代 MVI / UDF 工业级单向数据流最佳实践
+// 工业级高阶 MVI：状态切片 (State Slicing) + 防并发盲写治理
 // ═══════════════════════════════════════════════════════════════
 
-// 1. 【单一不可变状态】当前页面视觉的全量快照
-data class FeedUiState(
-    val isLoading: Boolean = false,
-    val items: List<String> = emptyList(),
+// 1. 【聚合根状态】全局单一不可变状态
+@Immutable
+data class ProfileUiState(
+    val header: HeaderState = HeaderState(),
+    val composer: ComposerState = ComposerState(),
+    val posts: ImmutableList<PostItem> = persistentListOf(),
     val error: String? = null
 )
 
-// 2. 【用户意图】用户交互发出的所有显式动作
-sealed interface FeedUiIntent {
-    data object Refresh : FeedUiIntent
-    data class LoadMore(val page: Int) : FeedUiIntent
-    data class ItemClicked(val id: String) : FeedUiIntent
+@Immutable
+data class HeaderState(val username: String = "", val avatarUrl: String = "", val isFollowing: Boolean = false)
+
+@Immutable
+data class ComposerState(val draftText: String = "", val isPosting: Boolean = false)
+
+@Immutable
+data class PostItem(val id: String, val title: String, val likes: Int)
+
+// 2. 【类型化意图】
+sealed interface ProfileIntent {
+    data class UpdateDraft(val text: String) : ProfileIntent
+    data object SubmitPost : ProfileIntent
+    data class ToggleFollow(val userId: String) : ProfileIntent
 }
 
-// 3. 【一次性副作用】弹窗、Toast、路由跳转等单次非粘性事件
-sealed interface FeedUiEffect {
-    data class ShowToast(val message: String) : FeedUiEffect
-    data class NavigateToDetail(val detailId: String) : FeedUiEffect
-}
-
-// 4. 【状态机 ViewModel】处理意图并单向分发状态与副作用
-class FeedViewModel(
-    private val repository: FeedRepository
+// 3. 【状态机 ViewModel】：读侧状态切片 + 写侧跨切片原子事务
+class ProfileViewModel(
+    private val repo: ProfileRepository
 ) : ViewModel() {
 
-    // ⚡ 单一状态源（只读向外部暴露）
-    private val _uiState = MutableStateFlow(FeedUiState(isLoading = true))
-    val uiState: StateFlow<FeedUiState> = _uiState.asStateFlow()
+    // ⚡ 内部唯一可变聚合状态源
+    private val _state = MutableStateFlow(ProfileUiState())
+    val state: StateFlow<ProfileUiState> = _state.asStateFlow()
 
-    // ⚡ 一次性副作用通道（Channel.BUFFERED 确保事件不丢失、不重放）
-    private val _effect = Channel<FeedUiEffect>(Channel.BUFFERED)
-    val effect: Flow<FeedUiEffect> = _effect.receiveAsFlow()
+    // ⚡ 【读侧状态切片 (State Slicing)】：
+    // 通过 distinctUntilChanged() 导出细粒度局部流，彻底切断子组件对全局状态的非必要重组依赖！
+    val headerState: StateFlow<HeaderState> = _state
+        .map { it.header }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _state.value.header)
 
-    // 统一意图分发入口
-    fun sendIntent(intent: FeedUiIntent) {
+    val composerState: StateFlow<ComposerState> = _state
+        .map { it.composer }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _state.value.composer)
+
+    val postsState: StateFlow<ImmutableList<PostItem>> = _state
+        .map { it.posts }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), _state.value.posts)
+
+    fun dispatch(intent: ProfileIntent) {
+        when (intent) {
+            is ProfileIntent.UpdateDraft -> {
+                _state.update { it.copy(composer = it.composer.copy(draftText = intent.text)) }
+            }
+            is ProfileIntent.SubmitPost -> handleSubmitPost()
+            is ProfileIntent.ToggleFollow -> handleToggleFollow(intent.userId)
+        }
+    }
+
+    // ⚡ 【并发避坑】：跨 suspend 挂起点的防御性更新，杜绝丢失用户新打的字
+    private fun handleSubmitPost() {
+        val draft = _state.value.composer.draftText
+        if (draft.isBlank()) return
+
         viewModelScope.launch {
-            when (intent) {
-                is FeedUiIntent.Refresh -> handleRefresh()
-                is FeedUiIntent.LoadMore -> handleLoadMore(intent.page)
-                is FeedUiIntent.ItemClicked -> {
-                    _effect.send(FeedUiEffect.NavigateToDetail(intent.id))
-                }
+            // 步骤 1：立即标记 posting 状态
+            _state.update { it.copy(composer = it.composer.copy(isPosting = true)) }
+
+            // 步骤 2：耗时网络挂起点
+            val newPost = repo.createPost(draft)
+
+            // 步骤 3：跨挂起点恢复时的【写侧跨切片原子事务】
+            _state.update { current ->
+                current.copy(
+                    // 切片 A：条件恢复草稿（若网络请求期间用户追加了新输入，绝不盲目清空！）
+                    composer = current.composer.copy(
+                        isPosting = false,
+                        draftText = if (current.composer.draftText == draft) "" else current.composer.draftText
+                    ),
+                    // 切片 B：原子追加新帖子到列表头部（跨切片零时序撕裂）
+                    posts = (persistentListOf(newPost) + current.posts).toPersistentList()
+                )
             }
         }
     }
 
-    private suspend fun handleRefresh() {
-        _uiState.update { it.copy(isLoading = true, error = null) }
-        repository.loadFeeds()
-            .onSuccess { list ->
-                _uiState.update { it.copy(isLoading = false, items = list) }
+    private fun handleToggleFollow(userId: String) {
+        viewModelScope.launch {
+            val nextFollow = !_state.value.header.isFollowing
+            // 乐观更新
+            _state.update { it.copy(header = it.header.copy(isFollowing = nextFollow)) }
+            repo.toggleFollow(userId, nextFollow).onFailure {
+                // 回滚
+                _state.update { it.copy(header = it.header.copy(isFollowing = !nextFollow)) }
             }
-            .onFailure { err ->
-                _uiState.update { it.copy(isLoading = false, error = err.message) }
-                _effect.send(FeedUiEffect.ShowToast("刷新失败: \${err.message}"))
-            }
+        }
     }
 }
 
-// 5. 【Compose View 订阅端】生命周期安全收集
+// 4. 【Compose View 订阅端】：各自订阅切片流，跳过不相关重组
 @Composable
-fun FeedScreen(viewModel: FeedViewModel, onNavigate: (String) -> Unit) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val context = LocalContext.current
+fun ProfileScreen(viewModel: ProfileViewModel) {
+    // 各自监听子切片，当用户在输入框打字时，Header 和 Posts 彻底跳过重组！
+    val header by viewModel.headerState.collectAsStateWithLifecycle()
+    val composer by viewModel.composerState.collectAsStateWithLifecycle()
+    val posts by viewModel.postsState.collectAsStateWithLifecycle()
 
-    // ⚡ 一次性事件收集：只在 STARTED 状态及以上收集，页面销毁自动取消
-    LaunchedEffect(viewModel.effect) {
-        viewModel.effect.collect { effect ->
-            when (effect) {
-                is FeedUiEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
-                is FeedUiEffect.NavigateToDetail -> onNavigate(effect.detailId)
-            }
-        }
+    Column(modifier = Modifier.fillMaxSize()) {
+        ProfileHeaderSection(header = header, onToggleFollow = { viewModel.dispatch(ProfileIntent.ToggleFollow("user_1")) })
+        PostComposerSection(composer = composer, onDraftChange = { viewModel.dispatch(ProfileIntent.UpdateDraft(it)) }, onSubmit = { viewModel.dispatch(ProfileIntent.SubmitPost) })
+        PostListSection(posts = posts)
     }
-
-    // 视图根据单一 state 声明式刷新，意图单向抛给 ViewModel
-    FeedContent(state = state, onRefresh = { viewModel.sendIntent(FeedUiIntent.Refresh) })
 }`,
       },
       {
