@@ -2641,12 +2641,11 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
   2. **列表项上下文绑定与就地 Loading**：管线强绑定当前被点击项的 \`targetItemId\`；当流程推进到耗时的异步上传生成时，立即解除全屏模态管线（\`activePipeline = null\`），将状态转为该列表项“就地转圈”，用户无需等待可继续自由浏览列表。
 
 \`\`\`kotlin
-// 1. 原子步骤卡片与管线定义
+// 1. 原子前置拦截卡片与管线定义（仅声明前置交互步骤）
 sealed interface PipelineStep {
     data object Privacy : PipelineStep
     data object PickPhoto : PipelineStep
     data class Ad(val adUnitId: String) : PipelineStep
-    data object UploadAndGenerate : PipelineStep
 }
 
 data class ActivePipeline(
@@ -2670,31 +2669,31 @@ class TemplateListViewModel(
     private val _items = MutableStateFlow<List<ItemUiModel>>(emptyList())
     val items: StateFlow<List<ItemUiModel>> = _items.asStateFlow()
 
-    // 为 null 表示无模态流程；有值则全屏承接当前步骤
+    // 模态交互管线（有值全屏承接交互，为 null 列表自由操作）
     private val _activePipeline = MutableStateFlow<ActivePipeline?>(null)
     val activePipeline: StateFlow<ActivePipeline?> = _activePipeline.asStateFlow()
 
-    // 触发长流程：隐私 ➔ 选图 ➔ 广告 ➔ 上传
+    // 组装任意前置卡片配方（例如：隐私 ➔ 选图 ➔ 广告）
     fun onItemClick(itemId: String) {
-        val steps = listOf(PipelineStep.Privacy, PipelineStep.PickPhoto, PipelineStep.Ad("ad_01"), PipelineStep.UploadAndGenerate)
+        val steps = listOf(PipelineStep.Privacy, PipelineStep.PickPhoto, PipelineStep.Ad("ad_01"))
         _activePipeline.value = ActivePipeline(steps, currentIndex = 0, targetItemId = itemId)
     }
 
-    // 步骤完成统一推进回调
+    // 步骤完成通用推进：最后一步走完自动触发业务终点动作，无需对特定步骤 if-else
     fun onStepCompleted() {
         val p = _activePipeline.value ?: return
         val nextIdx = p.currentIndex + 1
         if (nextIdx < p.steps.size) {
             _activePipeline.value = p.copy(currentIndex = nextIdx)
-            if (p.steps[nextIdx] is PipelineStep.UploadAndGenerate) executeUpload(p.targetItemId)
         } else {
-            _activePipeline.value = null
+            _activePipeline.value = null // ⚡ 前置交互全部闭环，退出全屏模态
+            onPipelineFinished(p.targetItemId) // ⚡ 统一触发终点业务（解耦任意后续操作）
         }
     }
 
-    private fun executeUpload(targetId: String) {
-        _activePipeline.value = null // ⚡ 模态立即退出，释放列表交互
-        updateItem(targetId) { it.copy(isGenerating = true) } // 目标项就地转圈
+    // 管线终点通用派发：目标项就地转圈，异步完成刷新数据
+    private fun onPipelineFinished(targetId: String) {
+        updateItem(targetId) { it.copy(isGenerating = true) }
 
         viewModelScope.launch {
             repository.uploadAndGenerate(targetId)
@@ -2708,7 +2707,7 @@ class TemplateListViewModel(
     }
 }
 
-// 4. Compose UI 界面层：列表常驻 + 管线弹层解耦
+// 4. Compose UI 界面层：列表常驻 + 前置步骤动态承接
 @Composable
 fun TemplateListScreen(viewModel: TemplateListViewModel) {
     val items by viewModel.items.collectAsStateWithLifecycle()
@@ -2722,13 +2721,12 @@ fun TemplateListScreen(viewModel: TemplateListViewModel) {
             }
         }
 
-        // ② 管线承接器：根据当前步骤渲染对应弹层，用户交互完毕仅回调 onStepCompleted
+        // ② 前置管线承接器：步骤完成统一回调 onStepCompleted，纯净无业务入侵
         activePipeline?.let { pipeline ->
             when (pipeline.steps[pipeline.currentIndex]) {
                 is PipelineStep.Privacy -> PrivacyDialog(onAgree = viewModel::onStepCompleted)
                 is PipelineStep.PickPhoto -> PhotoPickerSheet(onPicked = viewModel::onStepCompleted)
                 is PipelineStep.Ad -> AdOverlay(onAdClosed = viewModel::onStepCompleted)
-                is PipelineStep.UploadAndGenerate -> Unit // 已转入列表项局部转圈，无阻断弹层
             }
         }
     }
