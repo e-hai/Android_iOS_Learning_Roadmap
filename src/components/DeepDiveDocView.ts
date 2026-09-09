@@ -585,9 +585,26 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
   const card = document.createElement('div');
   card.className = `pipeline-flow-card ${platform === 'ios' ? 'pipeline-ios' : ''}`;
 
+  const hasCustomCategories = pipeline.some((step) =>
+    step.category === 'programmable' || step.category === 'optional' || step.category === 'fixed'
+  );
+
   const nodesHtml = pipeline.map((step, idx) => {
-    const isTheory = step.category === 'theory';
-    const nodeClass = isTheory ? 'node-theory' : 'node-engineering';
+    let nodeClass = 'node-engineering';
+    let badgeHtml = '';
+    if (step.category === 'theory') {
+      nodeClass = 'node-theory';
+    } else if (step.category === 'programmable') {
+      nodeClass = 'node-programmable';
+      badgeHtml = '<span class="node-stage-badge prog-badge"><span class="badge-dot"></span>可编程</span>';
+    } else if (step.category === 'optional') {
+      nodeClass = 'node-optional';
+      badgeHtml = '<span class="node-stage-badge opt-badge"><span class="badge-dot"></span>可选阶段</span>';
+    } else if (step.category === 'fixed') {
+      nodeClass = 'node-fixed';
+      badgeHtml = '<span class="node-stage-badge fix-badge"><span class="badge-dot"></span>固定功能</span>';
+    }
+
     const connector = idx < pipeline.length - 1 ? `
       <div class="pipeline-connector">
         <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -599,7 +616,10 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
 
     return `
       <div class="pipeline-node ${nodeClass}">
-        <h4 class="pipeline-node-title">${escapeHtml(step.title)}</h4>
+        <div class="pipeline-node-header">
+          <h4 class="pipeline-node-title">${escapeHtml(step.title)}</h4>
+          ${badgeHtml}
+        </div>
         <p class="pipeline-node-subtitle">${escapeHtml(step.subtitle)}</p>
       </div>
       ${connector}
@@ -610,22 +630,42 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
   const flowTitle = customTitle ?? (hasTheory ? '理论 ➔ 工程演进全景链路' : '工程演进全景链路');
   const badgeText = customTitle ? 'Workflow' : 'Roadmap';
 
-  const legendHtml = customTitle ? `
-    <div class="legend-item">
-      <span class="legend-dot eng-dot"></span>
-      <span>标准闭环流程</span>
-    </div>
-  ` : `
-    ${hasTheory ? `
+  let legendHtml = '';
+  if (hasCustomCategories) {
+    legendHtml = `
       <div class="legend-item">
-        <span class="legend-dot theory-dot"></span>
-        <span>理论与策略层</span>
-      </div>` : ''}
-    <div class="legend-item">
-      <span class="legend-dot eng-dot"></span>
-      <span>工程与运行时层</span>
-    </div>
-  `;
+        <span class="legend-dot prog-dot"></span>
+        <span>可编程阶段</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot opt-dot"></span>
+        <span>可选阶段</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-dot fix-dot"></span>
+        <span>固定阶段</span>
+      </div>
+    `;
+  } else if (customTitle) {
+    legendHtml = `
+      <div class="legend-item">
+        <span class="legend-dot eng-dot"></span>
+        <span>标准闭环流程</span>
+      </div>
+    `;
+  } else {
+    legendHtml = `
+      ${hasTheory ? `
+        <div class="legend-item">
+          <span class="legend-dot theory-dot"></span>
+          <span>理论与策略层</span>
+        </div>` : ''}
+      <div class="legend-item">
+        <span class="legend-dot eng-dot"></span>
+        <span>工程与运行时层</span>
+      </div>
+    `;
+  }
 
   card.innerHTML = `
     <div class="pipeline-flow-header">

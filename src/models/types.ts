@@ -29,7 +29,7 @@ export interface StepperStep {
 export interface PipelineStep {
   title: string;          // e.g. '协程概念'
   subtitle: string;       // e.g. 'Conway 1963 · 对称地互相让出控制权'
-  category?: 'theory' | 'engineering'; // 'theory' (理论与策略层) | 'engineering' (工程与运行时层)
+  category?: 'theory' | 'engineering' | 'programmable' | 'optional' | 'fixed'; // Pipeline classification
 }
 
 /** Overrides the renderer's default section headings when a module reuses a slot differently. */
