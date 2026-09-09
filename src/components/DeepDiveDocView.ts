@@ -661,7 +661,19 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
   // Split by markdown H3 heading
   const sections = rawText.split(/(?=(?:^|\n)#{3}(?!#)[ \t]+)/g).map((s) => s.trim()).filter(Boolean);
 
-  sections.forEach((sec, idx) => {
+  let stepSections = sections;
+  if (sections.length > 0 && !/^###\s+/.test(sections[0])) {
+    const topOverview = sections[0];
+    stepSections = sections.slice(1);
+
+    const overviewEl = document.createElement('div');
+    overviewEl.className = 'timeline-overview-card';
+    overviewEl.style.marginBottom = '22px';
+    overviewEl.innerHTML = formatCaseStudyBody(topOverview);
+    container.appendChild(overviewEl);
+  }
+
+  stepSections.forEach((sec, idx) => {
     const firstNewline = sec.indexOf('\n');
     let title = '';
     let bodyText = '';
