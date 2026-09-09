@@ -2634,19 +2634,44 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
 }
 \`\`\`
 
-#### 5. 实战进阶：复杂长流程管线编排与列表项解耦
-- **场景痛点**：跨越“点击列表项 ➔ 隐私弹窗 ➔ 系统相册 ➔ 激励广告 ➔ 上传推理 ➔ 刷新结果”的长链路流程；如果直接在单一 Activity / Screen 中堆叠布尔变量（\`showPrivacy\`、\`showAd\` 等），极易引发状态爆炸与庞大的 \`if-else\` 回调地狱；同时，若上传过程使用全屏遮罩强锁界面，会严重阻断用户浏览列表的体验。
-- **核心架构解法**：
-  1. **管线配方架构（Pipeline Recipe）**：将流程中的弹窗、相册、广告抽象为原子卡片步骤（\`PipelineStep\`）。触发时组装一个顺序配方，ViewModel 仅需通用推进 \`currentIndex + 1\`，彻底消除硬编码与状态分散；
-  2. **列表项上下文绑定与就地 Loading**：管线强绑定当前被点击项的 \`targetItemId\`；当流程推进到耗时的异步上传生成时，立即解除全屏模态管线（\`activePipeline = null\`），将状态转为该列表项“就地转圈”，用户无需等待可继续自由浏览列表。
+#### 5. 实战进阶：复杂长流程协同架构的演进之路
+
+##### 5.1 真实业务场景痛点
+在 AI 头像生成、美颜滤镜或模板体验类应用中，用户在列表点击某项模板后，通常需走完一条长链路流水线：
+$$\text{点击列表项} \longrightarrow \text{隐私弹窗协议} \longrightarrow \text{唤起系统相册选图} \longrightarrow \text{激励视频广告} \longrightarrow \text{上传与后台模型推理} \longrightarrow \text{结果回写}$$
+看似简单的顺序逻辑，在 Android 复杂的声明式 UI、配置变更与第三方生态下，却隐藏着大量的架构深水区陷阱。
+
+##### 5.2 方案进化历程
+
+- **第一版：直觉式布尔标记堆叠（Naive Approach）**
+  - **写法思路**：在 Activity / ViewModel 中为每个步骤定义一个布尔状态（\`showPrivacy\`、\`showAd\`、\`isUploading\` 等），步骤完成后手动将当前状态置为 \`false\`，再将下一个状态置为 \`true\`；上传时弹出一个全局模态 Loading 遮罩。
+  - **暴露的新问题**：
+    1. **状态爆炸与回调地狱**：随着流程步骤增多或调整，出现大量易错的布尔交叉判断（\`if-else\` 迷宫）；
+    2. **用户体验卡死**：全屏模态遮罩强行锁定整个页面，生成耗时 10 秒以上时用户完全无法滚动或浏览其他列表项。
+
+- **第二版：管线编排（Pipeline Recipe）与列表项就地转圈**
+  - **写法思路**：将流程动作抽象为平等的原子步骤 \`PipelineStep\`，组装成有序配方，由 \`ActivePipeline(steps, currentIndex, targetItemId)\` 统一驱动，提取 \`executeNextStep()\` 与 \`executeStep()\` 集中分发；上传阶段解除模态，仅目标项就地局部转圈（In-place Loading）。
+  - **暴露的新问题（真实生产环境深水区陷阱）**：
+    1. **外部副作用重复触发（屏幕旋转重放）**：若相册调起或广告播放在 Compose 挂载（\`LaunchedEffect\`）中仅依赖持久状态 \`pipeline.currentStep\` 触发，一旦用户在选图或看广告时旋转屏幕，Activity 重建后新树挂载，导致相册被二次拉起或广告二次弹窗；
+    2. **外部系统异常导致应用永久死锁（假死滞留）**：系统相册在低端机可能因后台查杀丢失返回，第三方广告 SDK 偶发黑屏、超时或吞掉 \`onDismiss\` 回调，导致管线卡死在当前步，用户无法进行后续任何操作。
+
+- **第三版（终局架构）：单次消费事件 + 超时熔断与生命周期自愈防线**
+  - **核心解法**：
+    1. **“渲染归 State，动作归 Effect”**：UI 弹窗（\`Privacy\`）由 State 驱动（旋转重建不丢失）；不可逆的外部动作（\`PickPhoto\`、\`Ad\`）通过 **\`Channel<PipelineEffect>\` 消费即焚**，旋转屏幕绝不重放；
+    2. **超时熔断与逃生通道**：针对不可靠的广告 SDK 设立 \`withTimeoutOrNull(30_000L)\` 协程超时死线与主动取消逃生通道；
+    3. **宿主生命周期回流（\`onResume\` 兜底）**：用户从外部回到前台若状态未解除，兜底自动纠错释放。
+
+##### 5.3 终极生产级闭环代码
 
 \`\`\`kotlin
-// 1. 原子步骤定义（所有动作均为平等的管线步骤，支持任意颠倒/组合）
+// ==========================================
+// 1. 领域模型：原子步骤、富管线模型与单次消费 Effect
+// ==========================================
 sealed interface PipelineStep {
-    data object Privacy : PipelineStep
-    data object PickPhoto : PipelineStep
-    data class Ad(val adUnitId: String) : PipelineStep
-    data object UploadAndGenerate : PipelineStep // 异步生成也是普通步骤之一
+    data object Privacy : PipelineStep                      // 纯 UI 对话框
+    data object PickPhoto : PipelineStep                    // 外部系统相册
+    data class Ad(val adUnitId: String) : PipelineStep      // 第三方广告 SDK
+    data object UploadAndGenerate : PipelineStep            // 纯后台异步任务
 }
 
 data class ActivePipeline(
@@ -2659,25 +2684,32 @@ data class ActivePipeline(
     fun next(): ActivePipeline = copy(currentIndex = currentIndex + 1)
 }
 
-// 2. 列表项 UI 状态模型
-data class ItemUiModel(
-    val id: String,
-    val title: String,
-    val imageUrl: String,
-    val isGenerating: Boolean = false
-)
+// 外部不可逆副作用（单次消费即焚，彻底防御屏幕旋转重放）
+sealed interface PipelineEffect {
+    data class LaunchPhotoPicker(val targetItemId: String) : PipelineEffect
+    data class ShowAd(val adUnitId: String) : PipelineEffect
+}
 
-// 3. ViewModel 集中调度管线
+data class ItemUiModel(val id: String, val title: String, val imageUrl: String, val isGenerating: Boolean = false)
+
+// ==========================================
+// 2. ViewModel：编排驱动、外部副作用发射与异步任务解耦
+// ==========================================
 class TemplateListViewModel(
     private val repository: ImageRecognitionRepository
 ) : ViewModel() {
     private val _items = MutableStateFlow<List<ItemUiModel>>(emptyList())
     val items: StateFlow<List<ItemUiModel>> = _items.asStateFlow()
 
+    // 模态状态：仅维护当前 UI 树需要渲染的弹层
     private val _activePipeline = MutableStateFlow<ActivePipeline?>(null)
     val activePipeline: StateFlow<ActivePipeline?> = _activePipeline.asStateFlow()
 
-    // 自由编排步骤配方（步骤可任意颠倒，例如先生成再看广告解锁，或先广告后生成）
+    // 一次性事件通道：消费即焚
+    private val _effectChannel = Channel<PipelineEffect>(Channel.BUFFERED)
+    val effectFlow = _effectChannel.receiveAsFlow()
+
+    // 步骤配方支持任意组合与顺序颠倒
     fun onItemClick(itemId: String) {
         val steps = listOf(PipelineStep.Privacy, PipelineStep.PickPhoto, PipelineStep.Ad("ad_01"), PipelineStep.UploadAndGenerate)
         startPipeline(ActivePipeline(steps, currentIndex = 0, targetItemId = itemId))
@@ -2688,7 +2720,6 @@ class TemplateListViewModel(
         executeStep(pipeline)
     }
 
-    // 步骤完成统一推进：外部显式判断 isLastStep 决定推进还是闭环
     fun onStepCompleted() {
         val pipeline = _activePipeline.value ?: return
         if (pipeline.isLastStep) {
@@ -2704,24 +2735,34 @@ class TemplateListViewModel(
         executeStep(nextPipeline)
     }
 
-    // ⚡ 核心分发器：每个步骤平等执行，直接基于 currentStep 分发
+    // ⚡ 核心分发器：严格区分 UI 渲染、后台异步与外部副作用
     private fun executeStep(pipeline: ActivePipeline) {
-        when (pipeline.currentStep) {
+        when (val step = pipeline.currentStep) {
+            is PipelineStep.Privacy -> Unit // 纯 UI 弹窗，由 Compose 监听 activePipeline 渲染
             is PipelineStep.UploadAndGenerate -> executeUploadStep(pipeline.targetItemId)
-            // 交互式 UI 步骤（Privacy / PickPhoto / Ad）保持 activePipeline，由 Compose 渲染对应弹层
-            else -> Unit
+            is PipelineStep.PickPhoto -> {
+                viewModelScope.launch { _effectChannel.send(PipelineEffect.LaunchPhotoPicker(pipeline.targetItemId)) }
+            }
+            is PipelineStep.Ad -> {
+                viewModelScope.launch { _effectChannel.send(PipelineEffect.ShowAd(step.adUnitId)) }
+            }
         }
     }
 
-    // 后台异步型步骤：列表项就地转圈，完成后自动推进下一步
+    // 后台异步任务：目标列表项就地转圈，完成后自动推进下一步
     private fun executeUploadStep(targetItemId: String) {
         updateItem(targetItemId) { it.copy(isGenerating = true) }
         viewModelScope.launch {
             repository.uploadAndGenerate(targetItemId)
                 .onSuccess { url -> updateItem(targetItemId) { it.copy(imageUrl = url, isGenerating = false) } }
                 .onFailure { updateItem(targetItemId) { it.copy(isGenerating = false) } }
-            onStepCompleted() // ⚡ 无论生成位于管线第几步，完成即推进下一步
+            onStepCompleted() // 无论生成位于管线第几步，完成即推进下一步
         }
+    }
+
+    // 逃生通道：支持用户主动取消或超时强行释放
+    fun cancelPipeline() {
+        _activePipeline.value = null
     }
 
     private fun updateItem(id: String, transform: (ItemUiModel) -> ItemUiModel) {
@@ -2729,28 +2770,74 @@ class TemplateListViewModel(
     }
 }
 
-// 4. Compose UI 界面层：列表常驻 + 步骤驱动弹层
+// ==========================================
+// 3. Compose UI：单次消费监听、超时熔断、生命周期兜底与就地 Loading
+// ==========================================
 @Composable
 fun TemplateListScreen(viewModel: TemplateListViewModel) {
+    val context = LocalContext.current
     val items by viewModel.items.collectAsStateWithLifecycle()
     val activePipeline by viewModel.activePipeline.collectAsStateWithLifecycle()
 
+    // 1. 系统相册 Launcher
+    val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.onStepCompleted() else viewModel.cancelPipeline()
+    }
+
+    // 2. ⚡ 消费副作用流：旋转屏幕重建时旧事件已消费完毕，绝不重放相册与广告！
+    LaunchedEffect(Unit) {
+        viewModel.effectFlow.collect { effect ->
+            when (effect) {
+                is PipelineEffect.LaunchPhotoPicker -> {
+                    photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+                is PipelineEffect.ShowAd -> {
+                    // 超时熔断防死锁：第三方 SDK 假死时 30 秒超时强行放行
+                    withTimeoutOrNull(30_000L) {
+                        suspendCancellableCoroutine { cont ->
+                            AdSdk.show(context, effect.adUnitId,
+                                onDismiss = { cont.resume(true) },
+                                onFailed = { cont.resume(false) }
+                            )
+                        }
+                    } ?: Log.e("Pipeline", "广告超时假死，触发熔断兜底")
+                    viewModel.onStepCompleted()
+                }
+            }
+        }
+    }
+
+    // 3. ⚡ 宿主生命周期回流兜底：用户从外部应用回到前台 500ms 后若未正常解除，兜底解除卡死
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, activePipeline) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && activePipeline != null) {
+                if (activePipeline?.currentStep is PipelineStep.Ad) {
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(500)
+                        if (activePipeline?.currentStep is PipelineStep.Ad) viewModel.cancelPipeline()
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    // 4. 界面渲染：列表常驻 + 步骤驱动 UI 弹层
     Box(modifier = Modifier.fillMaxSize()) {
-        // ① 基础列表：始终可响应滑动与点击
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(items, key = { it.id }) { item ->
                 ListItemRow(item = item, onClick = { viewModel.onItemClick(item.id) })
             }
         }
 
-        // ② 纯 UI 步骤弹层承接：通过 pipeline.currentStep 优雅渲染
-        activePipeline?.let { pipeline ->
-            when (pipeline.currentStep) {
-                is PipelineStep.Privacy -> PrivacyDialog(onAgree = viewModel::onStepCompleted)
-                is PipelineStep.PickPhoto -> PhotoPickerSheet(onPicked = viewModel::onStepCompleted)
-                is PipelineStep.Ad -> AdOverlay(onAdClosed = viewModel::onStepCompleted)
-                else -> Unit // 如 UploadAndGenerate 等纯逻辑步骤不渲染弹层
-            }
+        // 纯 UI 弹层由持久 State 驱动，旋转重建后自动还原不丢失
+        if (activePipeline?.currentStep is PipelineStep.Privacy) {
+            PrivacyDialog(
+                onAgree = viewModel::onStepCompleted,
+                onDismiss = viewModel::cancelPipeline // 逃生通道
+            )
         }
     }
 }
@@ -2760,7 +2847,7 @@ fun ListItemRow(item: ItemUiModel, onClick: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)) {
         Text(text = item.title, modifier = Modifier.weight(1f))
         if (item.isGenerating) {
-            CircularProgressIndicator(modifier = Modifier.size(24.dp)) // ⚡ 就地转圈
+            CircularProgressIndicator(modifier = Modifier.size(24.dp)) // ⚡ 就地转圈，不卡列表交互
         }
     }
 }
