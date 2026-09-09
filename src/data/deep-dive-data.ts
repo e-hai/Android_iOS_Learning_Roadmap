@@ -2869,7 +2869,44 @@ fun ListItemRow(item: ItemUiModel, onClick: () -> Unit) {
 | **业务实现 (\`:feature:*:impl\`)** | 私有业务逻辑闭环 | 自身的 \`:api\`、其他模块的 \`:api\`、\`:core:*\` | ❌ 严禁依赖其他 Feature 的 \`:impl\` |
 | **业务契约 (\`:feature:*:api\`)** | 对外暴露的标准接口与 Model | 最底层基础工具类型（尽量保持极简零依赖） | ❌ 严禁依赖任何业务 \`:impl\`，严禁依赖重型 \`:core\` |
 | **公共基建 (\`:core:*\`)** | 通用基础设施（网络、设计系统） | 更底层的纯工具类库 | ❌ 严禁依赖任何 \`:feature\` 业务层 |`,
-        codeSnippet: `// build-logic/convention/src/main/kotlin/AndroidFeatureConventionPlugin.kt
+        caseStudy: `### 1. build-logic 统一插件工程：最简单使用
+
+build-logic 本质是一个独立的 Gradle 子工程（Composite Build），核心目标是**把几十个业务模块中重复复制的数十行 Gradle 脚本，收敛为 1 行自定义插件**。
+
+#### 极简 4 步落地：
+
+- **第 1 步（根目录引入）**：在工程根目录 \`settings.gradle.kts\` 声明引入：
+\`\`\`kotlin
+// settings.gradle.kts (工程根目录)
+pluginManagement {
+    includeBuild("build-logic") // 纳入 Composite Build，优先于所有业务模块编译
+}
+\`\`\`
+
+- **第 2 步（配置插件子工程）**：在 \`build-logic/convention/build.gradle.kts\` 启用 \`kotlin-dsl\` 并注册插件 ID：
+\`\`\`kotlin
+// build-logic/convention/build.gradle.kts
+plugins {
+    \`kotlin-dsl\` // 启用 Kotlin 编写插件
+}
+
+dependencies {
+    compileOnly(libs.android.gradlePlugin)
+    compileOnly(libs.kotlin.gradlePlugin)
+}
+
+gradlePlugin {
+    plugins {
+        register("androidFeature") {
+            id = "demo.android.feature" // 对外暴露的插件 ID
+            implementationClass = "com.demo.buildlogic.AndroidFeatureConventionPlugin"
+        }
+    }
+}
+\`\`\`
+
+- **第 3 步（编写统一约定插件）**：创建 \`build-logic/convention/src/main/kotlin/AndroidFeatureConventionPlugin.kt\`：
+\`\`\`kotlin
 package com.demo.buildlogic
 
 import com.android.build.gradle.LibraryExtension
@@ -2909,44 +2946,8 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
             add("implementation", project(":core:network"))
         }
     }
-}`,
-        caseStudy: `### 1. build-logic 统一插件工程：最简单使用
-
-build-logic 本质是一个独立的 Gradle 子工程（Composite Build），核心目标是**把几十个业务模块中重复复制的数十行 Gradle 脚本，收敛为 1 行自定义插件**。
-
-#### 极简 4 步落地：
-
-- **第 1 步（根目录引入）**：在工程根目录 \`settings.gradle.kts\` 声明引入：
-\`\`\`kotlin
-// settings.gradle.kts (工程根目录)
-pluginManagement {
-    includeBuild("build-logic") // 纳入 Composite Build，优先于所有业务模块编译
 }
 \`\`\`
-
-- **第 2 步（配置插件子工程）**：在 \`build-logic/convention/build.gradle.kts\` 启用 \`kotlin-dsl\` 并注册插件 ID：
-\`\`\`kotlin
-// build-logic/convention/build.gradle.kts
-plugins {
-    \`kotlin-dsl\` // 启用 Kotlin 编写插件
-}
-
-dependencies {
-    compileOnly(libs.android.gradlePlugin)
-    compileOnly(libs.kotlin.gradlePlugin)
-}
-
-gradlePlugin {
-    plugins {
-        register("androidFeature") {
-            id = "demo.android.feature" // 对外暴露的插件 ID
-            implementationClass = "com.demo.buildlogic.AndroidFeatureConventionPlugin"
-        }
-    }
-}
-\`\`\`
-
-- **第 3 步（编写统一约定逻辑）**：编写 \`AndroidFeatureConventionPlugin.kt\`（见上方工业级源码），统一下发 \`compileSdk 35\`、Java 17 与公共库依赖。
 
 - **第 4 步（业务模块开箱即用）**：在任何业务模块 \`build.gradle.kts\` 中只需 1 行：
 \`\`\`kotlin
