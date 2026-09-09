@@ -3665,14 +3665,108 @@ final class TaskRunner {
     android: [
       {
         tag: '图形渲染',
-        title: 'OpenGL ES 3.0 管线、EGL 多线程上下文与 SurfaceView 硬件加速',
-        explanation: 'OpenGL ES 图形管线包含顶点着色器 (Vertex Shader) ➔ 图元装配 ➔ 光栅化 ➔ 片元着色器 (Fragment Shader) ➔ 帧缓冲 (FBO)。OpenGL 是状态机且严格与当前线程绑定。在后台线程进行滤镜处理或硬解码渲染时，必须调用 eglCreateContext 传入主 EGLContext 创建共享上下文 (ShareContext)。SurfaceView 拥有独立的 Surface 图层直接挂载在 WindowManagerService 上，不参与 View 树重绘，吞吐率远高于 TextureView。',
-        codeSnippet: `// EGL 共享上下文创建与双缓冲绑定
-val attribList = intArrayOf(EGL14.EGL_CONTEXT_CLIENT_VERSION, 3, EGL14.EGL_NONE)
-val sharedEglContext = EGL14.eglCreateContext(
-    eglDisplay, eglConfig, mainEglContext, attribList, 0
-)
-EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, sharedEglContext)`,
+        title: 'OpenGL ES',
+        sectionTitles: {
+          pipeline: '渲染管线',
+          explanation: 'OpenGL ES 管线与 EGL 底层架构详述',
+          caseStudy: '二、实战场景下的疑难问题与破局方案',
+        },
+        pipeline: [
+          { title: '顶点装配与VBO', subtitle: 'VAO 状态绑定 ➔ VBO/EBO 顶点与索引驻留显存', category: 'engineering' },
+          { title: '顶点着色变换', subtitle: 'Vertex Shader 执行 MVP 矩阵坐标空间转换', category: 'engineering' },
+          { title: '图元光栅化', subtitle: '裁剪剔除 ➔ 图元装配 ➔ 像素插值生成片元', category: 'engineering' },
+          { title: '片元着色处理', subtitle: 'Fragment Shader 执行纹理采样、光照与美颜滤镜', category: 'engineering' },
+          { title: 'FBO离屏链', subtitle: '绑定离屏 Framebuffer ➔ 级联渲染特效链', category: 'engineering' },
+          { title: 'EGL交换送显', subtitle: 'eglSwapBuffers ➔ 提交 BufferQueue 至 SurfaceFlinger 合成', category: 'engineering' },
+        ],
+        explanation: `### 1. OpenGL ES 3.0 现代渲染管线与核心特性
+- **VAO / VBO 显存管理架构**：彻底摒弃 GLES 2.0 时代每一帧通过 CPU 内存向 GPU 冗余传输顶点数据的瓶颈。利用顶点数组对象（VAO）记录顶点属性指针状态，利用顶点缓冲对象（VBO/EBO）将几何网格与索引数据直接常驻 GPU 显存，极大缩减 DrawCall 期间的 CPU-GPU 总线通信开销。
+- **MVP 坐标矩阵空间变换**：顶点着色器（Vertex Shader）负责执行模型变换（Model）、视图变换（View）、投影变换（Projection）的矩阵级联乘法，将 3D 物体从局部坐标系转换为标准化设备坐标系（NDC，范围 \`[-1, 1]\`）。
+- **光栅化与插值引擎**：硬件光栅化器将装配好的图元（三角形、线段）切分为离散的像素片元（Fragments），并在顶点间对颜色、法线、纹理坐标（UV）执行高精度的重心透视插值计算。
+- **片元着色与 FBO 离屏级联链**：片元着色器（Fragment Shader）对插值后的纹理执行多重采样、色彩空间转换（YUV ➔ RGB）、美颜磨皮及 LUT 滤镜计算；通过帧缓冲对象（FBO）实现 Ping-Pong 双缓冲离屏渲染，输出纹理可作为下一级 Shader 的输入，构建高吞吐的图像特效流水线。
+
+### 2. EGL 状态机核心机制与多线程上下文共享（ShareContext）
+- **EGL 纽带角色与线程独占性**：EGL 是 OpenGL ES 与 Android 本地窗口系统（Native Window System）之间的接口桥梁。**OpenGL 本质是强状态机，其执行上下文（EGLContext）在同一时刻只能被单个线程独占绑定**，严禁跨线程并发调用。
+- **主从双线程与 ShareContext 架构**：
+  - **预览主线程**：持有主 \`EGLContext\` 与 \`EGLWindowSurface\`，专门负责消费最终画面并调用 \`eglSwapBuffers\` 呈现给用户；
+  - **后台工作线程**：调用 \`eglCreateContext\` 并传入主 \`EGLContext\` 作为 \`share_context\` 参数，派生出共享上下文。共享上下文允许后台线程自由访问主线程创建的所有纹理、着色器程序与缓冲对象，在后台完成耗时的解码帧上传或离屏滤镜处理，实现主渲染回路 0 掉帧。
+- **EGLSurface 三大形态**：
+  - \`EGLWindowSurface\`：绑定底层 \`ANativeWindow\`（来自 SurfaceView / SurfaceTexture），用于上屏硬件显示；
+  - \`EGLPbufferSurface\`：纯内存离屏像素缓冲区（Pixel Buffer），不绑定任何显示设备，专用于后台离屏静默计算；
+  - \`EGLPixmapSurface\`：绑定本地位图的离屏表面（Android 平台极少使用）。
+
+### 3. SurfaceView vs TextureView 硬件加速与图层合成揭秘
+- **SurfaceView 独立图层架构（性能吞吐之王）**：
+  - 拥有独立的底层 \`Surface\` 与专有 \`BufferQueue\`，在系统 WindowManagerService 中拥有独立的 Layer；
+  - 渲染结果直接交由系统 \`SurfaceFlinger\` 服务进行硬件合成器（HWC）叠加显示，**完全不经过普通 View 树的 measure / layout / draw 重绘流程**；
+  - **优势与代价**：CPU 开销极低、高帧率吞吐最高、功耗最小；但由于处于独立硬件图层，无法支持普通 View 的平移、缩放、透明度渐变等属性动画与层叠覆盖。
+- **TextureView 纹理融合架构（灵活动画之王）**：
+  - 基于 \`SurfaceTexture\` 机制，将 OpenGL 渲染内容封装为应用 UI 树内的一张普通硬件加速纹理；
+  - 由应用主线程的 \`HardwareRenderer\`（RenderThread）在每一帧重绘时将其作为 View 层次的一部分统一合成；
+  - **优势与代价**：能够完美融合进 CoordinatorLayout、ViewPager2，支持旋转、缩放、透明度及各种转场动画；但必须多承担一层内部纹理缓冲复制与合成开销，内存占用更高且延迟额外增加 1~2 帧。`,
+        caseStudy: `### 实战问题一：后台子线程处理滤镜，主线程渲染报 EGL_BAD_ACCESS 崩溃或纹理纯黑
+
+**业务场景痛点**：
+在相机多级美颜滤镜或短视频导出流水线中，开发者常尝试开辟子线程执行复杂 Shader 渲染以避免阻塞主预览。若子线程直接操作主线程的 \`EGLContext\`，EGL 驱动会立即抛出 \`EGL_BAD_ACCESS\` 甚至导致底层崩溃。部分开发者虽然通过 \`share_context\` 创建了共享上下文，但在子线程刚执行完 \`glDrawArrays\` 的瞬间，主线程就立即在屏幕上使用该纹理，由于 GPU 内部指令执行具有异步乱序特性，主线程读取到未着色完毕的残缺数据，导致画面频繁闪烁绿屏或黑屏。
+
+**破局解决方案（EGL 共享上下文 + 硬件级 GPU 同步栅栏 FenceSync）**：
+1. **严格派生 ShareContext**：子线程初始化 EGL 时，通过 \`eglCreateContext(display, config, mainEglContext, attribs, 0)\` 构建与主渲染上下文共享的子 Context，且各自在专属线程调用 \`eglMakeCurrent\`；
+2. **GPU 硬件同步栅栏（glFenceSync）替代低效 CPU 线程锁**：
+   - 子线程完成 FBO 滤镜渲染后，向 GPU 指令流插入一条硬件栅栏：\`val sync = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0)\`，并调用 \`glFlush()\` 强行推入驱动；
+   - 将该 \`sync\` 句柄传递给主线程，主线程在绑定该纹理渲染前调用 \`glWaitSync(sync, 0, GL_TIMEOUT_IGNORED)\`；
+   - 核心优势：**等待动作完全由 GPU 内部调度器硬件级执行，CPU 线程零卡顿、无需阻塞等待**，纹理渲染完毕瞬间 GPU 自动放行下一道工序，彻底消除时序竞争闪烁。
+
+### 实战问题二：Activity 旋转或切后台瞬间，SurfaceView 抛 EGL_BAD_SURFACE 崩溃
+
+**业务场景痛点**：
+当用户旋转屏幕、锁屏或按下 Home 键退入后台时，系统会迅速回调 \`SurfaceHolder.Callback.surfaceDestroyed()\` 销毁底层的 WindowSurface。如果后台 GL 渲染线程仍在独立死循环执行 \`eglSwapBuffers\`，向一个已被系统底层释放的 \`ANativeWindow\` 写入缓冲，EGL 会立即抛出 \`EGL_BAD_SURFACE\` 或触发底层 SIGSEGV 致命信号闪退。
+
+**破局解决方案（基于 Surface 生命周期同步屏障的状态机）**：
+1. **解绑同步屏障**：在 \`surfaceDestroyed()\` 触发时，**主线程必须通过同步锁或协程通道阻塞等待渲染线程执行解绑**；
+2. **优雅销毁 Surface**：渲染线程接收到销毁信号后，立即调用 \`EGL14.eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)\` 解除所有关联，并调用 \`eglDestroySurface\` 释放原有的 WindowSurface；
+3. **保留 Context 热备**：销毁过程中**切勿销毁 EGLContext**，保留编译好的 Shader、加载好的纹理与 FBO 显存数据；
+4. **重建迅速恢复**：当 Activity 重新可见并触发 \`surfaceCreated()\` 时，传入全新的 \`SurfaceHolder.surface\` 快速重建 \`eglCreateWindowSurface\`，以 0 毫秒重建延迟瞬间恢复上一帧画面，避免白屏与闪烁。
+
+### 实战问题三：高帧率视频录制/人脸检测时 glReadPixels 导致主线程断崖式掉帧（20ms+ 阻塞）
+
+**业务场景痛点**：
+在实时视频录制、直播推流或 AI 人脸关键点检测中，需要将 GPU 渲染出的美颜纹理提取到 CPU 内存（\`byte[]\` 或 \`ByteBuffer\`）供 MediaCodec 编码或 AI 推理。传统做法是调用 \`glReadPixels\`，该 API 具有强制同步屏障特性，会强制 CPU 等待 GPU 管线中的所有渲染任务执行完毕并阻塞搬运内存，在 1080P 分辨率下耗时高达 20~40ms，导致画面帧率直接从 60fps 暴跌至 15fps 严重卡顿。
+
+**破局解决方案（双 PBO 异步乒乓 DMA 回读 + HardwareBuffer 零拷贝）**：
+1. **双 PBO（Pixel Buffer Object）异步乒乓回读**：
+   - 创建两块 PBO（\`pboA\` 与 \`pboB\`），利用 GPU 的 DMA（直接内存存取）机制异步传输；
+   - 第 N 帧：绑定 \`pboA\` 执行 \`glReadPixels\`，由于目标是 GPU 内部缓冲，函数立即返回（耗时 < 0.2ms），GPU 在后台默默搬运；
+   - 此时 CPU 绑定 \`pboB\`，调用 \`glMapBufferRange\` 映射提取第 N-1 帧已搬运好的像素数据；
+   - 下一帧交换两者角色（Ping-Pong），CPU 与 GPU 彻底实现并行流水线，将阻塞耗时降至近乎零感知。
+2. **Android 8.0+ 终极利器：HardwareBuffer / AHardwareBuffer 零拷贝**：
+   - 直接通过 \`AHardwareBuffer_allocate\` 申请图形内存，将其映射为 EGLClientBuffer 绑定到纹理；
+   - 编码器与 AI 模型直接共享同一块物理内存句柄，彻底杜绝数据在 CPU 与 GPU 之间的冗余拷贝。
+
+### 实战问题四：反复进出相机或滤镜页面导致显存爆炸（Native GL 资源泄漏）
+
+**业务场景痛点**：
+Java 层的垃圾收集器（GC）只能监控 Java 包装对象的内存引用，对 GPU 显存（VRAM）内部占用的纹理材质、FBO、VBO 及着色器程序（Program）完全不可见。开发者在 Activity 销毁时若仅将 Java 对象置空，GPU 内部显存并不会自动释放。高频反复打开关闭页面 5~10 次后，系统显存被占满，再次调用 \`glGenTextures\` 或 \`glTexImage2D\` 时抛出 \`GL_OUT_OF_MEMORY\`，导致新画面黑屏或触发 OOM 杀进程。
+
+**破局解决方案（显存生命周期引用计数与线程级严苛回收中台）**：
+1. **显存回收的严苛线程限制**：必须牢记：**所有 \`glDeleteXxx\` 函数必须在拥有该资源的 EGLContext 绑定线程中执行**。若在普通主线程直接异步调用 \`glDeleteTextures\`，指令由于没有上下文上下文而静默丢失，显存依然处于泄漏状态；
+2. **显存资源包装器（AutoCloseable + 引用计数）**：
+   - 将每个 Texture、FBO、VBO 封装为显存句柄类，记录引用计数器与分配时的时间戳；
+   - 页面销毁时，向 GL 渲染线程排入显式清理事务：按序调用 \`glDeleteTextures\`、\`glDeleteFramebuffers\`、\`glDeleteBuffers\`、\`glDeleteProgram\`；
+   - 最后解绑并调用 \`eglDestroyContext\` 与 \`eglTerminate\` 彻底归还 EGL 驱动资源，确保显存水位在进出页面后恢复平稳基线。
+
+### 实战问题五：带透明通道的水印/贴纸贴图渲染出现发暗、毛刺或黑边（Alpha 混合混乱）
+
+**业务场景痛点**：
+在美颜贴纸、视频文字水印叠加渲染时，经常发现包含半透明边缘（羽化效果、阴影渐变）的 PNG 贴图贴在视频背景上后，边缘出现一圈明显的黑色脏边，或者整体半透明区域颜色变灰发暗，视觉质感极为粗糙。
+
+**破局解决方案（预乘透明度 Premultiplied Alpha 统一校正）**：
+1. **问题成因深度剖析**：
+   - 传统默认混合模式为：\`glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)\`；
+   - 若加载解码 PNG 位图时，BitmapFactory 默认输出了已经过预乘的像素数据（即 RGB 分量已经预先乘过了 Alpha）：\`RGB = OriginalRGB * Alpha\`；
+   - 当再次应用默认混合公式时，源颜色被连续乘了两次 Alpha，导致边缘亮度过度衰减，呈现出一圈黑边。
+2. **标准破局落地**：
+   - **方案 A（预乘管线，推荐最高效）**：图片解码保持预乘格式，将混合模式配置为：\`glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)\`，源颜色直接累加，混合边缘平滑通透无瑕疵；
+   - **方案 B（Shader 动态校正）**：在 Fragment Shader 纹理采样后，显式校验贴图格式并解耦 Alpha 计算：\`color.rgb = textureColor.rgb * textureColor.a\`，统一整套特效管线的色彩空间与数学模型。`,
       },
       {
         tag: '音视频管线',
