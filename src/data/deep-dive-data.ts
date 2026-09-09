@@ -2656,7 +2656,7 @@ data class ActivePipeline(
 ) {
     val currentStep: PipelineStep get() = steps[currentIndex]
     val isLastStep: Boolean get() = currentIndex >= steps.lastIndex
-    fun next(): ActivePipeline? = if (isLastStep) null else copy(currentIndex = currentIndex + 1)
+    fun next(): ActivePipeline = copy(currentIndex = currentIndex + 1)
 }
 
 // 2. 列表项 UI 状态模型
@@ -2688,11 +2688,16 @@ class TemplateListViewModel(
         executeCurrentStep(pipeline)
     }
 
-    // 步骤完成统一推进：通过 pipeline.next() 内聚推进与终点判定
+    // 步骤完成统一推进：外部显式判断 isLastStep 决定推进还是闭环
     fun onStepCompleted() {
-        val nextPipeline = _activePipeline.value?.next()
-        _activePipeline.value = nextPipeline
-        nextPipeline?.let { executeCurrentStep(it) }
+        val pipeline = _activePipeline.value ?: return
+        if (pipeline.isLastStep) {
+            _activePipeline.value = null // 所有步骤闭环退出
+        } else {
+            val nextPipeline = pipeline.next()
+            _activePipeline.value = nextPipeline
+            executeCurrentStep(nextPipeline)
+        }
     }
 
     // ⚡ 核心分发器：每个步骤平等执行，直接基于 currentStep 分发
