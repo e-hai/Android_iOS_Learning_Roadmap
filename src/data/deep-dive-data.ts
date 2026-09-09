@@ -2760,7 +2760,7 @@ class TemplateListViewModel(
 }
 
 // ==========================================
-// 3. Compose UI：单次消费监听、超时兜底与就地 Loading
+// 3. Compose UI：单次消费监听与就地 Loading
 // ==========================================
 @Composable
 fun TemplateListScreen(viewModel: TemplateListViewModel) {
@@ -2781,16 +2781,7 @@ fun TemplateListScreen(viewModel: TemplateListViewModel) {
                     photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
                 is PipelineEffect.ShowAd -> {
-                    // 超时兜底：第三方 SDK 假死时 30 秒超时强行放行
-                    withTimeoutOrNull(30_000L) {
-                        suspendCancellableCoroutine { cont ->
-                            AdSdk.show(context, effect.adUnitId,
-                                onDismiss = { cont.resume(true) },
-                                onFailed = { cont.resume(false) }
-                            )
-                        }
-                    } ?: Log.e("Pipeline", "广告超时假死，触发熔断兜底")
-                    viewModel.onStepCompleted()
+                    AdSdk.show(context, effect.adUnitId, onDismiss = viewModel::onStepCompleted)
                 }
             }
         }
