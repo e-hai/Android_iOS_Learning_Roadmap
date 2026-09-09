@@ -3717,15 +3717,21 @@ final class TaskRunner {
   - \`EGLPbufferSurface\`：纯内存离屏像素缓冲区（Pixel Buffer），不绑定任何显示设备，专用于后台离屏静默计算；
   - \`EGLPixmapSurface\`：绑定本地位图的离屏表面（Android 平台极少使用）。
 
-### 3. SurfaceView vs TextureView 硬件加速与图层合成揭秘
-- **SurfaceView 独立图层架构（性能吞吐之王）**：
-  - 拥有独立的底层 \`Surface\` 与专有 \`BufferQueue\`，在系统 WindowManagerService 中拥有独立的 Layer；
-  - 渲染结果直接交由系统 \`SurfaceFlinger\` 服务进行硬件合成器（HWC）叠加显示，**完全不经过普通 View 树的 measure / layout / draw 重绘流程**；
-  - **优势与代价**：CPU 开销极低、高帧率吞吐最高、功耗最小；但由于处于独立硬件图层，无法支持普通 View 的平移、缩放、透明度渐变等属性动画与层叠覆盖。
-- **TextureView 纹理融合架构（灵活动画之王）**：
-  - 基于 \`SurfaceTexture\` 机制，将 OpenGL 渲染内容封装为应用 UI 树内的一张普通硬件加速纹理；
-  - 由应用主线程的 \`HardwareRenderer\`（RenderThread）在每一帧重绘时将其作为 View 层次的一部分统一合成；
-  - **优势与代价**：能够完美融合进 CoordinatorLayout、ViewPager2，支持旋转、缩放、透明度及各种转场动画；但必须多承担一层内部纹理缓冲复制与合成开销，内存占用更高且延迟额外增加 1~2 帧。`,
+### 3. SurfaceView vs TextureView 硬件加速与图层合成揭秘（兼析 Surface 与 SurfaceTexture 底层机制）
+- **Surface 底层本质：跨进程 BufferQueue 的生产者包装句柄**：
+  - **跨进程共享内存（GraphicBuffer / AHardwareBuffer）**：\`Surface\` 并不是一块直接存放像素的内存，而是 Native 层 \`ANativeWindow\` 的 Java 包装。它的核心是持有指向 \`BufferQueue\` 的客户端 Binder 句柄。
+  - **生产-消费模型**：开发者通过 \`Surface\` 作为**生产者（Producer）**调用 \`lockCanvas\` 或绑定 EGL 作为渲染目标，写入图元后提交；而系统服务端 \`SurfaceFlinger\` 作为**消费者（Consumer）**，在 VSYNC 信号到来时通过硬件合成器（HWC）将各个图层合成送往显示屏。
+- **SurfaceTexture 底层本质：将 BufferQueue 输出转换为 OpenGL 外部采样纹理**：
+  - **进程内流转闭环**：\`SurfaceTexture\`（配合相机或解码器）将 \`BufferQueue\` 的**消费者（Consumer）端直接收敛在应用进程内部**。
+  - **OES 外部纹理映射（GL_TEXTURE_EXTERNAL_OES）**：当相机 CameraX 或硬解码器向其投递帧数据时，\`SurfaceTexture\` 触发 \`onFrameAvailable\` 回调；开发者调用 \`updateTexImage()\`，底层直接通过 EGL 将 GraphicBuffer 零拷贝绑定为当前 OpenGL 上下文中的一张 OES 纹理，并可通过 \`getTransformMatrix()\` 获取坐标矩阵自动校正画面的翻转与旋转。
+- **SurfaceView 架构实现（独立 Layer · 极致吞吐）**：
+  - **双图层独立挂载**：\`SurfaceView\` 在 View 树里本质上只是一个“镂空的透明占位穿孔（Punch Hole）”。真正的显示是通过 WindowManagerService 在底层创建了一个独立的硬件 \`Surface\`（Layer），Z-Order 默认位于应用主窗口下方（\`Z-below\`）。
+  - **SurfaceFlinger 直通合成**：渲染循环完全在后台 GL 线程独立运行，画面直接写入独立 BufferQueue 并由 \`SurfaceFlinger\` 硬件合成，**彻底绕过 View 树的重绘与渲染管线**。
+  - **优劣势权衡**：零 View 树 CPU 开销、吞吐率极高、绝不掉帧；但无法跟随父容器做 View 属性动画（平移、缩放、Alpha 渐变），无法与其他普通 View 灵活层叠。
+- **TextureView 架构实现（纹理内嵌 · 灵活动画）**：
+  - **基于 SurfaceTexture 驱动**：\`TextureView\` 内部持有 \`SurfaceTexture\`，将其生成的 OES 纹理作为该 View 的绘制内容。
+  - **RenderThread 统一调度**：应用主线程触发绘制时，\`HardwareRenderer\`（RenderThread）将该 OES 纹理当作一块普通的四边形材质，与其他普通 View 统一参与基于 DisplayList 的渲染树绘制。
+  - **优劣势权衡**：天然支持旋转、缩放、透明度混合与复杂层叠；但画面需要经历额外的内存纹理绑定与 View 树合成，延迟额外增加 1~2 帧，且内存占用和发热量明显高于 SurfaceView。`,
         caseStudy: `### 实战问题一：后台子线程处理滤镜，主线程渲染报 EGL_BAD_ACCESS 崩溃或纹理纯黑
 
 **业务场景痛点**：
