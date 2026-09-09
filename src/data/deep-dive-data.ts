@@ -2958,7 +2958,7 @@ dependencies {
 }
 \`\`\`
 
-### 3. DIP 依赖倒置四步走：跨组件通信与解耦
+### 3. DIP 依赖倒置四步走：跨组件通信与解耦（基于 Koin 4.x 新写法）
 
 #### 第 1 步：在 \`:feature:user:api\` 定义契约与数据模型
 \`\`\`kotlin
@@ -2985,11 +2985,10 @@ import android.content.Context
 import android.content.Intent
 import com.demo.user.api.UserApi
 import com.demo.user.api.UserProfile
-import javax.inject.Inject
-import javax.inject.Singleton
+import org.koin.core.module.dsl.bind
+import org.koin.dsl.module
 
-@Singleton
-class UserApiImpl @Inject constructor(
+class UserApiImpl(
     private val localStore: UserDataStore,
     private val remoteService: UserHttpService
 ) : UserApi {
@@ -3003,12 +3002,9 @@ class UserApiImpl @Inject constructor(
     }
 }
 
-// Hilt 接口与实现绑定声明 (impl 内部闭环)
-@Module
-@InstallIn(SingletonComponent::class)
-abstract class UserModule {
-    @Binds
-    abstract fun bindUserApi(impl: UserApiImpl): UserApi
+// ⚡ 第一种写法（Koin 4.x 编译器插件）：单例泛型直写，编译器自动推导参数，绑定契约接口
+val userModule = module {
+    single<UserApiImpl>() bind UserApi::class
 }
 \`\`\`
 
@@ -3019,7 +3015,7 @@ dependencies {
     implementation(projects.feature.user.api) // ⚡ 仅依赖 api 契约，绝不依赖 impl
 }
 \`\`\`
-在业务逻辑中直接注入契约接口并调用：
+在业务 ViewModel 中直接面向接口注入，并通过 \`viewModel<T>()\` 声明：
 \`\`\`kotlin
 // feature/home/src/main/kotlin/com/demo/home/HomeViewModel.kt
 package com.demo.home
@@ -3027,13 +3023,11 @@ package com.demo.home
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.demo.user.api.UserApi
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
-import javax.inject.Inject
+import org.koin.dsl.module
 
-@HiltViewModel
-class HomeViewModel @Inject constructor(
-    private val userApi: UserApi // 仅依赖契约接口类型，不感知实现类
+class HomeViewModel(
+    private val userApi: UserApi // 纯构造函数接收契约接口
 ) : ViewModel() {
     fun refresh() {
         if (userApi.isLogin()) {
@@ -3044,20 +3038,58 @@ class HomeViewModel @Inject constructor(
         }
     }
 }
+
+// ⚡ 第一种写法：直接传入 ViewModel 泛型，Koin 编译器插件自动连线参数
+val homeModule = module {
+    viewModel<HomeViewModel>()
+}
+\`\`\`
+
+在 Compose UI 中零样板消费：
+\`\`\`kotlin
+@Composable
+fun HomeScreen(
+    // ⚡ 自动从 Koin 容器获取绑定的 HomeViewModel 实例
+    viewModel: HomeViewModel = koinViewModel()
+) {
+    // 渲染 UI...
+}
 \`\`\`
 
 #### 第 4 步：\`:app\` 壳工程组装全量业务实现
 \`\`\`kotlin
-// app/build.gradle.kts
-dependencies {
-    // 壳工程聚合所有业务实现，打入最终 APK 安装包
-    implementation(projects.feature.user.impl)
-    implementation(projects.feature.home.impl)
-    implementation(projects.feature.order.impl)
+// app/src/main/kotlin/com/demo/MyApplication.kt
+package com.demo
+
+import android.app.Application
+import com.demo.home.homeModule
+import com.demo.user.impl.userModule
+import org.koin.android.ext.koin.androidContext
+import org.koin.core.context.startKoin
+
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        startKoin {
+            androidContext(this@MyApplication)
+            // 组装各业务组件暴露的 Koin Module
+            modules(userModule, homeModule, orderModule)
+        }
+    }
 }
 \`\`\`
 
-### 4. 架构治理收益对照
+### 4. Koin 3 种写法极简对比
+
+| 核心维度 | ① 编译器插件风格 (4.x 主推) | ② 经典推导风格 (Classic DSL) | ③ 注解风格 (Annotations) |
+| :--- | :--- | :--- | :--- |
+| **单例定义** | \`single<UserApiImpl>()\` | \`singleOf(::UserApiImpl)\` | \`@Singleton class UserApiImpl\` |
+| **绑定接口** | \`single<UserApiImpl>() bind UserApi::class\` | \`singleOf(::UserApiImpl) bind UserApi::class\` | \`@Single(binds = [UserApi::class])\` |
+| **ViewModel** | \`viewModel<HomeViewModel>()\` | \`viewModelOf(::HomeViewModel)\` | \`@KoinViewModel class HomeViewModel\` |
+| **核心机制** | **Kotlin K2 Compiler Plugin** (编译期连线) | **Kotlin 构造器函数引用推导** (运行时查找) | **KSP 代码生成** (类注解驱动) |
+| **安全机制** | 编译期直接捕获依赖缺失 | 运行时报错或依赖 \`verify()\` 单元测试 | 编译期捕获依赖缺失 |
+
+### 5. 架构治理收益对照
 
 | 场景 | 传统直连组件化（易出错写法） | 现代 build-logic + DIP（推荐用法） |
 | :--- | :--- | :--- |
