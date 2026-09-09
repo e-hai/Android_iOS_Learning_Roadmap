@@ -2697,8 +2697,9 @@ class TemplateListViewModel(
     private val _effectChannel = Channel<PipelineEffect>(Channel.BUFFERED)
     val effectFlow = _effectChannel.receiveAsFlow()
 
-    // 步骤配方支持任意组合与顺序颠倒
+    // 步骤配方支持任意组合，且支持可重入（若前次流程异常卡死，再次点击直接覆盖重置）
     fun onItemClick(itemId: String) {
+        cancelPipeline() // ⚡ 可重入支持：重置可能滞留的旧流程，杜绝状态死锁
         val steps = listOf(PipelineStep.Privacy, PipelineStep.PickPhoto, PipelineStep.Ad("ad_01"), PipelineStep.UploadAndGenerate)
         startPipeline(ActivePipeline(steps, currentIndex = 0, targetItemId = itemId))
     }
@@ -2759,7 +2760,7 @@ class TemplateListViewModel(
 }
 
 // ==========================================
-// 3. Compose UI：单次消费监听、超时熔断、生命周期兜底与就地 Loading
+// 3. Compose UI：单次消费监听、超时兜底与就地 Loading
 // ==========================================
 @Composable
 fun TemplateListScreen(viewModel: TemplateListViewModel) {
@@ -2767,7 +2768,7 @@ fun TemplateListScreen(viewModel: TemplateListViewModel) {
     val items by viewModel.items.collectAsStateWithLifecycle()
     val activePipeline by viewModel.activePipeline.collectAsStateWithLifecycle()
 
-    // 1. 系统相册 Launcher
+    // 1. 系统相册 Launcher（取消则调用 cancelPipeline 释放）
     val photoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.onStepCompleted() else viewModel.cancelPipeline()
     }
@@ -2780,7 +2781,7 @@ fun TemplateListScreen(viewModel: TemplateListViewModel) {
                     photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 }
                 is PipelineEffect.ShowAd -> {
-                    // 超时熔断防死锁：第三方 SDK 假死时 30 秒超时强行放行
+                    // 超时兜底：第三方 SDK 假死时 30 秒超时强行放行
                     withTimeoutOrNull(30_000L) {
                         suspendCancellableCoroutine { cont ->
                             AdSdk.show(context, effect.adUnitId,
@@ -2793,23 +2794,6 @@ fun TemplateListScreen(viewModel: TemplateListViewModel) {
                 }
             }
         }
-    }
-
-    // 3. ⚡ 宿主生命周期回流兜底：用户从外部应用回到前台 500ms 后若未正常解除，兜底解除卡死
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, activePipeline) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && activePipeline != null) {
-                if (activePipeline?.currentStep is PipelineStep.Ad) {
-                    CoroutineScope(Dispatchers.Main).launch {
-                        delay(500)
-                        if (activePipeline?.currentStep is PipelineStep.Ad) viewModel.cancelPipeline()
-                    }
-                }
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // 4. 界面渲染：列表常驻 + 步骤驱动 UI 弹层
