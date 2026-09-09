@@ -2653,7 +2653,11 @@ data class ActivePipeline(
     val steps: List<PipelineStep>,
     val currentIndex: Int = 0,
     val targetItemId: String
-)
+) {
+    val currentStep: PipelineStep get() = steps[currentIndex]
+    val isLastStep: Boolean get() = currentIndex >= steps.lastIndex
+    fun next(): ActivePipeline? = if (isLastStep) null else copy(currentIndex = currentIndex + 1)
+}
 
 // 2. 列表项 UI 状态模型
 data class ItemUiModel(
@@ -2684,30 +2688,24 @@ class TemplateListViewModel(
         executeCurrentStep(pipeline)
     }
 
-    // 步骤完成统一推进回调（UI 弹层关闭、相册选完、协程执行完毕均调用此方法）
+    // 步骤完成统一推进：通过 pipeline.next() 内聚推进与终点判定
     fun onStepCompleted() {
-        val p = _activePipeline.value ?: return
-        val nextIdx = p.currentIndex + 1
-        if (nextIdx < p.steps.size) {
-            val nextPipeline = p.copy(currentIndex = nextIdx)
-            _activePipeline.value = nextPipeline
-            executeCurrentStep(nextPipeline) // 触发下一步
-        } else {
-            _activePipeline.value = null // 所有步骤闭环
-        }
+        val nextPipeline = _activePipeline.value?.next()
+        _activePipeline.value = nextPipeline
+        nextPipeline?.let { executeCurrentStep(it) }
     }
 
-    // ⚡ 核心分发器：每个步骤平等执行，无需在推进时特殊判断步骤位置
+    // ⚡ 核心分发器：每个步骤平等执行，直接基于 currentStep 分发
     private fun executeCurrentStep(pipeline: ActivePipeline) {
-        when (pipeline.steps[pipeline.currentIndex]) {
+        when (pipeline.currentStep) {
             is PipelineStep.UploadAndGenerate -> {
-                // 后台异步型步骤：退出模态弹层，列表项就地转圈，完成后自动触发 onStepCompleted
+                // 后台异步型步骤：列表项就地转圈，完成后自动推进下一步
                 updateItem(pipeline.targetItemId) { it.copy(isGenerating = true) }
                 viewModelScope.launch {
                     repository.uploadAndGenerate(pipeline.targetItemId)
                         .onSuccess { url -> updateItem(pipeline.targetItemId) { it.copy(imageUrl = url, isGenerating = false) } }
                         .onFailure { updateItem(pipeline.targetItemId) { it.copy(isGenerating = false) } }
-                    onStepCompleted() // ⚡ 无论生成位于管线第几步，完成即自动推进下一步
+                    onStepCompleted() // ⚡ 无论生成位于管线第几步，完成即推进下一步
                 }
             }
             // 交互式 UI 步骤（Privacy / PickPhoto / Ad）保持 activePipeline，由 Compose 渲染对应弹层
@@ -2734,9 +2732,9 @@ fun TemplateListScreen(viewModel: TemplateListViewModel) {
             }
         }
 
-        // ② 纯 UI 步骤弹层承接（非 UI 步骤自动放行，无需写 if-else）
+        // ② 纯 UI 步骤弹层承接：通过 pipeline.currentStep 优雅渲染
         activePipeline?.let { pipeline ->
-            when (val currentStep = pipeline.steps[pipeline.currentIndex]) {
+            when (pipeline.currentStep) {
                 is PipelineStep.Privacy -> PrivacyDialog(onAgree = viewModel::onStepCompleted)
                 is PipelineStep.PickPhoto -> PhotoPickerSheet(onPicked = viewModel::onStepCompleted)
                 is PipelineStep.Ad -> AdOverlay(onAdClosed = viewModel::onStepCompleted)
