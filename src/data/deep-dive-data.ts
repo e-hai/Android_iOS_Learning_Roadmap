@@ -2707,18 +2707,20 @@ class TemplateListViewModel(
     // ⚡ 核心分发器：每个步骤平等执行，直接基于 currentStep 分发
     private fun executeStep(pipeline: ActivePipeline) {
         when (pipeline.currentStep) {
-            is PipelineStep.UploadAndGenerate -> {
-                // 后台异步型步骤：列表项就地转圈，完成后自动推进下一步
-                updateItem(pipeline.targetItemId) { it.copy(isGenerating = true) }
-                viewModelScope.launch {
-                    repository.uploadAndGenerate(pipeline.targetItemId)
-                        .onSuccess { url -> updateItem(pipeline.targetItemId) { it.copy(imageUrl = url, isGenerating = false) } }
-                        .onFailure { updateItem(pipeline.targetItemId) { it.copy(isGenerating = false) } }
-                    onStepCompleted() // ⚡ 无论生成位于管线第几步，完成即推进下一步
-                }
-            }
+            is PipelineStep.UploadAndGenerate -> executeUploadStep(pipeline.targetItemId)
             // 交互式 UI 步骤（Privacy / PickPhoto / Ad）保持 activePipeline，由 Compose 渲染对应弹层
             else -> Unit
+        }
+    }
+
+    // 后台异步型步骤：列表项就地转圈，完成后自动推进下一步
+    private fun executeUploadStep(targetItemId: String) {
+        updateItem(targetItemId) { it.copy(isGenerating = true) }
+        viewModelScope.launch {
+            repository.uploadAndGenerate(targetItemId)
+                .onSuccess { url -> updateItem(targetItemId) { it.copy(imageUrl = url, isGenerating = false) } }
+                .onFailure { updateItem(targetItemId) { it.copy(isGenerating = false) } }
+            onStepCompleted() // ⚡ 无论生成位于管线第几步，完成即推进下一步
         }
     }
 
