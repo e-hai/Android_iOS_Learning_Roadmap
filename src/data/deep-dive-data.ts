@@ -2980,99 +2980,197 @@ Koin 是轻量纯 Kotlin 依赖注入框架，普通业务类无需任何注解�
 | **底层实现机制** | **Kotlin K2 Compiler Plugin**（编译期自动连线） | **Kotlin 构造器函数引用**（运行时推导） | **KSP 代码生成**（类注解驱动） |
 | **安全性** | **编译期直接拦截未绑定错误** | 运行时报错（或配合 \`verify()\` 单测） | **编译期直接拦截未绑定错误** |
 
-### 3. 两者结合的组件化完整例子（build-logic + Koin 实战）
+### 3. 两者结合的组件化完整例子（build-logic + Koin Repository 实战）
 
-本例完整展示现代工程中，**build-logic（编译治理）** 与 **Koin DIP（依赖倒置）** 如何天衣无缝地协作：
+在现代化大型工程中，**build-logic 治理构建依赖与插件规范**，**Koin 治理业务对象的依赖倒置（DIP）**。本例以实际项目中最为经典的 **\`Repository（仓储模式）\`** 为核心，贯穿展示“数据源 ➔ 仓储契约 ➔ 仓储实现 ➔ 跨模块 ViewModel 消费 ➔ 壳工程装配”的全链路设计：
 
-#### 1. 业务契约层（\`:feature:user:api\`）
-使用约定插件，代码仅暴露接口契约与数据载体：
+\`\`\`text
+┌──────────────────────────────┐              ┌──────────────────────────────┐
+│       :feature:home          │              │      :feature:user:api       │
+│  HomeViewModel               │──(依赖注入)──➔│  UserRepository (接口契约)   │
+│       │                      │   (DIP解耦)  │  data class UserProfile      │
+│  Compose UI (koinViewModel)  │              └──────────────────────────────┘
+└──────────────────────────────┘                             ▲
+               │ (模块隔离，无编译依赖)                         │ (实现契约)
+               ▼                                             │
+┌────────────────────────────────────────────────────────────┴─────────────────┐
+│                             :feature:user:impl                               │
+│  UserRepositoryImpl (双数据源协调器)                                           │
+│    ├── UserRemoteDataSource (网络请求 / Retrofit / Ktor)                     │
+│    └── UserLocalDataSource (本地持久化 / Room / DataStore)                    │
+│                                                                              │
+│  val userModule = module {                                                   │
+│      single<UserRepositoryImpl>() bind UserRepository::class // 依赖倒置     │
+│      viewModel<UserViewModel>()                              // 模块内自身UI  │
+│  }                                                                           │
+└──────────────────────────────────────────────────────────────────────────────┘
+                                       ▲
+                                       │ (聚合依赖)
+┌──────────────────────────────────────┴───────────────────────────────────────┐
+│                                    :app                                      │
+│  MyApplication: startKoin { modules(userModule, homeModule) }                │
+└──────────────────────────────────────────────────────────────────────────────┘
+\`\`\`
+
+#### 1. 契约定义层（\`:feature:user:api\`）
+仅声明数据结构与仓储抽象接口契约，没有任何具体业务与库依赖：
 \`\`\`kotlin
 // feature/user/api/build.gradle.kts
 plugins {
-    id("demo.android.feature")
+    id("demo.android.feature") // 由 build-logic 统一提供编译与基础库规范
 }
 
-// feature/user/api/src/main/kotlin/com/demo/user/api/UserApi.kt
+// feature/user/api/src/main/kotlin/com/demo/user/api/UserRepository.kt
 package com.demo.user.api
 
-data class UserProfile(val id: String, val nickname: String, val avatarUrl: String)
+import kotlinx.coroutines.flow.Flow
 
-interface UserApi {
-    suspend fun getUserProfile(userId: String): Result<UserProfile>
-    fun isLogin(): Boolean
+// 核心数据模型
+data class UserProfile(
+    val id: String,
+    val username: String,
+    val avatarUrl: String
+)
+
+// 仓储接口契约（DIP 核心：高层业务与底层实现均依赖此抽象）
+interface UserRepository {
+    fun getUserStream(userId: String): Flow<UserProfile>
+    suspend fun refreshUser(userId: String): Result<Unit>
 }
 \`\`\`
 
 #### 2. 业务实现层（\`:feature:user:impl\`）
-实现类纯构造函数入参，并在 Koin Module 中完成单例绑定：
+包含本地与网络双数据源，实现 \`UserRepository\` 接口，并通过 Koin 绑定契约对外暴露：
 \`\`\`kotlin
 // feature/user/impl/build.gradle.kts
 plugins {
     id("demo.android.feature")
 }
 dependencies {
-    implementation(projects.feature.user.api)
+    implementation(projects.feature.user.api) // 实现契约
 }
 
-// feature/user/impl/src/main/kotlin/com/demo/user/impl/UserApiImpl.kt
-package com.demo.user.impl
+// feature/user/impl/src/main/kotlin/com/demo/user/impl/data/UserDataSource.kt
+package com.demo.user.impl.data
 
-import com.demo.user.api.UserApi
 import com.demo.user.api.UserProfile
-import org.koin.core.module.dsl.bind
-import org.koin.dsl.module
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 
-class UserApiImpl(
-    private val localStore: UserDataStore,
-    private val remoteService: UserHttpService
-) : UserApi {
-    override suspend fun getUserProfile(userId: String): Result<UserProfile> =
-        remoteService.fetchUser(userId)
-
-    override fun isLogin(): Boolean = localStore.token.isNotBlank()
+// 1. 远程网络数据源（内部实现细节，对外隐蔽）
+class UserRemoteDataSource {
+    suspend fun fetchUser(userId: String): UserProfile {
+        return UserProfile(id = userId, username = "User_\${userId.take(4)}", avatarUrl = "https://...")
+    }
 }
 
-// ⚡ 向外暴露本模块的 Koin 依赖绑定
+// 2. 本地缓存/数据库数据源
+class UserLocalDataSource {
+    private val cache = MutableStateFlow<Map<String, UserProfile>>(emptyMap())
+
+    fun observeUser(userId: String): Flow<UserProfile?> = cache.map { it[userId] }
+
+    suspend fun saveUser(user: UserProfile) {
+        cache.value = cache.value + (user.id to user)
+    }
+}
+
+// feature/user/impl/src/main/kotlin/com/demo/user/impl/data/UserRepositoryImpl.kt
+package com.demo.user.impl.data
+
+import com.demo.user.api.UserProfile
+import com.demo.user.api.UserRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterNotNull
+
+// 3. Repository 实现类：协调 Local 与 Remote 数据源
+class UserRepositoryImpl(
+    private val remoteDataSource: UserRemoteDataSource,
+    private val localDataSource: UserLocalDataSource
+) : UserRepository {
+
+    override fun getUserStream(userId: String): Flow<UserProfile> =
+        localDataSource.observeUser(userId).filterNotNull()
+
+    override suspend fun refreshUser(userId: String): Result<Unit> = runCatching {
+        val user = remoteDataSource.fetchUser(userId)
+        localDataSource.saveUser(user)
+    }
+}
+
+// 4. 用户模块内部自身使用的 ViewModel（例如个人主页）
+class UserViewModel(
+    private val repository: UserRepository
+) : androidx.lifecycle.ViewModel()
+
+// ⚡ 5. Koin 模块装配：对外暴露统一依赖图
 val userModule = module {
-    single<UserApiImpl>() bind UserApi::class
+    // 注册双数据源单例
+    single<UserRemoteDataSource>()
+    single<UserLocalDataSource>()
+    // ⚡ 核心依赖倒置：注册 UserRepositoryImpl 并向上转型绑定为接口 UserRepository
+    single<UserRepositoryImpl>() bind UserRepository::class
+    // 模块内部 ViewModel
+    viewModel<UserViewModel>()
 }
 \`\`\`
 
 #### 3. 业务消费层（\`:feature:home\`）
-仅依赖契约 \`:api\`，ViewModel 注入接口，Compose 零样板消费：
+首页模块**仅依赖 \`:feature:user:api\`**。ViewModel 直接声明依赖 \`UserRepository\` 接口，无需了解实现细节：
 \`\`\`kotlin
 // feature/home/build.gradle.kts
 plugins {
     id("demo.android.feature")
 }
 dependencies {
-    implementation(projects.feature.user.api) // ⚡ 绝不依赖 user:impl
+    implementation(projects.feature.user.api) // ⚡ 仅依赖接口契约，编译期物理隔离实现
 }
 
 // feature/home/src/main/kotlin/com/demo/home/HomeViewModel.kt
 package com.demo.home
 
 import androidx.lifecycle.ViewModel
-import com.demo.user.api.UserApi
+import androidx.lifecycle.viewModelScope
+import com.demo.user.api.UserProfile
+import com.demo.user.api.UserRepository
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import org.koin.dsl.module
 
+// ViewModel 仅面向契约编程，单元测试时极易注入 FakeUserRepository
 class HomeViewModel(
-    private val userApi: UserApi // 仅依赖接口契约
-) : ViewModel()
+    private val userRepository: UserRepository
+) : ViewModel() {
 
-val homeModule = module {
-    viewModel<HomeViewModel>() // Koin 自动连线 UserApi
+    val currentUser: StateFlow<UserProfile?> = userRepository
+        .getUserStream("current_user")
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun refresh() {
+        viewModelScope.launch {
+            userRepository.refreshUser("current_user")
+        }
+    }
 }
 
-// Compose UI 消费
+// 声明 Home 模块的 Koin 依赖
+val homeModule = module {
+    viewModel<HomeViewModel>() // Koin 自动在全局依赖树中匹配并注入 UserRepository 单例
+}
+
+// Compose UI 消费端（零冗余样板代码）
 @Composable
 fun HomeScreen(viewModel: HomeViewModel = koinViewModel()) {
-    // 渲染首页...
+    val user by viewModel.currentUser.collectAsStateWithLifecycle()
+    Text(text = "欢迎回来: \${user?.username ?: \"加载中...\"}")
 }
 \`\`\`
 
 #### 4. 壳工程装配层（\`:app\`）
-在 \`app/build.gradle.kts\` 聚合所有业务实现，并在 \`Application\` 中启动整图：
+在 \`app/build.gradle.kts\` 聚合所有业务实现，并在 \`Application\` 中统一启动整图：
 \`\`\`kotlin
 // app/build.gradle.kts
 dependencies {
@@ -3085,7 +3183,7 @@ package com.demo
 
 import android.app.Application
 import com.demo.home.homeModule
-import com.demo.user.impl.userModule
+import com.demo.user.impl.data.userModule
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.context.startKoin
 
@@ -3094,7 +3192,7 @@ class MyApplication : Application() {
         super.onCreate()
         startKoin {
             androidContext(this@MyApplication)
-            // 组装所有业务 Module
+            // 组装所有业务 Module，运行时动态解析依赖
             modules(userModule, homeModule)
         }
     }
