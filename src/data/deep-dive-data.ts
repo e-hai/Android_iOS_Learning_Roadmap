@@ -3743,89 +3743,106 @@ VTCompressionSessionCreate(
           caseStudy: '二、断网掉单全场景破局策略与 PayKit 工业级实战',
         },
         pipeline: [
-          { title: '连接与查价', subtitle: 'startConnection ➔ 获取 BasePlan 与 OfferToken', category: 'engineering' },
-          { title: '防重调起支付', subtitle: '校验购买互斥锁 ➔ launchBillingFlow', category: 'engineering' },
-          { title: '支付结果分流', subtitle: 'onPurchasesUpdated ➔ Pending 挂起 / Purchased 成功', category: 'engineering' },
-          { title: '验单与记账', subtitle: '服务端安全验签 ➔ 消耗品入账 ConsumableLedger', category: 'engineering' },
-          { title: '发货与权益生效', subtitle: '业务系统发放权益 ➔ 刷新本地 DeviceCache', category: 'engineering' },
-          { title: '确认与消费闭环', subtitle: '订阅 acknowledge ➔ 消耗品 consume 擦除账本', category: 'engineering' },
+          { title: '控制台配置', subtitle: 'Console 登记 Product ID、BasePlan 与全球价格体系', category: 'engineering' },
+          { title: '中台动态下发', subtitle: '中台下发售卖矩阵与商品类型 (SUBS / 消耗 / 非消耗)', category: 'engineering' },
+          { title: '连接与查价', subtitle: 'startConnection ➔ 通过商品 ID 查询真实价格与 OfferToken', category: 'engineering' },
+          { title: '防重调起支付', subtitle: '抢占原子互斥锁 ➔ launchBillingFlow 唤起收银台', category: 'engineering' },
+          { title: '支付结果分流', subtitle: 'PurchasesUpdatedListener ➔ PENDING 挂起 / PURCHASED 成功', category: 'engineering' },
+          { title: '验单与记账', subtitle: '服务端 Developer API 验签 ➔ 写入 ConsumableLedger 账本', category: 'engineering' },
+          { title: '发货与终态闭环', subtitle: '业务履约发货 ➔ acknowledge / consume 闭环擦除账本', category: 'engineering' },
         ],
         explanation: `\`\`\`text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 1. 官方配置源头层 (Google Play Console)                                     │
+│ 1. Google Play Console 配置商品与价格体系                                   │
 │    - 登记 Product ID (订阅 / 消耗品 / 非消耗品)                              │
-│    - 配置 Base Plan (月/年) + Offer (试用/折扣) + 提取唯一 offerToken        │
-│    - 托管全球 170+ 国家本地化汇率与货币价格体系                              │
+│    - 配置 Base Plan (月/年) + Offer (试用/折扣) + 生成唯一 offerToken        │
+│    - 托管全球 170+ 国家本地化基准汇率与多币种价格体系                        │
 └──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ (商品定义与价格基准)
+                                       │ (商品 ID 体系与官方定价基准)
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 2. 商业化中台动态下发 (Backend / Firebase Remote Config)                    │
-│    - 动态拉取商品配置矩阵 (根据用户画像、地域、AB 实验推荐档位与活动标签)   │
-│    - 离线网络防御：断网或接口失败时自动退避降级至本地 Assets 静态兜底配置    │
+│ 2. 商业化中台动态下发对应配置的商品信息 (商品 ID、商品类型)                  │
+│    - 动态下发商品矩阵 (根据用户画像、地域、AB 实验推荐档位与活动标签)       │
+│    - 输出核心元数据：商品 ID、三分法商品类型 (SUBS / 消耗品 / 永久非消耗)    │
+│    - 离线网络防御：断网或接口超时时自动退避降级至本地 Assets 静态兜底配置    │
+└───────────────────┬─────────────────────────────────────────────────────────┘
+                    │ (下发商品 ID 列表与类型字典)
+                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 3. 客户端连接设备上的 Google Play 并通过商品 ID 获取详细信息 (价格体系)     │
+│    - 调用 startConnection 绑定设备底层 Google Play 商店系统服务 (AIDL IPC)   │
+│    - 调用 queryProductDetailsAsync(商品ID列表) 查询设备当前地区的真实价格   │
+│    - 提取本地化货币符号、格式化价格及合法 BasePlan / OfferToken 详情         │
 └──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ (下发商品 ID 列表与展示元数据)
+                                       │ (已获得完整商品详情与合法 offerToken)
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 3. 发起支付与防重调起 (Client PayKit ➔ Google Play 官方收银台)               │
+│ 4. 发起支付与防重调起 (Client PayKit 抢占互斥锁 ➔ launchBillingFlow)        │
 │    - PayKit 单例校验并抢占全局购买互斥锁 (PURCHASE_IN_PROGRESS 防狂点重入)  │
-│    - GoogleBillingWrapper 封装 AIDL IPC 调起 launchBillingFlow              │
-│    - 携带指定 offerToken 与混淆用户 ID (obfuscatedAccountId 防羊毛欺诈)    │
+│    - 携带商品 ID、选中的 offerToken 与混淆用户 ID (obfuscatedAccountId)     │
+│    - GoogleBillingWrapper 封装调起官方半屏收银台，用户完成输入与渠道扣款     │
 └──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │ (唤起系统半屏支付界面，用户完成扣款)
+                                       │ (用户完成扣款，系统异步派发支付结果)
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 4. 支付结果监听与状态分流 (Google Play IPC 回调 ➔ PurchasesUpdatedListener) │
-│    - PENDING 状态：现金代付/家长审批挂起，严格进入待付监听态，【严禁发货】   │
+│ 5. 支付结果监听与状态分流 (Google Play IPC ➔ PurchasesUpdatedListener)      │
+│    - PENDING 状态：现金代付/家长审批中，严格进入挂起等待态，【严禁发货】     │
 │    - PURCHASED 状态：扣款成功，捕获真实 Purchase 实体并提取 purchaseToken   │
 │    - USER_CANCELED / 异常：立即释放购买互斥锁，向 UI 分发友好提示并终止     │
 └───────────────────┬───────────────────────────────────▲─────────────────────┘
-                    │ 5. 上传 Token 安全验签            │ 6. 终态确认闭环
-                    │    (向自建后台发起双向核验)       │    (acknowledge / consume)
+                    │ 上传 Token 安全验签               │ 终态确认闭环
+                    │ (向自建后台发起双向核验)          │ (acknowledge / consume)
                     ▼                                   │
 ┌───────────────────────────────────────────────────────┴─────────────────────┐
-│ 5. 服务端安全验签与账本落盘 (Client ➔ Backend ➔ ConsumableLedger)           │
+│ 6. 服务端安全验签与账本落盘 (Client ➔ Backend ➔ ConsumableLedger)           │
 │    - 后端对接 Google Play Developer API 校验 purchaseToken 真实性与防重复核销│
 │    - 消耗品发货前执行本地持久化记账：写入 ConsumableLedger 履约账本 (防掉单) │
 └──────────────────────────────────────┬──────────────────────────────────────┘
-                                       │
+                                       │ (安全验签通过，进入发货环节)
                                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ 6. 业务发货与终态确认闭环 (Fulfillment ➔ Acknowledge / Consume 擦除账本)    │
+│ 7. 业务发货与终态确认闭环 (Fulfillment ➔ Acknowledge / Consume 擦除账本)    │
 │    - 业务履约发货：充值金币/解锁权益，并同步刷新本地 DeviceCache 离线秒开快照│
 │    - 订阅确认：acknowledgePurchase 标记终态 (3 天未确认触发 Google 强制退款)│
 │    - 消耗品核销：consumePurchase 释放拥有权并擦除账本记录，最后释放全局互斥锁│
 └─────────────────────────────────────────────────────────────────────────────┘
 \`\`\`
 
-### 1. 官方配置源头：商品定义与定价（Console）
-- **建立 IPC 查价通信**：调用 \`startConnection\` 绑定 Google Play 商店系统级独立进程，成功连接后检索官方商品详情。
-- **三级定价模型拆解**：从 \`Product\` 检索基础方案 \`BasePlan\`（月度/年度）与优惠方案 \`Offer\`（新客折扣/免费试用），提取唯一合法 \`offerToken\`。
-- **三分法商品属性**：在配置源头严格区分订阅（SUBS）、消耗品（Consumable）与非消耗品（Non-Consumable），为后续确认 API 精准分流打下基石。
+### 1. 官方配置源头：Google Play Console 配置商品与价格体系
+- **商品注册与分类**：在 Google Play Console 登记商品 ID，明确划分为订阅（SUBS）、单次消耗型商品（Consumable）以及永久非消耗型商品（Non-Consumable）。
+- **三级定价结构**：订阅体系基于 \`BasePlan\`（月度/年度等计费周期）与 \`Offer\`（新客折扣/免费试用）组织，生成唯一合法且具备生命周期的 \`offerToken\`。
+- **全球价格托管**：Google 托管全球 170+ 国家本地化基准汇率、税费换算与多币种价格矩阵，作为所有端侧与中台价格计算的权威官方源头。
 
-### 2. 商业化中台：动态矩阵与离线兜底（Backend & Remote Config）
-- **商业化动态下发**：服务端根据用户分群、地区与 AB 实验下发动态商品 ID 与促销推荐标签，实时控制客户端售卖矩阵。
-- **离线降级策略**：若用户弱网或商业化接口超时失败，PayKit 自动退避至本地预置的 JSON 静态配置，保障收银台始终可用。
+### 2. 商业化中台动态下发：对应配置的商品信息（商品 ID、商品类型）
+- **商品配置矩阵下发**：商业化中台服务端结合当前用户画像、国家地域、AB 实验策略，动态下发当前场景售卖的商品 ID 列表与促销角标标签。
+- **三分法商品类型注入**：中台明确返回每个商品 ID 对应的类型字典（订阅 / 消耗品 / 非消耗品），供客户端 PayKit 在后续确认链路中精准路由执行 \`acknowledge\` 还是 \`consume\`。
+- **离线网络防御机制**：若用户处于无网、弱网或商业化接口报错，PayKit 自动退避降级读取本地预置的 JSON/Assets 兜底配置，确保页面收银台高可用。
 
-### 3. 发起支付：防重调起与唤起收银台（Client PayKit ➔ Google Play）
-- **原子互斥锁保障**：调用 \`purchase()\` 前先抢占全局原子锁（\`PURCHASE_IN_PROGRESS\`），杜绝用户高频连续狂点导致重复唤起或状态机紊乱。
-- **调起官方收银台**：携带精准的 \`offerToken\` 与用户混淆账号 ID（\`obfuscatedAccountId\`），调用 \`launchBillingFlow\` 拉起 Google 官方半屏收银台。
+### 3. 客户端连接与查价：连接设备 Google Play 并通过商品 ID 获取详细信息（价格体系）
+- **建立底层服务通信**：PayKit 调用 \`startConnection\` 绑定用户设备底层的 Google Play 商店系统级进程（通过 AIDL IPC 通信），连接成功方可发起通信。
+- **动态拉取设备端价格**：调用 \`queryProductDetailsAsync\` 传入中台下发的商品 ID 列表，实时查询用户设备当前绑定的 Google 账号在对应国家地区的真实购买价格。
+- **提取格式化货币与 OfferToken**：解析返回的 \`ProductDetails\` 实体，提取格式化价格字符串（如 \`$4.99\`、\`¥30.00\`）直接用于 UI 展示，并缓存当前生效方案的合法 \`offerToken\`。
 
-### 4. 结果分流：IPC 回调与状态分流（Google Play ➔ PurchasesUpdatedListener）
-- **系统级回调监听**：通过 \`PurchasesUpdatedListener\` 接收 Google Play 独立进程返回的 \`Purchase\` 实体。
+### 4. 发起支付与防重调起：Client PayKit 抢占原子互斥锁 ➔ launchBillingFlow
+- **全局原子购买互斥锁**：调用 \`purchase()\` 前必须先抢占原子互斥锁（\`PURCHASE_IN_PROGRESS\`），严防用户快速双击或狂点按钮导致并发唤起两次官方收银台。
+- **构建调起参数**：从缓存的 \`ProductDetails\` 中装配选中的 \`offerToken\`，并注入基于用户账户生成的防混淆 ID（\`obfuscatedAccountId\`）用于防作弊防刷。
+- **唤起系统半屏收银台**：调用 \`BillingClient.launchBillingFlow\` 拉起系统级半屏支付界面，用户在该界面选卡、输入密码或进行生物识别扣款。
+
+### 5. 支付结果监听与状态分流：Google Play IPC 回调 ➔ PurchasesUpdatedListener
+- **系统级结果监听**：通过 \`PurchasesUpdatedListener\` 接收 Google Play 进程异步派发回应用的 \`Purchase\` 结果实体。
 - **状态精准三向分流**：
-  - \`PENDING\`（延迟付款）：现金代付或家长审批中，**铁律守则：绝对禁止提前发货**，进入挂起等待态；
-  - \`PURCHASED\`（付款成功）：扣款真实生效，立即提取 \`purchaseToken\` 与 \`orderId\` 移交下一阶段；
-  - \`USER_CANCELED\` / 异常：立即释放购买锁，向用户展示友好交互并终止流程。
+  - \`PENDING\`（延迟付款）：用户选择了便利店现金支付或触发了家长审批，**铁律守则：绝对禁止提前发货**，进入挂起等待态；
+  - \`PURCHASED\`（扣款成功）：款项已真实扣除，提取订单核心凭证 \`purchaseToken\` 与 \`orderId\` 进入下一阶段验单；
+  - \`USER_CANCELED\` / 支付异常：立即释放全局互斥锁，向用户展示友好提示并安全终止支付状态机。
 
-### 5. 验单记账：服务端安全验签与账本落盘（Developer API ➔ ConsumableLedger）
-- **服务端安全验签**：向自建业务后端提交 \`purchaseToken\`，后端通过 Google Play Developer API 完成官方核验，杜绝客户端作弊伪造。
-- **消耗品账本落盘**：消耗型商品在业务发货前，**必须先写入本地持久化账本 \`ConsumableLedger\`**（标记状态为已发货待 Consume），彻底防范发货后瞬间断网无法核销的死结。
+### 6. 服务端安全验签与账本落盘：Client ➔ Developer API 核验真实性 ➔ ConsumableLedger
+- **服务端安全验签**：客户端将 \`purchaseToken\`、\`orderId\` 及用户凭据上传至自建业务后端，后端直接请求 Google Play Developer API 进行官方双向核验，彻底拦截客户端本地作弊与重放伪造。
+- **消耗品入账落盘**：对于消耗型商品，在执行任何发货与充值操作前，**客户端/服务端必须先将订单持久化写入 \`ConsumableLedger\` 履约账本**（标记为“已发货待 Consume”），彻底杜绝两阶段提交中的掉单死结。
 
-### 6. 终态闭环：业务发货、确认消费与释放锁（Fulfillment ➔ Acknowledge / Consume）
-- **业务履约与秒开快照**：业务系统为用户充值虚拟币或发放权益，并将最新权益同步持久化至本地 \`DeviceCache\`，实现离线 0 毫秒秒开体验。
-- **订阅与非消耗品确认**：调用 \`acknowledgePurchase\` 标记订单完成。3 天内未确认的订单将被 Google 官方强制退款并废除。
-- **消耗品核销出库**：调用 \`consumePurchase\` 释放商品拥有权，支持用户后续复购；消费成功后立即从 \`ConsumableLedger\` 账本中擦除记录，最后释放全局互斥锁。`,
+### 7. 业务发货与终态确认闭环：Fulfillment 发货 ➔ Acknowledge / Consume 擦除账本
+- **业务履约与权益快照**：业务系统为用户充值虚拟币或发放会员特权，并同步刷新持久化到本地的 \`DeviceCache\`，保障用户在后续离线断网环境下依然享有 0 毫秒 VIP 秒开体验。
+- **订阅与非消耗品确认**：调用 \`acknowledgePurchase\` 标记订单最终完成。Google 规定 3 天内未确认的订单将被官方强制退款并废除。
+- **消耗品核销出库**：调用 \`consumePurchase\` 释放该商品拥有权，使得用户能够立即再次购买；消费成功回调后，立即从 \`ConsumableLedger\` 履约账本中擦除记录，最后释放全局购买互斥锁。`,
         caseStudy: `### 策略一：ConsumableLedger 履约账本机制（破解两阶段提交掉单死结）
 
 在消耗品支付中，“给用户发放金币”与“向 Google Play 调用 \`consumePurchase\`”是两个独立的跨系统操作，网络波动极易导致**分布式最终一致性破坏**：
