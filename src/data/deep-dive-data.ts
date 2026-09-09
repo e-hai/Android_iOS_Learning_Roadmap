@@ -3672,18 +3672,40 @@ final class TaskRunner {
           caseStudy: '二、实战场景下的疑难问题与破局方案',
         },
         pipeline: [
-          { title: '顶点装配与VBO', subtitle: 'VAO 状态绑定 ➔ VBO/EBO 顶点与索引驻留显存', category: 'engineering' },
-          { title: '顶点着色变换', subtitle: 'Vertex Shader 执行 MVP 矩阵坐标空间转换', category: 'engineering' },
-          { title: '图元光栅化', subtitle: '裁剪剔除 ➔ 图元装配 ➔ 像素插值生成片元', category: 'engineering' },
-          { title: '片元着色处理', subtitle: 'Fragment Shader 执行纹理采样、光照与美颜滤镜', category: 'engineering' },
-          { title: 'FBO离屏链', subtitle: '绑定离屏 Framebuffer ➔ 级联渲染特效链', category: 'engineering' },
-          { title: 'EGL交换送显', subtitle: 'eglSwapBuffers ➔ 提交 BufferQueue 至 SurfaceFlinger 合成', category: 'engineering' },
+          { title: '顶点数据(CPU)', subtitle: 'VBO · VAO · EBO 显存数据绑定', category: 'engineering' },
+          { title: '顶点着色器', subtitle: '可编程 ➔ 坐标变换 · MVP矩阵 · 逐顶点运算', category: 'engineering' },
+          { title: '曲面细分(可选)', subtitle: '可编程 ➔ 控制着色器 · 细分 · 求值着色器', category: 'engineering' },
+          { title: '几何着色器(可选)', subtitle: '可编程 ➔ 生成/删减图元 · 粒子系统', category: 'engineering' },
+          { title: '图元装配与裁剪', subtitle: '固定 ➔ 点/线/三角形装配 · 视锥裁剪 · 背面剔除', category: 'engineering' },
+          { title: '光栅化', subtitle: '固定 ➔ 图元转换为片段 · 属性重心插值', category: 'engineering' },
+          { title: '片段着色器', subtitle: '可编程 ➔ 纹理采样 · 光照计算 · 颜色输出', category: 'engineering' },
+          { title: '逐片段测试&混合', subtitle: '固定 ➔ 深度测试 · 模板测试 · Alpha混合', category: 'engineering' },
+          { title: '帧缓冲输出', subtitle: 'FBO ➔ 颜色/深度/模板缓冲 · 显示呈现', category: 'engineering' },
         ],
-        explanation: `### 1. OpenGL ES 3.0 现代渲染管线与核心特性
-- **VAO / VBO 显存管理架构**：彻底摒弃 GLES 2.0 时代每一帧通过 CPU 内存向 GPU 冗余传输顶点数据的瓶颈。利用顶点数组对象（VAO）记录顶点属性指针状态，利用顶点缓冲对象（VBO/EBO）将几何网格与索引数据直接常驻 GPU 显存，极大缩减 DrawCall 期间的 CPU-GPU 总线通信开销。
-- **MVP 坐标矩阵空间变换**：顶点着色器（Vertex Shader）负责执行模型变换（Model）、视图变换（View）、投影变换（Projection）的矩阵级联乘法，将 3D 物体从局部坐标系转换为标准化设备坐标系（NDC，范围 \`[-1, 1]\`）。
-- **光栅化与插值引擎**：硬件光栅化器将装配好的图元（三角形、线段）切分为离散的像素片元（Fragments），并在顶点间对颜色、法线、纹理坐标（UV）执行高精度的重心透视插值计算。
-- **片元着色与 FBO 离屏级联链**：片元着色器（Fragment Shader）对插值后的纹理执行多重采样、色彩空间转换（YUV ➔ RGB）、美颜磨皮及 LUT 滤镜计算；通过帧缓冲对象（FBO）实现 Ping-Pong 双缓冲离屏渲染，输出纹理可作为下一级 Shader 的输入，构建高吞吐的图像特效流水线。
+        explanation: `### 1. OpenGL ES 现代标准渲染管线（Pipeline）全阶详述
+根据现代图形学标准渲染流水线规范，从 CPU 顶点提交到最终帧缓冲输出经历以下核心阶段：
+
+- **阶段一：顶点数据输入（Vertex Data / CPU ➔ GPU）**
+  - **核心机制**：通过 **VAO**（顶点数组对象）记录顶点属性指针状态，配合 **VBO**（顶点缓冲对象）将顶点位置、法线、纹理坐标驻留显存，通过 **EBO**（索引缓冲对象）实现索引绘制（\`glDrawElements\`），消减重复顶点传输开销。
+- **阶段二：顶点着色器（Vertex Shader，【可编程阶段】）**
+  - **核心机制**：接收逐顶点属性，执行坐标空间线性变换：\`gl_Position = Projection * View * Model * vec4(position, 1.0)\`，完成从局部坐标到裁剪空间（Clip Space）的映射。
+- **阶段三：曲面细分（Tessellation，【可选 · 可编程阶段】）**
+  - **核心机制**：包含细分控制着色器（TCS）与细分求值着色器（TES）。在 OpenGL ES 3.2+ 或扩展支持下，由 GPU 硬件级将粗糙图元动态细分成致密网格，实现高精度地形与平滑位移贴图。
+- **阶段四：几何着色器（Geometry Shader，【可选 · 可编程阶段】）**
+  - **核心机制**：以整个图元为单位进行操作，能够动态生成新的顶点或删减图元（如点扩充为广告牌面片、实时毛发生成、粒子爆炸系统）。
+- **阶段五：图元装配与裁剪·背面剔除（Primitive Assembly & Culling，【固定功能阶段】）**
+  - **核心机制**：将顶点组装成点、线或三角形；执行视锥体裁剪（Frustum Clipping），抛弃完全落在视锥体外的图元；执行透视除法（Normalized Device Coordinates，NDC）与面剔除（\`glCullFace\`，剔除背面顺时针/逆时针不可见图元）。
+- **阶段六：光栅化（Rasterization，【固定功能阶段】）**
+  - **核心机制**：屏幕映射（Viewport 变换）将连续的矢量图元离散化为屏幕像素栅格，生成海量“片元（Fragments）”；在此阶段，顶点属性（颜色、UV 纹理坐标、法线）经过透视校正的**重心坐标线性插值**，生成片元输入属性。
+- **阶段七：片段着色器（Fragment / Pixel Shader，【可编程阶段】）**
+  - **核心机制**：现代图形渲染最核心的计算工场。执行多级纹理采样（\`texture()\`）、PBR 物理光照计算、LUT 调色、YUV ➔ RGB 转换与美颜磨皮算法，最终输出片元的矢量颜色值（RGBA）。
+- **阶段八：逐片段操作与测试混合（Per-Fragment Operations & Blending，【固定功能阶段】）**
+  - **核心机制**：
+    - **模板测试（Stencil Test）**：根据模板缓冲区掩码决定片元去留（用于轮廓描边、镜像反射）；
+    - **深度测试（Depth Test）**：比对当前片元与深度缓冲区的 Z-Buffer 值，遮挡关系判定（Early-Z 硬件可前置加速）；
+    - **Alpha 混合（Blending）**：调用 \`glBlendFunc\` 执行透明通道混合计算，将前景片元与帧缓冲已有颜色融合。
+- **阶段九：帧缓冲输出（Framebuffer Output）**
+  - **核心机制**：写入最终的默认窗口缓冲或自定义 **FBO**（颜色缓冲、深度缓冲、模板缓冲），完成离屏级联渲染或调用 \`eglSwapBuffers\` 呈现给显示设备。
 
 ### 2. EGL 状态机核心机制与多线程上下文共享（ShareContext）
 - **EGL 纽带角色与线程独占性**：EGL 是 OpenGL ES 与 Android 本地窗口系统（Native Window System）之间的接口桥梁。**OpenGL 本质是强状态机，其执行上下文（EGLContext）在同一时刻只能被单个线程独占绑定**，严禁跨线程并发调用。
