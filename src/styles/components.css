@@ -3394,7 +3394,7 @@ input:focus-visible,
   font-size: 13.5px;
   font-weight: 700;
   color: var(--color-ink);
-  margin: 12px 0 6px 0;
+  margin: 10px 0 2px 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -3409,7 +3409,8 @@ input:focus-visible,
   background: var(--color-accent);
 }
 
-.case-study-card.deepdive-ios .case-study-h5::before {
+.case-study-card.deepdive-ios .case-study-h5::before,
+.case-study-panel.deepdive-ios .case-study-h5::before {
   background: var(--color-ios);
 }
 
@@ -3441,20 +3442,38 @@ input:focus-visible,
   margin-top: 6px;
 }
 
+.case-study-bullet-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 4px 0;
+}
+
 .case-study-bullet {
   display: flex;
   align-items: flex-start;
   gap: 8px;
   font-size: 13.5px;
   color: var(--color-ink);
-  line-height: 1.65;
-  margin: 3px 0;
+  line-height: 1.6;
+  margin: 1px 0;
 }
 
 .case-study-bullet.is-sub {
   margin-left: 20px;
-  margin-top: 4px;
-  margin-bottom: 4px;
+  margin-top: 1px;
+  margin-bottom: 2px;
+  font-size: 13px;
+  color: var(--color-ink-secondary);
+  line-height: 1.55;
+}
+
+.case-study-bullet.is-sub + .case-study-bullet:not(.is-sub) {
+  margin-top: 7px;
+}
+
+.case-study-bullet:not(.is-sub) + .case-study-bullet:not(.is-sub) {
+  margin-top: 5px;
 }
 
 .case-bullet-dot {
@@ -3463,10 +3482,11 @@ input:focus-visible,
   border-radius: 50%;
   background: var(--color-accent);
   flex-shrink: 0;
-  margin-top: 8px;
+  margin-top: 7.5px;
 }
 
-.case-study-card.deepdive-ios .case-bullet-dot {
+.case-study-card.deepdive-ios .case-bullet-dot,
+.case-study-panel.deepdive-ios .case-bullet-dot {
   background: var(--color-ios);
 }
 
@@ -3477,10 +3497,11 @@ input:focus-visible,
   border: 1.5px solid var(--color-accent);
   background: transparent;
   flex-shrink: 0;
-  margin-top: 8px;
+  margin-top: 7.5px;
 }
 
-.case-study-card.deepdive-ios .case-bullet-subdot {
+.case-study-card.deepdive-ios .case-bullet-subdot,
+.case-study-panel.deepdive-ios .case-bullet-subdot {
   border-color: var(--color-ios);
 }
 

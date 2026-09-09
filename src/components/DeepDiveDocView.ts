@@ -834,6 +834,13 @@ function formatCaseStudyBody(rawText: string): string {
   let tableHeader: string[] = [];
   let tableRows: string[][] = [];
 
+  let listItems: string[] = [];
+  const flushList = () => {
+    if (listItems.length === 0) return;
+    html += `<div class="case-study-bullet-group">${listItems.join('')}</div>`;
+    listItems = [];
+  };
+
   const flushTable = () => {
     if (!inTable) return;
     html += '<div class="case-study-table-wrap"><table class="case-study-table">';
@@ -870,6 +877,7 @@ function formatCaseStudyBody(rawText: string): string {
         currentCodeLang = '';
       } else {
         flushTable();
+        flushList();
         inCodeBlock = true;
         currentCodeLang = trimmed.slice(3).trim().toLowerCase();
         codeContent = '';
@@ -890,6 +898,7 @@ function formatCaseStudyBody(rawText: string): string {
         continue;
       }
       if (!inTable) {
+        flushList();
         inTable = true;
         tableHeader = cells;
       } else {
@@ -904,10 +913,13 @@ function formatCaseStudyBody(rawText: string): string {
 
     // Headings & formatting
     if (trimmed.startsWith('#### ')) {
+      flushList();
       html += `<h4 class="case-study-h4">${formatInlineText(trimmed.replace(/^####\s+/, ''))}</h4>`;
     } else if (trimmed.startsWith('##### ')) {
+      flushList();
       html += `<h5 class="case-study-h5">${formatInlineText(trimmed.replace(/^#####\s+/, ''))}</h5>`;
     } else if (trimmed.startsWith('> ')) {
+      flushList();
       const quoteLines = [trimmed.replace(/^>\s*/, '')];
       while (i + 1 < lines.length && lines[i + 1].trim().startsWith('> ')) {
         i++;
@@ -929,17 +941,19 @@ function formatCaseStudyBody(rawText: string): string {
       if (numMatch) {
         const num = numMatch[1];
         const text = numMatch[2];
-        html += `<div class="case-study-bullet ${isSub ? 'is-sub' : ''} is-num"><span class="case-bullet-num">${num}</span><span>${formatInlineText(text)}</span></div>`;
+        listItems.push(`<div class="case-study-bullet ${isSub ? 'is-sub' : ''} is-num"><span class="case-bullet-num">${num}</span><span>${formatInlineText(text)}</span></div>`);
       } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
         const text = trimmed.replace(/^[-*]\s+/, '');
-        html += `<div class="case-study-bullet ${isSub ? 'is-sub' : ''}"><span class="${isSub ? 'case-bullet-subdot' : 'case-bullet-dot'}"></span><span>${formatInlineText(text)}</span></div>`;
+        listItems.push(`<div class="case-study-bullet ${isSub ? 'is-sub' : ''}"><span class="${isSub ? 'case-bullet-subdot' : 'case-bullet-dot'}"></span><span>${formatInlineText(text)}</span></div>`);
       } else {
+        flushList();
         html += `<p class="case-study-p">${formatInlineText(trimmed)}</p>`;
       }
     }
   }
 
   flushTable();
+  flushList();
   return html;
 }
 
