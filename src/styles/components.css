@@ -3143,6 +3143,18 @@ input:focus-visible,
   line-height: 1.65;
 }
 
+.timeline-stream.timeline-ios .case-bullet-dot {
+  background: var(--color-ios);
+}
+
+.timeline-stream.timeline-ios .case-bullet-subdot {
+  border-color: var(--color-ios);
+}
+
+.timeline-card-content .case-study-bullet {
+  color: var(--color-ink-muted);
+}
+
 .timeline-card-content .chapter-bullet-list {
   margin: 0;
   padding-left: 18px;

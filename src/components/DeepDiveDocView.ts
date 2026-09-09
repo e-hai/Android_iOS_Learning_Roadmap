@@ -646,10 +646,19 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
   const sections = rawText.split(/(?=(?:^|\n)#{3}(?!#)[ \t]+)/g).map((s) => s.trim()).filter(Boolean);
 
   sections.forEach((sec, idx) => {
-    const lines = sec.split('\n').map((l) => l.trim()).filter(Boolean);
-    const titleLine = lines[0] || '';
-    const title = titleLine.replace(/^###\s+/, '');
-    const bodyLines = lines.slice(1);
+    const firstNewline = sec.indexOf('\n');
+    let title = '';
+    let bodyText = '';
+    if (firstNewline !== -1) {
+      title = sec.substring(0, firstNewline).replace(/^###\s+/, '').trim();
+      bodyText = sec.substring(firstNewline + 1).trim();
+    } else {
+      title = sec.replace(/^###\s+/, '').trim();
+      bodyText = '';
+    }
+
+    // Clean duplicate leading index (e.g. "1. ", "01. ", "一、") since badgeNumber already renders "01", "02"...
+    title = title.replace(/^(?:[一二三四五六七八九十]+|\d+)[、\.]\s*/, '');
 
     const isTheory = pipeline?.[idx]?.category === 'theory' || (!pipeline && idx < 3);
     const badgeNumber = String(idx + 1).padStart(2, '0');
@@ -657,12 +666,6 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
 
     const item = document.createElement('div');
     item.className = 'timeline-item';
-
-    // Format list items
-    const listHtml = bodyLines.map((line) => {
-      const cleanLine = line.replace(/^[-*]\s*/, '').trim();
-      return `<li>${formatInlineText(cleanLine)}</li>`;
-    }).join('');
 
     item.innerHTML = `
       <div class="timeline-axis">
@@ -675,9 +678,7 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
           <span class="timeline-card-tag ${isTheory ? 'tag-theory' : 'tag-engineering'}">${tagText}</span>
         </div>
         <div class="timeline-card-content">
-          <ul class="chapter-bullet-list">
-            ${listHtml}
-          </ul>
+          ${formatCaseStudyBody(bodyText)}
         </div>
       </div>
     `;
