@@ -2818,10 +2818,10 @@ fun ListItemRow(item: ItemUiModel, onClick: () -> Unit) {
       },
       {
         tag: '组件治理',
-        title: '大型组件化依赖倒置 (DIP) 与 build-logic 统一插件工程',
+        title: '组件化方案',
         sectionTitles: {
           explanation: '组件化落地核心结构与全局拓扑',
-          caseStudy: '开箱即用操作手册（build-logic 与 DIP 落地）',
+          caseStudy: '生产落地指南（build-logic、Koin 与综合实战）',
         },
         explanation: `> **核心治理目标**：彻底根治大型工程的“网状依赖死锁”与“编译脚本分散爆炸”，实现**单向树状依赖**与**全局编译秒级管控**。
 
@@ -2910,60 +2910,25 @@ class AndroidFeatureConventionPlugin : Plugin<Project> {
         }
     }
 }`,
-        caseStudy: `### 1. 物理工程目录组织结构
+        caseStudy: `### 1. build-logic 统一插件工程：最简单使用
 
-\`\`\`text
-root/
-├── build-logic/                          # 独立编译插件工程 (Composite Build)
-│   ├── convention/                       # 约定插件子模块
-│   │   ├── src/main/kotlin/
-│   │   │   ├── AndroidApplicationConventionPlugin.kt
-│   │   │   ├── AndroidLibraryConventionPlugin.kt
-│   │   │   └── AndroidFeatureConventionPlugin.kt
-│   │   └── build.gradle.kts
-│   └── settings.gradle.kts
-├── core/                                 # 底层公共库 (仅提供基础设施，不依赖任何业务)
-│   ├── designsystem/                     # UI 主题与基础组件
-│   └── network/                          # 网络请求库与 Http 引擎
-├── feature/                              # 业务组件库 (按业务垂直切分)
-│   ├── user/                             # 用户组件
-│   │   ├── api/                          # 契约模块 (对外暴露: 接口、Model、路由协议)
-│   │   │   ├── src/main/kotlin/.../UserApi.kt
-│   │   │   └── build.gradle.kts
-│   │   └── impl/                         # 业务实现模块 (私有黑盒: 具体实现、界面、Repository)
-│   │       ├── src/main/kotlin/.../UserApiImpl.kt
-│   │       └── build.gradle.kts
-│   └── home/                             # 首页组件
-│       └── impl/
-│           └── build.gradle.kts          # 仅依赖 projects.feature.user.api
-└── app/                                  # 壳工程 (聚合组装所有 feature:*:impl，出 APK 包)
-    └── build.gradle.kts
-\`\`\`
+build-logic 本质是一个独立的 Gradle 子工程（Composite Build），核心目标是**把几十个业务模块中重复复制的数十行 Gradle 脚本，收敛为 1 行自定义插件**。
 
-> **核心依赖规则**：
-> 1. \`feature:home:impl\` ➔ 仅依赖 \`feature:user:api\`（绝不依赖 \`feature:user:impl\`）；
-> 2. \`app\` ➔ 依赖所有 \`feature:*:impl\`（负责全量注入绑定与路由注册）。
+#### 极简 4 步落地：
 
-### 2. build-logic 统一插件工程：极简 4 步落地
-
-#### 第 1 步：根目录 \`settings.gradle.kts\` 引入插件工程
+- **第 1 步（根目录引入）**：在工程根目录 \`settings.gradle.kts\` 声明引入：
 \`\`\`kotlin
 // settings.gradle.kts (工程根目录)
 pluginManagement {
-    includeBuild("build-logic") // 纳入 Composite Build，优先参与编译
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
+    includeBuild("build-logic") // 纳入 Composite Build，优先于所有业务模块编译
 }
 \`\`\`
 
-#### 第 2 步：创建 \`build-logic/convention/build.gradle.kts\`
+- **第 2 步（配置插件子工程）**：在 \`build-logic/convention/build.gradle.kts\` 启用 \`kotlin-dsl\` 并注册插件 ID：
 \`\`\`kotlin
 // build-logic/convention/build.gradle.kts
 plugins {
-    \`kotlin-dsl\` // 启用 Kotlin DSL 编写 Gradle 约定插件
+    \`kotlin-dsl\` // 启用 Kotlin 编写插件
 }
 
 dependencies {
@@ -2973,59 +2938,84 @@ dependencies {
 
 gradlePlugin {
     plugins {
-        register("androidLibrary") {
-            id = "demo.android.library"
-            implementationClass = "com.demo.buildlogic.AndroidLibraryConventionPlugin"
-        }
         register("androidFeature") {
-            id = "demo.android.feature"
+            id = "demo.android.feature" // 对外暴露的插件 ID
             implementationClass = "com.demo.buildlogic.AndroidFeatureConventionPlugin"
         }
     }
 }
 \`\`\`
 
-#### 第 3 步：编写通用插件 \`AndroidFeatureConventionPlugin.kt\`
-统一收敛每个模块重复书写的 SDK 版本、Java 目标版本与核心依赖（参见下方工业级源码）。
+- **第 3 步（编写统一约定逻辑）**：编写 \`AndroidFeatureConventionPlugin.kt\`（见上方工业级源码），统一下发 \`compileSdk 35\`、Java 17 与公共库依赖。
 
-#### 第 4 步：业务模块开箱即用（告别几十行重复脚本）
-业务模块只需声明自定义插件 ID，自动继承全部标准规范：
+- **第 4 步（业务模块开箱即用）**：在任何业务模块 \`build.gradle.kts\` 中只需 1 行：
 \`\`\`kotlin
 // feature/user/impl/build.gradle.kts
 plugins {
-    id("demo.android.feature") // ⚡ 1 行继承全部编译规范与核心库依赖
-}
-
-dependencies {
-    implementation(projects.feature.user.api)
+    id("demo.android.feature") // ⚡ 1 行继承全部编译规范与核心库依赖，告别样板代码
 }
 \`\`\`
 
-### 3. DIP 依赖倒置四步走：跨组件通信与解耦（基于 Koin 4.x 新写法）
+### 2. Koin 依赖注入：最简单使用与 3 种写法对比
 
-#### 第 1 步：在 \`:feature:user:api\` 定义契约与数据模型
+Koin 是轻量纯 Kotlin 依赖注入框架，普通业务类无需任何注解侵入。
+
+#### 核心使用三部曲：
+1. **类本身保持纯粹**：通过构造函数正常声明需要的参数，不写任何 DI 代码；
+2. **在 Module 中声明生命周期**：
+   - \`single<T>()\`：全局单例（如 Repository、网络引擎）；
+   - \`factory<T>()\`：每次获取创建全新实例；
+   - \`viewModel<T>()\`：绑定到页面生命周期的 ViewModel；
+   - \`bind TargetInterface::class\`：将具体实现绑定到抽象契约接口；
+3. **在界面处取出**：Compose 中用 \`koinViewModel()\`，Activity 中用 \`by viewModel()\`。
+
+#### Koin 3 种写法极简对照表：
+
+| 核心目标 | ① 编译器插件风格 (4.x 主推) | ② 经典推导风格 (Classic DSL) | ③ 注解驱动风格 (Annotations) |
+| :--- | :--- | :--- | :--- |
+| **单例定义** | \`single<UserApiImpl>()\` | \`singleOf(::UserApiImpl)\` | \`@Singleton class UserApiImpl\` |
+| **绑定接口** | \`single<UserApiImpl>() bind UserApi::class\` | \`singleOf(::UserApiImpl) bind UserApi::class\` | \`@Single(binds = [UserApi::class])\` |
+| **注册 ViewModel** | \`viewModel<HomeViewModel>()\` | \`viewModelOf(::HomeViewModel)\` | \`@KoinViewModel class HomeViewModel\` |
+| **底层实现机制** | **Kotlin K2 Compiler Plugin**（编译期自动连线） | **Kotlin 构造器函数引用**（运行时推导） | **KSP 代码生成**（类注解驱动） |
+| **安全性** | **编译期直接拦截未绑定错误** | 运行时报错（或配合 \`verify()\` 单测） | **编译期直接拦截未绑定错误** |
+
+### 3. 两者结合的组件化完整例子（build-logic + Koin 实战）
+
+本例完整展示现代工程中，**build-logic（编译治理）** 与 **Koin DIP（依赖倒置）** 如何天衣无缝地协作：
+
+#### 1. 业务契约层（\`:feature:user:api\`）
+使用约定插件，代码仅暴露接口契约与数据载体：
 \`\`\`kotlin
+// feature/user/api/build.gradle.kts
+plugins {
+    id("demo.android.feature")
+}
+
 // feature/user/api/src/main/kotlin/com/demo/user/api/UserApi.kt
 package com.demo.user.api
-
-import android.content.Context
 
 data class UserProfile(val id: String, val nickname: String, val avatarUrl: String)
 
 interface UserApi {
     suspend fun getUserProfile(userId: String): Result<UserProfile>
     fun isLogin(): Boolean
-    fun launchLoginActivity(context: Context)
 }
 \`\`\`
 
-#### 第 2 步：在 \`:feature:user:impl\` 编写业务实现并绑定
+#### 2. 业务实现层（\`:feature:user:impl\`）
+实现类纯构造函数入参，并在 Koin Module 中完成单例绑定：
 \`\`\`kotlin
+// feature/user/impl/build.gradle.kts
+plugins {
+    id("demo.android.feature")
+}
+dependencies {
+    implementation(projects.feature.user.api)
+}
+
 // feature/user/impl/src/main/kotlin/com/demo/user/impl/UserApiImpl.kt
 package com.demo.user.impl
 
-import android.content.Context
-import android.content.Intent
 import com.demo.user.api.UserApi
 import com.demo.user.api.UserProfile
 import org.koin.core.module.dsl.bind
@@ -3039,68 +3029,56 @@ class UserApiImpl(
         remoteService.fetchUser(userId)
 
     override fun isLogin(): Boolean = localStore.token.isNotBlank()
-
-    override fun launchLoginActivity(context: Context) {
-        context.startActivity(Intent(context, LoginActivity::class.java))
-    }
 }
 
-// ⚡ 第一种写法（Koin 4.x 编译器插件）：单例泛型直写，编译器自动推导参数，绑定契约接口
+// ⚡ 向外暴露本模块的 Koin 依赖绑定
 val userModule = module {
     single<UserApiImpl>() bind UserApi::class
 }
 \`\`\`
 
-#### 第 3 步：其他业务模块（如 \`:feature:home\`）跨模块消费
-在 \`feature/home/build.gradle.kts\` 引入依赖：
+#### 3. 业务消费层（\`:feature:home\`）
+仅依赖契约 \`:api\`，ViewModel 注入接口，Compose 零样板消费：
 \`\`\`kotlin
-dependencies {
-    implementation(projects.feature.user.api) // ⚡ 仅依赖 api 契约，绝不依赖 impl
+// feature/home/build.gradle.kts
+plugins {
+    id("demo.android.feature")
 }
-\`\`\`
-在业务 ViewModel 中直接面向接口注入，并通过 \`viewModel<T>()\` 声明：
-\`\`\`kotlin
+dependencies {
+    implementation(projects.feature.user.api) // ⚡ 绝不依赖 user:impl
+}
+
 // feature/home/src/main/kotlin/com/demo/home/HomeViewModel.kt
 package com.demo.home
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import com.demo.user.api.UserApi
-import kotlinx.coroutines.launch
 import org.koin.dsl.module
 
 class HomeViewModel(
-    private val userApi: UserApi // 纯构造函数接收契约接口
-) : ViewModel() {
-    fun refresh() {
-        if (userApi.isLogin()) {
-            viewModelScope.launch {
-                val profile = userApi.getUserProfile("1001").getOrNull()
-                // 根据个人资料刷新首页头部状态
-            }
-        }
-    }
-}
+    private val userApi: UserApi // 仅依赖接口契约
+) : ViewModel()
 
-// ⚡ 第一种写法：直接传入 ViewModel 泛型，Koin 编译器插件自动连线参数
 val homeModule = module {
-    viewModel<HomeViewModel>()
+    viewModel<HomeViewModel>() // Koin 自动连线 UserApi
 }
-\`\`\`
 
-在 Compose UI 中零样板消费：
-\`\`\`kotlin
+// Compose UI 消费
 @Composable
-fun HomeScreen(
-    // ⚡ 自动从 Koin 容器获取绑定的 HomeViewModel 实例
-    viewModel: HomeViewModel = koinViewModel()
-) {
-    // 渲染 UI...
+fun HomeScreen(viewModel: HomeViewModel = koinViewModel()) {
+    // 渲染首页...
 }
 \`\`\`
 
-#### 第 4 步：\`:app\` 壳工程组装全量业务实现
+#### 4. 壳工程装配层（\`:app\`）
+在 \`app/build.gradle.kts\` 聚合所有业务实现，并在 \`Application\` 中启动整图：
 \`\`\`kotlin
+// app/build.gradle.kts
+dependencies {
+    implementation(projects.feature.user.impl)
+    implementation(projects.feature.home.impl)
+}
+
 // app/src/main/kotlin/com/demo/MyApplication.kt
 package com.demo
 
@@ -3115,26 +3093,16 @@ class MyApplication : Application() {
         super.onCreate()
         startKoin {
             androidContext(this@MyApplication)
-            // 组装各业务组件暴露的 Koin Module
-            modules(userModule, homeModule, orderModule)
+            // 组装所有业务 Module
+            modules(userModule, homeModule)
         }
     }
 }
 \`\`\`
 
-### 4. Koin 3 种写法极简对比
+### 4. 架构治理收益对照
 
-| 核心维度 | ① 编译器插件风格 (4.x 主推) | ② 经典推导风格 (Classic DSL) | ③ 注解风格 (Annotations) |
-| :--- | :--- | :--- | :--- |
-| **单例定义** | \`single<UserApiImpl>()\` | \`singleOf(::UserApiImpl)\` | \`@Singleton class UserApiImpl\` |
-| **绑定接口** | \`single<UserApiImpl>() bind UserApi::class\` | \`singleOf(::UserApiImpl) bind UserApi::class\` | \`@Single(binds = [UserApi::class])\` |
-| **ViewModel** | \`viewModel<HomeViewModel>()\` | \`viewModelOf(::HomeViewModel)\` | \`@KoinViewModel class HomeViewModel\` |
-| **核心机制** | **Kotlin K2 Compiler Plugin** (编译期连线) | **Kotlin 构造器函数引用推导** (运行时查找) | **KSP 代码生成** (类注解驱动) |
-| **安全机制** | 编译期直接捕获依赖缺失 | 运行时报错或依赖 \`verify()\` 单元测试 | 编译期捕获依赖缺失 |
-
-### 5. 架构治理收益对照
-
-| 场景 | 传统直连组件化（易出错写法） | 现代 build-logic + DIP（推荐用法） |
+| 场景 | 传统直连组件化（易出错写法） | 现代 build-logic + Koin DIP（推荐用法） |
 | :--- | :--- | :--- |
 | **模块构建脚本** | 每个模块重复复制 40+ 行 gradle，升级 compileSdk 需修改数十个文件 | 每个模块仅需 1 行插件 id，修改 \`build-logic\` 全局 1 处立即生效 |
 | **跨模块依赖** | \`:home\` 直接 \`implementation(project(":user"))\`，强耦合内部实现 | \`:home\` 仅依赖 \`projects.feature.user.api\`，内部改动对外完全隐蔽 |
