@@ -2685,7 +2685,7 @@ class TemplateListViewModel(
 
     private fun startPipeline(pipeline: ActivePipeline) {
         _activePipeline.value = pipeline
-        executeCurrentStep(pipeline)
+        executeStep(pipeline)
     }
 
     // 步骤完成统一推进：外部显式判断 isLastStep 决定推进还是闭环
@@ -2694,14 +2694,18 @@ class TemplateListViewModel(
         if (pipeline.isLastStep) {
             _activePipeline.value = null // 所有步骤闭环退出
         } else {
-            val nextPipeline = pipeline.next()
-            _activePipeline.value = nextPipeline
-            executeCurrentStep(nextPipeline)
+            executeNextStep(pipeline)
         }
     }
 
+    private fun executeNextStep(pipeline: ActivePipeline) {
+        val nextPipeline = pipeline.next()
+        _activePipeline.value = nextPipeline
+        executeStep(nextPipeline)
+    }
+
     // ⚡ 核心分发器：每个步骤平等执行，直接基于 currentStep 分发
-    private fun executeCurrentStep(pipeline: ActivePipeline) {
+    private fun executeStep(pipeline: ActivePipeline) {
         when (pipeline.currentStep) {
             is PipelineStep.UploadAndGenerate -> {
                 // 后台异步型步骤：列表项就地转圈，完成后自动推进下一步
