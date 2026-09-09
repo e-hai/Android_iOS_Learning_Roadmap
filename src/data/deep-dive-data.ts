@@ -3273,18 +3273,6 @@ let package = Package(
         },
         diagram: 'perf-loop',
         explanation: '性能优化绝非零散的技巧堆砌，而是一套严谨的闭环工程（目标 ➔ 测量 ➔ 定位 ➔ 优化 ➔ 验证 ➔ 线上观察 ➔ 持续提升）。Perfetto 作为 Android 官方系统级性能剖析基石，通过 ftrace 抓取内核调度、Choreographer 渲染与主线程 Lock 锁争用；配合 Baseline Profiles 预录制 ART 热点代码实现安装期 AOT 机器码预编译，使应用启动免除 JIT 解释开销，形成从度量到落地的工业级优化闭环。',
-        codeSnippet: `# 1. 抓取 Perfetto 性能 Trace (记录 10 秒)
-adb shell perfetto -o /data/misc/perfetto-traces/trace.perfetto-trace \
-    -t 10s sched freq idle am wm gfx view binder_driver
-
-# 2. 生成 Baseline Profile 自动化模块配置
-plugins {
-    id("androidx.baselineprofile")
-}
-baselineProfile {
-    saveInSrc = true
-    automaticGenerationDuringBuild = false
-}`,
       },
       {
         tag: '内存模型',
