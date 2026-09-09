@@ -908,7 +908,17 @@ function formatCaseStudyBody(rawText: string): string {
     } else if (trimmed.startsWith('##### ')) {
       html += `<h5 class="case-study-h5">${formatInlineText(trimmed.replace(/^#####\s+/, ''))}</h5>`;
     } else if (trimmed.startsWith('> ')) {
-      html += `<div class="case-study-callout">${formatInlineText(trimmed.replace(/^>\s+/, ''))}</div>`;
+      const quoteLines = [trimmed.replace(/^>\s*/, '')];
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith('> ')) {
+        i++;
+        quoteLines.push(lines[i].trim().replace(/^>\s*/, ''));
+      }
+      if (quoteLines.length === 1) {
+        html += `<div class="case-study-callout">${formatInlineText(quoteLines[0])}</div>`;
+      } else {
+        const inner = quoteLines.map((q) => `<div class="case-study-callout-line">${formatInlineText(q)}</div>`).join('');
+        html += `<div class="case-study-callout">${inner}</div>`;
+      }
     } else {
       // Match indentation (2 spaces or 1 tab counts as a sub-item)
       const indentMatch = line.match(/^(\s+)/);

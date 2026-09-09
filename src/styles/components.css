@@ -3421,21 +3421,24 @@ input:focus-visible,
 }
 
 .case-study-callout {
-  background: var(--color-accent-soft);
-  border: 1px solid var(--color-accent-ring);
-  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-ink-faint);
   border-radius: var(--radius-xs);
   padding: 10px 14px;
   font-size: 13px;
-  color: var(--color-ink);
-  line-height: 1.6;
-  margin: 8px 0;
+  color: var(--color-ink-secondary);
+  line-height: 1.65;
+  margin: 10px 0;
 }
 
-.case-study-card.deepdive-ios .case-study-callout {
-  background: var(--color-ios-soft);
-  border-color: var(--color-ios-border);
-  border-left-color: var(--color-ios);
+.case-study-callout strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.case-study-callout-line + .case-study-callout-line {
+  margin-top: 6px;
 }
 
 .case-study-bullet {
