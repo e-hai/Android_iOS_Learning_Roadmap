@@ -2819,18 +2819,252 @@ fun ListItemRow(item: ItemUiModel, onClick: () -> Unit) {
       {
         tag: '组件治理',
         title: '大型组件化依赖倒置 (DIP) 与 build-logic 统一插件工程',
-        explanation: '在多 Module 大型工程中，Feature 模块间严禁直接相互依赖，必须通过依赖倒置原则 (DIP) 拆分为 :feature:user:api (仅包含接口契约与数据模型) 与 :feature:user:impl (具体业务实现)。全局依赖版本与公共编译脚本通过 Gradle Convention Plugins (build-logic 独立 Composite Build) 集中管控，杜绝各个 build.gradle.kts 中重复配置编译选项。',
-        codeSnippet: `// build-logic/src/main/kotlin/AndroidFeatureConventionPlugin.kt
+        sectionTitles: {
+          explanation: '组件化落地核心结构与全局拓扑',
+          caseStudy: '开箱即用操作手册（build-logic 与 DIP 落地）',
+        },
+        explanation: `大型 Android 工程治理的核心原则只有两条实战标准：
+1. **编译脚本集中化**：通过 Gradle \`build-logic\` 独立工程维护 Convention Plugins，各个业务模块只需 \`plugins { id(...) }\` 极简引入，修改 compileSdk、Java 版本或公共依赖全工程 1 处生效；
+2. **模块依赖单向解耦 (DIP)**：Feature 间严禁直接依赖实现代码。每个业务拆分为 \`:api\`（对外轻量契约）与 \`:impl\`（对内闭环实现），调用方只依赖 \`:api\`，运行时由 \`:app\` 统一装配。`,
+        codeSnippet: `// build-logic/convention/src/main/kotlin/AndroidFeatureConventionPlugin.kt
+package com.demo.buildlogic
+
+import com.android.build.gradle.LibraryExtension
+import org.gradle.api.Plugin
+import org.gradle.api.Project
+import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.dependencies
+import org.gradle.kotlin.dsl.project
+
+/**
+ * 业务 Feature 模块统一约定插件：
+ * 自动应用 Android Library、Kotlin、序列化插件，配置统一 SDK 版本，并注入公共下层核心库。
+ */
 class AndroidFeatureConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) = with(target) {
+        // 1. 自动挂载公共编译插件
         pluginManager.apply("com.android.library")
         pluginManager.apply("org.jetbrains.kotlin.android")
+        pluginManager.apply("org.jetbrains.kotlin.plugin.serialization")
+
+        // 2. 统一配置 Android 编译选项
         extensions.configure<LibraryExtension> {
             compileSdk = 35
-            defaultConfig.minSdk = 24
+            defaultConfig {
+                minSdk = 24
+                testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_17
+                targetCompatibility = JavaVersion.VERSION_17
+            }
+        }
+
+        // 3. 统一装配每个 Feature 必备的基础设施库
+        dependencies {
+            add("implementation", project(":core:designsystem"))
+            add("implementation", project(":core:network"))
         }
     }
 }`,
+        caseStudy: `### 1. 标准工程目录结构与依赖拓扑
+
+\`\`\`text
+root/
+├── build-logic/                          # 独立编译插件工程 (Composite Build)
+│   ├── convention/                       # 约定插件子模块
+│   │   ├── src/main/kotlin/
+│   │   │   ├── AndroidApplicationConventionPlugin.kt
+│   │   │   ├── AndroidLibraryConventionPlugin.kt
+│   │   │   └── AndroidFeatureConventionPlugin.kt
+│   │   └── build.gradle.kts
+│   └── settings.gradle.kts
+├── core/                                 # 底层公共库 (仅提供基础设施，不依赖任何业务)
+│   ├── designsystem/                     # UI 主题与基础组件
+│   └── network/                          # 网络请求库与 Http 引擎
+├── feature/                              # 业务组件库 (按业务垂直切分)
+│   ├── user/                             # 用户组件
+│   │   ├── api/                          # 契约模块 (对外暴露: 接口、Model、路由协议)
+│   │   │   ├── src/main/kotlin/.../UserApi.kt
+│   │   │   └── build.gradle.kts
+│   │   └── impl/                         # 业务实现模块 (私有黑盒: 具体实现、界面、Repository)
+│   │       ├── src/main/kotlin/.../UserApiImpl.kt
+│   │       └── build.gradle.kts
+│   └── home/                             # 首页组件
+│       └── impl/
+│           └── build.gradle.kts          # 仅依赖 projects.feature.user.api
+└── app/                                  # 壳工程 (聚合组装所有 feature:*:impl，出 APK 包)
+    └── build.gradle.kts
+\`\`\`
+
+> **核心依赖规则**：
+> 1. \`feature:home:impl\` ➔ 仅依赖 \`feature:user:api\`（绝不依赖 \`feature:user:impl\`）；
+> 2. \`app\` ➔ 依赖所有 \`feature:*:impl\`（负责全量注入绑定与路由注册）。
+
+### 2. build-logic 统一插件工程：极简 4 步落地
+
+#### 第 1 步：根目录 \`settings.gradle.kts\` 引入插件工程
+\`\`\`kotlin
+// settings.gradle.kts (工程根目录)
+pluginManagement {
+    includeBuild("build-logic") // 纳入 Composite Build，优先参与编译
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+\`\`\`
+
+#### 第 2 步：创建 \`build-logic/convention/build.gradle.kts\`
+\`\`\`kotlin
+// build-logic/convention/build.gradle.kts
+plugins {
+    \`kotlin-dsl\` // 启用 Kotlin DSL 编写 Gradle 约定插件
+}
+
+dependencies {
+    compileOnly(libs.android.gradlePlugin)
+    compileOnly(libs.kotlin.gradlePlugin)
+}
+
+gradlePlugin {
+    plugins {
+        register("androidLibrary") {
+            id = "demo.android.library"
+            implementationClass = "com.demo.buildlogic.AndroidLibraryConventionPlugin"
+        }
+        register("androidFeature") {
+            id = "demo.android.feature"
+            implementationClass = "com.demo.buildlogic.AndroidFeatureConventionPlugin"
+        }
+    }
+}
+\`\`\`
+
+#### 第 3 步：编写通用插件 \`AndroidFeatureConventionPlugin.kt\`
+统一收敛每个模块重复书写的 SDK 版本、Java 目标版本与核心依赖（参见下方工业级源码）。
+
+#### 第 4 步：业务模块开箱即用（告别几十行重复脚本）
+业务模块只需声明自定义插件 ID，自动继承全部标准规范：
+\`\`\`kotlin
+// feature/user/impl/build.gradle.kts
+plugins {
+    id("demo.android.feature") // ⚡ 1 行继承全部编译规范与核心库依赖
+}
+
+dependencies {
+    implementation(projects.feature.user.api)
+}
+\`\`\`
+
+### 3. DIP 依赖倒置四步走：跨组件通信与解耦
+
+#### 第 1 步：在 \`:feature:user:api\` 定义契约与数据模型
+\`\`\`kotlin
+// feature/user/api/src/main/kotlin/com/demo/user/api/UserApi.kt
+package com.demo.user.api
+
+import android.content.Context
+
+data class UserProfile(val id: String, val nickname: String, val avatarUrl: String)
+
+interface UserApi {
+    suspend fun getUserProfile(userId: String): Result<UserProfile>
+    fun isLogin(): Boolean
+    fun launchLoginActivity(context: Context)
+}
+\`\`\`
+
+#### 第 2 步：在 \`:feature:user:impl\` 编写业务实现并绑定
+\`\`\`kotlin
+// feature/user/impl/src/main/kotlin/com/demo/user/impl/UserApiImpl.kt
+package com.demo.user.impl
+
+import android.content.Context
+import android.content.Intent
+import com.demo.user.api.UserApi
+import com.demo.user.api.UserProfile
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class UserApiImpl @Inject constructor(
+    private val localStore: UserDataStore,
+    private val remoteService: UserHttpService
+) : UserApi {
+    override suspend fun getUserProfile(userId: String): Result<UserProfile> =
+        remoteService.fetchUser(userId)
+
+    override fun isLogin(): Boolean = localStore.token.isNotBlank()
+
+    override fun launchLoginActivity(context: Context) {
+        context.startActivity(Intent(context, LoginActivity::class.java))
+    }
+}
+
+// Hilt 接口与实现绑定声明 (impl 内部闭环)
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class UserModule {
+    @Binds
+    abstract fun bindUserApi(impl: UserApiImpl): UserApi
+}
+\`\`\`
+
+#### 第 3 步：其他业务模块（如 \`:feature:home\`）跨模块消费
+在 \`feature/home/build.gradle.kts\` 引入依赖：
+\`\`\`kotlin
+dependencies {
+    implementation(projects.feature.user.api) // ⚡ 仅依赖 api 契约，绝不依赖 impl
+}
+\`\`\`
+在业务逻辑中直接注入契约接口并调用：
+\`\`\`kotlin
+// feature/home/src/main/kotlin/com/demo/home/HomeViewModel.kt
+package com.demo.home
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.demo.user.api.UserApi
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+
+@HiltViewModel
+class HomeViewModel @Inject constructor(
+    private val userApi: UserApi // 仅依赖契约接口类型，不感知实现类
+) : ViewModel() {
+    fun refresh() {
+        if (userApi.isLogin()) {
+            viewModelScope.launch {
+                val profile = userApi.getUserProfile("1001").getOrNull()
+                // 根据个人资料刷新首页头部状态
+            }
+        }
+    }
+}
+\`\`\`
+
+#### 第 4 步：\`:app\` 壳工程组装全量业务实现
+\`\`\`kotlin
+// app/build.gradle.kts
+dependencies {
+    // 壳工程聚合所有业务实现，打入最终 APK 安装包
+    implementation(projects.feature.user.impl)
+    implementation(projects.feature.home.impl)
+    implementation(projects.feature.order.impl)
+}
+\`\`\`
+
+### 4. 架构治理收益对照
+
+| 场景 | 传统直连组件化（易出错写法） | 现代 build-logic + DIP（推荐用法） |
+| :--- | :--- | :--- |
+| **模块构建脚本** | 每个模块重复复制 40+ 行 gradle，升级 compileSdk 需修改数十个文件 | 每个模块仅需 1 行插件 id，修改 \`build-logic\` 全局 1 处立即生效 |
+| **跨模块依赖** | \`:home\` 直接 \`implementation(project(":user"))\`，强耦合内部实现 | \`:home\` 仅依赖 \`projects.feature.user.api\`，内部改动对外完全隐蔽 |
+| **增量编译耗时** | 修改 \`UserActivity\` 触发依赖它的所有模块全量重新编译 | 修改 \`UserActivity\` 仅增量重编 \`user:impl\`，其他模块秒级跳过（UP-TO-DATE） |
+| **循环依赖风险** | 模块多时极易出现 \`A ➔ B ➔ A\` 循环依赖，项目无法编译 | 严格遵循 \`api\` 单向树状依赖，物理目录层彻底杜绝循环依赖 |`,
       },
     ],
     ios: [
