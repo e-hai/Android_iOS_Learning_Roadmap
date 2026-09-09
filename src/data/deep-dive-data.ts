@@ -2641,11 +2641,12 @@ fun ProfileScreen(viewModel: ProfileViewModel) {
   2. **列表项上下文绑定与就地 Loading**：管线强绑定当前被点击项的 \`targetItemId\`；当流程推进到耗时的异步上传生成时，立即解除全屏模态管线（\`activePipeline = null\`），将状态转为该列表项“就地转圈”，用户无需等待可继续自由浏览列表。
 
 \`\`\`kotlin
-// 1. 原子前置拦截卡片与管线定义（仅声明前置交互步骤）
+// 1. 原子步骤定义（所有动作均为平等的管线步骤，支持任意颠倒/组合）
 sealed interface PipelineStep {
     data object Privacy : PipelineStep
     data object PickPhoto : PipelineStep
     data class Ad(val adUnitId: String) : PipelineStep
+    data object UploadAndGenerate : PipelineStep // 异步生成也是普通步骤之一
 }
 
 data class ActivePipeline(
@@ -2669,36 +2670,48 @@ class TemplateListViewModel(
     private val _items = MutableStateFlow<List<ItemUiModel>>(emptyList())
     val items: StateFlow<List<ItemUiModel>> = _items.asStateFlow()
 
-    // 模态交互管线（有值全屏承接交互，为 null 列表自由操作）
     private val _activePipeline = MutableStateFlow<ActivePipeline?>(null)
     val activePipeline: StateFlow<ActivePipeline?> = _activePipeline.asStateFlow()
 
-    // 组装任意前置卡片配方（例如：隐私 ➔ 选图 ➔ 广告）
+    // 自由编排步骤配方（步骤可任意颠倒，例如先生成再看广告解锁，或先广告后生成）
     fun onItemClick(itemId: String) {
-        val steps = listOf(PipelineStep.Privacy, PipelineStep.PickPhoto, PipelineStep.Ad("ad_01"))
-        _activePipeline.value = ActivePipeline(steps, currentIndex = 0, targetItemId = itemId)
+        val steps = listOf(PipelineStep.Privacy, PipelineStep.PickPhoto, PipelineStep.Ad("ad_01"), PipelineStep.UploadAndGenerate)
+        startPipeline(ActivePipeline(steps, currentIndex = 0, targetItemId = itemId))
     }
 
-    // 步骤完成通用推进：最后一步走完自动触发业务终点动作，无需对特定步骤 if-else
+    private fun startPipeline(pipeline: ActivePipeline) {
+        _activePipeline.value = pipeline
+        executeCurrentStep(pipeline)
+    }
+
+    // 步骤完成统一推进回调（UI 弹层关闭、相册选完、协程执行完毕均调用此方法）
     fun onStepCompleted() {
         val p = _activePipeline.value ?: return
         val nextIdx = p.currentIndex + 1
         if (nextIdx < p.steps.size) {
-            _activePipeline.value = p.copy(currentIndex = nextIdx)
+            val nextPipeline = p.copy(currentIndex = nextIdx)
+            _activePipeline.value = nextPipeline
+            executeCurrentStep(nextPipeline) // 触发下一步
         } else {
-            _activePipeline.value = null // ⚡ 前置交互全部闭环，退出全屏模态
-            onPipelineFinished(p.targetItemId) // ⚡ 统一触发终点业务（解耦任意后续操作）
+            _activePipeline.value = null // 所有步骤闭环
         }
     }
 
-    // 管线终点通用派发：目标项就地转圈，异步完成刷新数据
-    private fun onPipelineFinished(targetId: String) {
-        updateItem(targetId) { it.copy(isGenerating = true) }
-
-        viewModelScope.launch {
-            repository.uploadAndGenerate(targetId)
-                .onSuccess { url -> updateItem(targetId) { it.copy(imageUrl = url, isGenerating = false) } }
-                .onFailure { updateItem(targetId) { it.copy(isGenerating = false) } }
+    // ⚡ 核心分发器：每个步骤平等执行，无需在推进时特殊判断步骤位置
+    private fun executeCurrentStep(pipeline: ActivePipeline) {
+        when (pipeline.steps[pipeline.currentIndex]) {
+            is PipelineStep.UploadAndGenerate -> {
+                // 后台异步型步骤：退出模态弹层，列表项就地转圈，完成后自动触发 onStepCompleted
+                updateItem(pipeline.targetItemId) { it.copy(isGenerating = true) }
+                viewModelScope.launch {
+                    repository.uploadAndGenerate(pipeline.targetItemId)
+                        .onSuccess { url -> updateItem(pipeline.targetItemId) { it.copy(imageUrl = url, isGenerating = false) } }
+                        .onFailure { updateItem(pipeline.targetItemId) { it.copy(isGenerating = false) } }
+                    onStepCompleted() // ⚡ 无论生成位于管线第几步，完成即自动推进下一步
+                }
+            }
+            // 交互式 UI 步骤（Privacy / PickPhoto / Ad）保持 activePipeline，由 Compose 渲染对应弹层
+            else -> Unit
         }
     }
 
@@ -2707,7 +2720,7 @@ class TemplateListViewModel(
     }
 }
 
-// 4. Compose UI 界面层：列表常驻 + 前置步骤动态承接
+// 4. Compose UI 界面层：列表常驻 + 步骤驱动弹层
 @Composable
 fun TemplateListScreen(viewModel: TemplateListViewModel) {
     val items by viewModel.items.collectAsStateWithLifecycle()
@@ -2721,12 +2734,13 @@ fun TemplateListScreen(viewModel: TemplateListViewModel) {
             }
         }
 
-        // ② 前置管线承接器：步骤完成统一回调 onStepCompleted，纯净无业务入侵
+        // ② 纯 UI 步骤弹层承接（非 UI 步骤自动放行，无需写 if-else）
         activePipeline?.let { pipeline ->
-            when (pipeline.steps[pipeline.currentIndex]) {
+            when (val currentStep = pipeline.steps[pipeline.currentIndex]) {
                 is PipelineStep.Privacy -> PrivacyDialog(onAgree = viewModel::onStepCompleted)
                 is PipelineStep.PickPhoto -> PhotoPickerSheet(onPicked = viewModel::onStepCompleted)
                 is PipelineStep.Ad -> AdOverlay(onAdClosed = viewModel::onStepCompleted)
+                else -> Unit // 如 UploadAndGenerate 等纯逻辑步骤不渲染弹层
             }
         }
     }
