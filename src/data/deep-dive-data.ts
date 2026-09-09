@@ -3741,19 +3741,182 @@ VTCompressionSessionCreate(
       {
         tag: '出海订阅',
         title: 'Google Play Billing v6+ 订阅生命周期与断网掉单补单机制',
-        explanation: 'Google Play Billing v6+ 引入了多 BasePlan 与 Offer 定价模型。订阅购买完整闭环：queryProductDetailsAsync ➔ launchBillingFlow ➔ PurchasesUpdatedListener 接收 Purchase 对象 ➔ 上传 purchaseToken 至自建服务端发起 Google Play Developer API 验证 ➔ 验证通过后必须调用 acknowledgePurchase() 确认订单完成发货。若 3 天内未 acknowledge，Google Play 会自动退款并撤销订阅。客户端在每次 App 启动和用户登录时必须调用 queryPurchasesAsync()，主动捞取未确认订单进行补发货。',
-        codeSnippet: `// 启动检查未确认订单 (补单机制)
-billingClient.queryPurchasesAsync(
-    QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build()
-) { billingResult, purchases ->
-    if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-        purchases.forEach { purchase ->
-            if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED && !purchase.isAcknowledged) {
-                verifyWithServerAndAcknowledge(purchase) // 服务端验签并确认
-            }
-        }
-    }
-}`,
+        sectionTitles: {
+          explanation: 'Play Billing v6+ 架构底座与三分法履约核心',
+          caseStudy: '二、断网掉单全场景破局策略与 PayKit 工业级实战',
+        },
+        pipeline: [
+          { title: 'Play 商店连接', subtitle: 'IPC 绑定 Play 进程 ➔ 指数退避重试', category: 'engineering' },
+          { title: '商品三分法配置', subtitle: '订阅 / 消耗 / 非消耗 ➔ 确认 API 精准解耦', category: 'theory' },
+          { title: '收银台拉起与防重', subtitle: '单次唯一购买锁 ➔ launchBillingFlow', category: 'engineering' },
+          { title: 'Pending 延迟支付', subtitle: '现金/家长批准 ➔ 严禁提前发货策略', category: 'theory' },
+          { title: 'ConsumableLedger', subtitle: '发货前账本落盘 ➔ 消费失败补偿重试', category: 'engineering' },
+          { title: '断网对齐与掉单自愈', subtitle: 'queryPurchases 双轨扫描 ➔ 3天自动退款兜底', category: 'engineering' },
+        ],
+        explanation: `### 1. Google Play Billing v6+ 定价与实体架构范式
+- **实体层级升级**：从旧版单一 SKU 演化为 \`Product\` ➔ \`BasePlan\`（基础方案）➔ \`Offer\`（优惠方案）三级嵌套结构。
+- **订阅模型解耦**：一个订阅产品（如 \`vip_membership\`）可包含多个基础方案（按月扣费、按年扣费），每个方案下可挂载多个优惠策略（新客 7 天免费试用、前 3 个月 5 折半价）。
+- **发起购买差异**：客户端发起支付时不仅指定商品 ID，还必须精确传递对应方案的 \`offerToken\`，由 Google Play 根据用户过往购买历史校验是否具备优惠资格。
+
+### 2. 支付结算 SDK 架构分层（参考 PayKit 工业级方案）
+- **单例门面隔离**：业务宿主仅面向轻量门面交互，核心逻辑在底层分为五个自治组件：
+\`\`\`text
+┌────────────────────────────────────────────────────────┐
+│               宿主业务层 (ViewModel / UI)               │
+└───────────────────────────┬────────────────────────────┘
+                            │ API 交互 (查询 / 购买 / 监听)
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│                     PayKit 单例门面                     │
+├───────────────┬────────────────┬───────────────────────┤
+│ Purchase      │ CustomerInfo   │ ConsumableLedger      │
+│ Verifier      │ Helper         │ (消耗品履约持久化账本) │
+│ (发货前验单)  │ (订单 ➔ 权益)  │ [核心防掉单与防重发]  │
+├───────────────┴────────────────┴───────────────────────┤
+│ DeviceCache (本地权益快照，保障弱网/断网权限秒开)       │
+├────────────────────────────────────────────────────────┤
+│ GoogleBillingWrapper (封装 BillingClient 6+/8+ 连接与)  │
+│ [负责 IPC 通信、商品查询、拉起收银台、ack 与 consume]   │
+└───────────────────────────┬────────────────────────────┘
+                            │ Android AIDL IPC 跨进程通信
+                            ▼
+┌────────────────────────────────────────────────────────┐
+│        Google Play Store 系统级应用 / 服务端集群       │
+└────────────────────────────────────────────────────────┘
+\`\`\`
+
+### 3. 商品履约“三分法”策略（严防误消耗与复购死锁）
+- **痛点误区**：Google Play Console 将非订阅的一次性商品统一归类为 \`INAPP\`，如果开发者仅凭是否为 \`INAPP\` 决定确认方式，极易酿成重大资金灾难。
+- **三分法严格对齐矩阵**：
+  - **订阅型商品（SUBS）**：必须调用 \`acknowledgePurchase\`。在订阅有效周期内生效；未在 3 天内确认的订单会被 Google Play 判定为废单并自动全额退款。
+  - **消耗型商品（Consumable）**：如金币、抽奖券。发货后**必须且只能**调用 \`consumePurchase\`。消费后该订单在 Google 商店中释放，允许用户复购。若误调用 \`acknowledgePurchase\`，该商品将永久变为“已拥有”，用户再也无法进行下一次购买！
+  - **非消耗型商品（Non-Consumable）**：如永久去广告、解锁高级功能包。**必须且只能**调用 \`acknowledgePurchase\`。若误调用 \`consumePurchase\`，用户购买的永久权益在消费后直接丢失！
+
+### 4. 购买状态机与两阶段全流程控制
+- **标准闭环流程**：
+\`\`\`text
+发起购买 ➔ 互斥检查 (避免连击) ➔ launchBillingFlow 唤起官方收银台
+  │
+  ▼
+onPurchasesUpdated 状态分流:
+  ├─ PENDING ──────────➔ 进入 onPending 等待流程 (严禁发货！)
+  │
+  └─ PURCHASED ────────➔ PurchaseVerifier 安全验单
+                           │ (验签通过)
+                           ▼
+                    商品类型判定分流:
+                    ├─ 消耗型 ──➔ 写入 ConsumableLedger 账本
+                    │              ➔ 宿主业务发货
+                    │              ➔ 执行 consumePurchase
+                    │              ➔ 成功后擦除账本
+                    │
+                    └─ 订阅/非消耗 ➔ 执行 acknowledgePurchase
+                                   ➔ 更新本地权益缓存
+\`\`\`
+
+### 5. 延迟付款（Pending Transactions）合规治理
+- **现实场景**：拉美地区的现金支付（Boleto）、便利店线下代付、或家庭监护人批准机制，用户在手机上点击购买后并未完成资金划扣，订单处于 \`PurchaseState.PENDING\`。
+- **铁律守则**：处于 \`PENDING\` 状态时，严禁发放任何应用内权益，严禁调用 \`consume\` 或 \`acknowledge\`！必须持久化订单标记，等待用户在线下完成付款后 Google Play 主动推送已付款状态，再触发后续履约流。
+
+### 6. 设备端权益快照缓存（DeviceCache 无网秒开策略）
+- **离线容灾体验**：弱网或完全断网环境下，应用无法与 Google Play 建立连接，若每次都阻塞等待网络同步，会导致付费 VIP 用户在打开 App 时因无法获取权限而降级为普通免费用户。
+- **缓存策略**：本地通过加密持久化保存最新成功的 \`CustomerInfo\`（包括有效期与生效商品列表）。冷启动时优先读取本地快照，**0 毫秒完成 UI 权限解锁**；后台异步建立网络连接并拉取最新状态静默对齐。`,
+        caseStudy: `### 策略一：ConsumableLedger 履约账本机制（破解两阶段提交掉单死结）
+
+在消耗品支付中，“给用户发放金币”与“向 Google Play 调用 \`consumePurchase\`”是两个独立的跨系统操作，网络波动极易导致**分布式最终一致性破坏**：
+
+\`\`\`text
+┌─────────────┐     1. 准备发货     ┌────────────────────────┐
+│ 支付成功    │───────────────────➔│ 写入 ConsumableLedger   │
+│ (PURCHASED) │                    │ (状态: 已发货待Consume) │
+└─────────────┘                    └────────────────────────┘
+                                               │
+                                   2. 业务发货 │ (发货成功)
+                                               ▼
+┌─────────────┐     3. 消费成功     ┌────────────────────────┐
+│ 移出账本    │◀───────────────────│ 调用 consumePurchase   │
+│ (履约完结)  │   (若断网则滞留)    │ (向 Google Play 消费)  │
+└─────────────┘                    └────────────────────────┘
+\`\`\`
+
+- **两难困境剖析**：
+  - 场景：App 给用户发了 100 钻，但在调用 \`consume\` 瞬间用户进电梯断网，或 App 崩溃被杀。
+  - 若下次启动检测到未 consume 就再次发货：用户零成本拿到了 200 钻（遭遇黑产恶意卡断网薅羊毛）；
+  - 若下次启动不发货直接 consume：万一上次发货因数据库异常失败了，用户就遭遇“扣款不给货”（掉单纠纷）。
+- **PayKit 账本破解法则**：
+  - 以 \`purchaseToken\` 为主键，在本地数据库建立持久化账本 \`ConsumableLedger\`；
+  - 发货前写入账本（标记为 \`DELIVERED_PENDING_CONSUME\`）➔ 执行发货 ➔ 执行 consume ➔ 成功后移除记录；
+  - **补单时精准分流**：启动恢复扫描到未消费订单时，先查账本：**命中账本说明已发过货，仅补偿重发 \`consumePurchase\`；未命中账本说明是新掉单，执行完整发货与入账流程**。
+
+---
+
+### 策略二：断网掉单的主动自愈与多切面扫描矩阵
+
+客户端无法预测用户何时断网或强制退出，必须在生命周期的关键节点构建多重兜底扫描网：
+
+\`\`\`text
+┌────────────────────────────────────────────────────────┐
+│               全方位掉单捕获触发切面                   │
+├────────────────────────────────────────────────────────┤
+│ 1. App 冷启动初始化 (Application / 首屏)                │
+│    ➔ startConnection 成功后立即触发全量同步            │
+├────────────────────────────────────────────────────────┤
+│ 2. 应用由后台切回前台 (ProcessLifecycleOwner.onResume) │
+│    ➔ 防抖间隔 30 秒，静默比对是否有后台自动续费/待补单 │
+├────────────────────────────────────────────────────────┤
+│ 3. 系统网络状态变化 (ConnectivityManager 回调)         │
+│    ➔ 监听到网络由断开变为连通时，自动重发滞留账本与订单│
+├────────────────────────────────────────────────────────┤
+│ 4. 用户设置页显式点击“恢复购买 (Restore Purchases)”    │
+│    ➔ 强制全量双轨扫描，并为用户展示同步进度与 Toast    │
+└────────────────────────────────────────────────────────┘
+\`\`\`
+
+- **双轨全量查询**：扫描时必须并行发起 \`queryPurchasesAsync(SUBS)\` 与 \`queryPurchasesAsync(INAPP)\`，遍历所有返回的订单，对未确认的订阅执行补确认，对滞留的消耗品核对账本执行补消费。
+
+---
+
+### 策略三：Google Play IPC 连接状态机与指数退避重试
+
+Google Play 商店本质上是运行在设备底层的独立应用，通过 AIDL Service 与客户端通信。当 Play 商店在后台被省电策略杀死或自更新时，会产生 \`onBillingServiceDisconnected\`。
+
+\`\`\`text
+┌──────────────┐     连接断开     ┌──────────────┐
+│  Service 正常 │─────────────────➔│ 触发断开回调 │
+└──────────────┘                  └──────────────┘
+       ▲                                 │
+       │                                 ▼
+       │ 重新连接成功             ┌──────────────┐
+       └──────────────────────────│ 指数退避重试 │
+                                  │ (1s➔2s➔4s..) │
+                                  └──────────────┘
+\`\`\`
+
+- **防护策略**：
+  - 严禁在 \`onBillingServiceDisconnected\` 中无延迟立即递归重连，否则在 Play 商店崩溃时会导致死循环打满 CPU；
+  - 引入指数退避计时器（1s ➔ 2s ➔ 4s ➔ 8s ... 最大 32s 封顶）；
+  - 当用户在前台点击发起购买按钮时，重置退避计时器，立即唤起强制重新连接。
+
+---
+
+### 策略四：并发购买防重互斥锁（Purchase In Progress Lock）
+
+- **风险隐患**：在收银台弹窗拉起瞬间，部分用户或自动化脚本会高频快速点击购买按钮，若多次向 BillingClient 提交并发请求，会导致底层状态机紊乱，抛出 \`DEVELOPER_ERROR\`，甚至引发重复扣款。
+- **治理策略**：
+  - 在 SDK 门面层维持全局原子状态锁（如 \`AtomicBoolean\` 或协程互斥锁 \`Mutex\`）；
+  - 当调用 \`purchase()\` 时首先抢锁，若已有购买在处理中，直接向回调抛出 \`PURCHASE_IN_PROGRESS\` 错误并拦截请求；
+  - 只有在收到 \`onPurchasesUpdated\` 终态、用户主动按返回键取消（\`USER_CANCELED\`）、或遇到网络异常终止时，方可原子释放购买锁。
+
+---
+
+### 策略五：出海防刷与服务端双重校验（Server-side Verification）
+
+- **黑产作弊手段**：攻击者利用 LuckyPatcher 或注入 Frida 脚本，在客户端内存中篡改 \`PurchasesUpdatedListener\` 返回的购买签名，伪造假的 \`Purchase\` 对象骗取客户端发货。
+- **企业级安全闭环**：
+  - 客户端在获取到 \`purchaseToken\` 后，不直接在本地决定发货；
+  - 将 \`purchaseToken\`、\`orderId\`、\`productId\` 以及与用户绑定的混淆账户 ID（\`obfuscatedAccountId\`）上传至业务后端；
+  - 业务服务端通过 Google Cloud 服务账号秘钥调用官方 REST API：\`Google Play Developer API\`（\`purchases.subscriptionsv2.get\` 或 \`purchases.products.get\`）；
+  - 由服务端核实付款金额、有效状态以及是否已被其他账号兑换，验证通过后向客户端下发发货指令，并在服务端直接标记 \`acknowledge\`，从根本上杜绝客户端破解风险。`,
       },
       {
         tag: '变现与合规',
