@@ -3429,13 +3429,169 @@ LeakActivity instance
       {
         tag: '故障攻坚',
         title: '线上 ANR 信号捕获机制与 Native 内存泄漏定位',
-        explanation: '当主线程在处理 Broadcast (10s/60s)、Service (20s) 或 InputEvent (5s) 超时未返回时，系统 ActivityManagerService 会向目标进程发送 SIGQUIT (3) 信号，由 ART 信号处理器在 /data/anr/traces.txt 生成线程堆栈快照。排查 Native/堆外内存暴涨时，使用 Android Studio Profiler 的 Native Memory Record 或 AddressSanitizer (ASan) 排查 C/C++ 指针未释放及 Bitmap Hardware Buffer 泄漏。',
-        codeSnippet: `# 导出并分析最新 ANR 堆栈
-adb shell ls -l /data/anr/
-adb pull /data/anr/anr_* ./anr_trace.txt
+        sectionTitles: {
+          explanation: 'ANR 信号捕获原理与 Native 内存度量基石',
+          caseStudy: '二、生产级疑难攻坚实战案例（ANR 破案与 Native 泄漏定位）',
+        },
+        pipeline: [
+          { title: 'ANR 触发底座', subtitle: 'AMS 延时超时 ➔ 内核发信号 SIGQUIT (3)', category: 'theory' },
+          { title: 'SIGQUIT 信号捕获', subtitle: 'Signal Catcher 机制 ➔ sigaction 链路回传', category: 'engineering' },
+          { title: 'Watchdog 双轨检测', subtitle: '主线程退火打点 ➔ 规避误报与假死判定', category: 'engineering' },
+          { title: 'Native 内存四维指标', subtitle: 'VSS / RSS / PSS / USS ➔ 虚拟与物理解耦', category: 'theory' },
+          { title: 'ASan 与 Profiler 诊断', subtitle: '编译期插桩 ➔ Malloc/Free 调用栈差值追踪', category: 'engineering' },
+          { title: 'JNI / 显存缓冲区治理', subtitle: 'HardwareBuffer 泄漏 ➔ RAII 与 Cleaner 保障', category: 'engineering' },
+        ],
+        explanation: `### 1. ANR 触发底座与超时阈值
+- **超时判定矩阵**：InputEvent（按键/触屏输入 5s 未消费完毕）；BroadcastReceiver（前台广播 10s，后台广播 60s）；Service（前台服务 20s，后台服务 200s）；ContentProvider（publish 超时 10s）。
+- **AMS 检测原理**：AMS 在向应用主线程分发任务前，在 \`ActivityManagerService\` 的消息队列中投递带延迟的超时检测 \`Message\`；若主线程在限时内处理完毕并通知 AMS，则取消该消息；若超时消息被处理，则确认发生 ANR。
 
-# 查看进程 Native 与 Graphics 物理内存开销
-adb shell dumpsys meminfo com.example.app | grep -E "Native Heap|Gfx dev|EGL mtrack"`,
+### 2. SIGQUIT 信号与 Signal Catcher 线程
+- **系统处理链路**：AMS 确认超时后，向目标应用进程发送 \`SIGQUIT (信号 3)\`。
+- **ART 运行时响应**：应用进程初始化时，ART 虚拟机会拉起名为 \`Signal Catcher\` 的守护线程，通过 \`sigwait()\` 阻塞等待 \`SIGQUIT\`。收到信号后，调用 \`ThreadList::Dump()\` 暂停所有 Java 线程（Suspend All），遍历调用栈并生成 \`/data/anr/traces.txt\`（Android 10+ 统一写入系统 DropBox）。
+
+### 3. 工业级线上 ANR 监控 SDK 核心架构
+- **非 Java 异常捕获**：\`Thread.setDefaultUncaughtExceptionHandler\` 无法捕获 ANR，必须在 Native 层通过 \`sigaction\` 注册并接管 \`SIGQUIT\` 信号。
+- **信号链回传（Signal Chaining）**：SDK 在 Native 抓取完自身堆栈、CPU 负载、Looper 消息历史后，**必须将信号重新递交给系统原有的 Signal Catcher 处理**，否则系统无法生成完整的系统级 ANR 堆栈，破坏系统级排查链路。
+- **主线程退火与 Watchdog 心跳双保底**：由于接收到 \`SIGQUIT\` 不一定是本进程 ANR（系统可能向后台多个候选进程广播 Dump 信号），必须结合主线程消息队列心跳（Looper 探针）验证主线程是否卡死，彻底规避假 ANR 告警。
+
+### 4. Native 内存四维指标与隐秘杀手
+- **四维内存指标**：\`VSS\`（虚拟耗用内存）➔ \`RSS\`（实际物理占用，含共享库）➔ \`PSS\`（按比例分摊物理内存，核心考量指标）➔ \`USS\`（进程独占物理内存）。
+- **Java 堆与 Native 堆脱节**：Android 8.0+ 后 Bitmap 像素内存全面移入 Native 堆。Java 堆即使只占 30MB，如果 Native/显存达到 1GB+，设备依然会遭遇 Linux 内核 LowMemoryKiller (LMK) 瞬间强杀，或者抛出看似由于 Java 无法分配几百字节引发的虚假 OOM。
+
+### 5. Native 内存排查工具矩阵
+- **线下诊断首选**：
+  - \`AddressSanitizer (ASan / HWASan)\`：Google 官方推荐的编译期插桩工具，毫秒级检测 Native 堆越界（Heap buffer overflow）、野指针访问（Use after free）和内存泄漏。
+  - \`Android Studio Profiler (Native Memory)\`：记录每个 \`malloc\` / \`free\` 的调用栈与对象分配时间戳，计算 Allocated - Deallocated 净增长。
+- **系统级指标分析**：\`dumpsys meminfo <pkg>\` 重点盯防 \`Native Heap\`、\`Gfx dev\`（显存设备分配）、\`EGL mtrack\`。
+
+### 6. 线上 Native 内存监控：PLT Hook 与 Malloc 追踪
+- **线上治理方案**：线上无法使用 ASan（CPU 与内存开销过高），通常采用 Hook 底层 C 库的分配接口（如 \`malloc\`、\`calloc\`、\`mmap\`、\`free\`）。
+- **聚合与防爆**：利用 PLT/GOT Hook（如开源的 ByteDance Raphaelite、Tencent Matrix）拦截分配调用，对分配未释放的调用栈进行哈希聚合与内存大头排序，定期回传高危调用链。`,
+        caseStudy: `### 疑难案例一：【ANR 破案】主线程“被锁死”——跨线程锁争用与 Binder 穿透背锅
+
+- **现场还原与表象误导**：
+  线上 APM 频繁报警，主线程 ANR 调用栈永远指向 \`SharedPreferencesImpl.getString()\` 或一个轻量数据库读取：
+  \`\`\`text
+  "main" prio=5 tid=1 Blocked
+    at android.app.SharedPreferencesImpl.getString(SharedPreferencesImpl.java:240)
+    - waiting to lock <0x04f5e718> (a java.lang.Object) held by thread 16
+    at com.demo.ui.HomeActivity.onResume(HomeActivity.kt:42)
+  \`\`\`
+  很多工程师第一反应是“主线程读 SP 导致磁盘 I/O 慢”，甚至将 \`getString()\` 盲目改写到后台协程，但依然频繁触发 ANR。
+
+- **Trace 深度破案**：
+  顺藤摸瓜寻找持有互斥锁的 \`thread 16\` 调用栈：
+  \`\`\`text
+  "Sync-Worker-Thread" prio=5 tid=16 Native
+    at android.os.BinderProxy.transactNative(Native Method)
+    at android.os.BinderProxy.transact(BinderProxy.java:540)
+    at com.demo.account.IAuthService$Stub$Proxy.getRemoteToken(...)
+    at com.demo.storage.AccountCache.syncToken(AccountCache.kt:88)
+    - locked <0x04f5e718> (a java.lang.Object)
+  \`\`\`
+  **真相大白**：后台线程 \`tid=16\` 持有了全局锁 \`<0x04f5e718>\`，但在临界区内部，竟然发起了一个跨进程 Binder 调用 \`getRemoteToken()\`！当服务端进程挂起或高负载（响应超过 5 秒）时，该锁长期无法释放；主线程在 \`onResume\` 请求该锁瞬间被阻塞，无辜沦为 ANR“背锅受害者”。
+
+- **工程治理方案**：
+  1. **临界区最小化**：严禁在持锁期间（\`synchronized\` / \`ReentrantLock\`）执行任何阻塞式 I/O、网络请求或跨进程 IPC 调用。
+  2. **读写分离锁**：改用 \`ReentrantReadWriteLock\`，读操作彼此不互斥，写操作仅在内存赋值微秒级时间内持锁。
+  3. **长持锁告警监控**：通过字节码插桩监控主线程持锁等待耗时，超过 500ms 自动抓取持锁线程堆栈上报。
+
+---
+
+### 疑难案例二：【ANR 破案】CPU 饥饿型假死——主线程处于 RUNNABLE 却超时
+
+- **现场还原与表象误导**：
+  ANR trace 中主线程状态赫然显示为 \`RUNNABLE\`，调用栈停留在一个极简单的内存遍历中：
+  \`\`\`text
+  "main" prio=5 tid=1 Runnable
+    at java.util.HashMap.getNode(HashMap.java:572)
+    at java.util.HashMap.get(HashMap.java:557)
+    at com.demo.feed.FeedAdapter.onBindViewHolder(FeedAdapter.kt:65)
+  \`\`\`
+  单测运行这段代码只需 0.03ms，排查人员十分困惑：“主线程没死锁、没 I/O、状态还是正在运行，为什么会报 ANR？”
+
+- **Trace 深度破案**：
+  翻阅 ANR 日志头部的系统总体 CPU 开销与进程负载：
+  \`\`\`text
+  CPU usage from 0ms to 5420ms later:
+  99% TOTAL: 62% kswapd0 + 22% app_image_decoder + 10% kcompactd0
+  CPU usage 400ms to 920ms later:
+  100% TOTAL: 70% kswapd0 + 25% app_image_decoder
+  \`\`\`
+  **真相大白**：
+  1. 页面快速滑动时，后台协程池并发发起了 30+ 张高分辨率图片异步解码，多核 CPU 被瞬间压满；
+  2. 大量大对象分配使系统可用物理内存瞬间跌破水位线，Linux 内核守护进程 \`kswapd0\` 和 \`kcompactd0\` 疯狂抢占 70% CPU 进行内存压缩（zRAM）与页置换；
+  3. 主线程虽然处于 \`RUNNABLE\`（就绪态），但因 CPU 资源完全枯竭，操作系统 Linux 调度器分配给主线程的时间片极度匮乏，导致主线程 5 秒内无法消化完当前 Looper 队列。
+
+- **工程治理方案**：
+  1. **线程调度优先级降权**：所有后台并发解码协程/线程池必须显式设置为 \`Process.THREAD_PRIORITY_BACKGROUND\`（nice 值 10），确保 CFS 调度器绝对优先保障主线程。
+  2. **并发度与队列限流**：后台计算线程池最大核心线程数严禁超过 \`availableProcessors()\`，拒绝无节制并发。
+  3. **复用内存池规避 kswapd**：开启 Bitmap 复用（\`BitmapFactory.Options.inBitmap\`），杜绝瞬时内存大震荡。
+
+---
+
+### 疑难案例三：【Native 内存泄漏】JNI 跨层图像处理 HardwareBuffer 与 GlobalRef 显存吞噬
+
+- **现场还原与表象误导**：
+  App 上线人脸识别滤镜功能后，低端与中端机型频繁发生静默闪退（应用突然消失回到桌面）。Firebase 后台仅记录 \`Application terminated by OS\`（被系统 LMK 强杀）。
+  本地使用 LeakCanary 监控，Java 堆始终平稳（稳定在 45MB 左右），没有产生任何 Java 对象的泄漏报警。
+
+- **深度排查与定位路径**：
+  1. 执行 \`adb shell dumpsys meminfo <pkg>\` 进行进出页面多轮测试对比：
+     \`\`\`text
+     测试前（冷启动进入首页）:
+     Native Heap:   42,100 KB
+     Gfx dev:       11,200 KB
+     TOTAL PSS:    108,050 KB
+
+     反复进出人脸滤镜页 10 次后:
+     Native Heap:  210,400 KB  (增长 5 倍)
+     Gfx dev:      880,300 KB  (激增 80 倍，显存严重爆炸！)
+     TOTAL PSS:  1,350,200 KB  (突破 1.3GB，触达整机 LMK 阈值)
+     \`\`\`
+  2. 启用 Android Studio 的 Native Memory Profiler 抓取 C++ 堆栈，聚焦在 \`libnative_face.so\` 中的 \`processFrame\`。
+
+- **根因剖析与问题代码**：
+  在 Native C++ 层，每一帧相机数据回调均通过 \`AHardwareBuffer_allocate()\` 分配了图形缓冲区，并通过 \`env->NewGlobalRef(callback)\` 持有了 Java 回调对象：
+  \`\`\`cpp
+  // ❌ 存在严重 Native 显存与引用泄漏的代码
+  JNIEXPORT void JNICALL Java_com_demo_face_NativeFilter_processFrame(
+      JNIEnv* env, jobject thiz, jobject jBitmap, jobject callback) {
+      
+      AHardwareBuffer* buffer = nullptr;
+      AHardwareBuffer_Desc desc = { /* 1080x1920 RGBA_8888 规格 */ };
+      AHardwareBuffer_allocate(&desc, &buffer); // ⚡ 分配物理显存约 8.3MB
+      
+      jobject gCallback = env->NewGlobalRef(callback); // ⚡ 全局强引用未释放
+      
+      if (checkFaceValid(buffer) != SUCCESS) {
+          // 致命缺陷：校验失败提前 return，完全未执行释放！
+          // 每秒 30 帧 * 8.3MB = 250MB/s 显存泄漏，极速挤爆 PSS！
+          return; 
+      }
+      
+      // 即使正常流程，也缺少 AHardwareBuffer_release(buffer);
+  }
+  \`\`\`
+
+- **工程治理方案与最佳实践**：
+  1. **现代 C++ RAII 智能指针**：使用 \`std::unique_ptr\` 结合自定义 Deleter，保证任何分支退出或异常抛出时显存百分之百自动回收：
+     \`\`\`cpp
+     // ✅ 使用 RAII 确保显存自动释放
+     struct AHardwareBufferDeleter {
+         void operator()(AHardwareBuffer* buf) const {
+             if (buf) AHardwareBuffer_release(buf);
+         }
+     };
+     using ScopedHardwareBuffer = std::unique_ptr<AHardwareBuffer, AHardwareBufferDeleter>;
+
+     // 使用时：
+     ScopedHardwareBuffer bufferWrapper(rawBuffer);
+     // 作用域结束时自动调用 AHardwareBuffer_release，坚不可摧
+     \`\`\`
+  2. **JNI 全局引用配对防御**：严禁随意创建全局引用，必须在生命周期对等的销毁函数中调用 \`env->DeleteGlobalRef(gCallback)\`；或改用 \`NewWeakGlobalRef\` 弱全局引用配合空值判定。
+  3. **Java 包装层挂载 Cleaner 兜底**：使用 \`java.lang.ref.Cleaner\`（或低版本 FinalizerDaemon）注册 Native 指针，当 Java 包装壳被 GC 时，在后台线程自动执行底层释放。
+  4. **CI 开启 HWASan 门禁**：在 CI 自动化流水线集成 \`AddressSanitizer\`，单元测试与 UI 自动化运行中若发生 Native 泄漏直接阻断合并。`,
       },
     ],
     ios: [
