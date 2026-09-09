@@ -79,15 +79,20 @@ function renderSingleChapterView(
     const principleSection = document.createElement('section');
     principleSection.className = 'chapter-content-section pipeline-stage-section';
     const hasTheory = mod.pipeline.some((step) => step.category === 'theory');
-    const sectionTitle = hasTheory ? '一、核心理论与工程演进全景' : '一、核心机制与工程演进全景';
+    let sectionTitle = hasTheory ? '一、核心理论与工程演进全景' : '一、核心机制与工程演进全景';
+    if (mod.sectionTitles?.explanation) {
+      sectionTitle = mod.sectionTitles.explanation.startsWith('一、')
+        ? mod.sectionTitles.explanation
+        : `一、${mod.sectionTitles.explanation}`;
+    }
     principleSection.innerHTML = `
       <div class="section-header">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
         <h2 class="section-header-title">${sectionTitle}</h2>
       </div>
     `;
-    principleSection.appendChild(renderPipelineFlowCard(mod.pipeline, platform));
-    principleSection.appendChild(renderTimelineExplanation(mod.explanation || '', platform, mod.pipeline));
+    principleSection.appendChild(renderPipelineFlowCard(mod.pipeline, platform, mod.sectionTitles?.pipeline));
+    principleSection.appendChild(renderTimelineExplanation(mod.explanation || '', platform, mod.pipeline, mod.sectionTitles?.pipeline));
     container.appendChild(principleSection);
   } else {
     // Cognitive Metaphor & Formula Card (if present on traditional modules)
@@ -576,7 +581,7 @@ function renderStepperComponent(stepper: StepperStep[], platform: 'android' | 'i
   return wrapper;
 }
 
-function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 'ios'): HTMLElement {
+function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 'ios', customTitle?: string): HTMLElement {
   const card = document.createElement('div');
   card.className = `pipeline-flow-card ${platform === 'ios' ? 'pipeline-ios' : ''}`;
 
@@ -601,25 +606,35 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
     `;
   }).join('');
 
-  const hasTheory = pipeline.some((step) => step.category === 'theory');
-  const legendTheoryHtml = hasTheory ? `
-        <div class="legend-item">
-          <span class="legend-dot theory-dot"></span>
-          <span>理论与策略层</span>
-        </div>` : '';
+  const hasTheory = !customTitle && pipeline.some((step) => step.category === 'theory');
+  const flowTitle = customTitle ?? (hasTheory ? '理论 ➔ 工程演进全景链路' : '工程演进全景链路');
+  const badgeText = customTitle ? 'Workflow' : 'Roadmap';
+
+  const legendHtml = customTitle ? `
+    <div class="legend-item">
+      <span class="legend-dot eng-dot"></span>
+      <span>标准闭环流程</span>
+    </div>
+  ` : `
+    ${hasTheory ? `
+      <div class="legend-item">
+        <span class="legend-dot theory-dot"></span>
+        <span>理论与策略层</span>
+      </div>` : ''}
+    <div class="legend-item">
+      <span class="legend-dot eng-dot"></span>
+      <span>工程与运行时层</span>
+    </div>
+  `;
 
   card.innerHTML = `
     <div class="pipeline-flow-header">
       <div class="pipeline-flow-title-wrap">
-        <span class="pipeline-flow-badge">Roadmap</span>
-        <h3 class="pipeline-flow-title">${hasTheory ? '理论 ➔ 工程演进全景链路' : '工程演进全景链路'}</h3>
+        <span class="pipeline-flow-badge">${badgeText}</span>
+        <h3 class="pipeline-flow-title">${flowTitle}</h3>
       </div>
       <div class="pipeline-flow-legend">
-        ${legendTheoryHtml}
-        <div class="legend-item">
-          <span class="legend-dot eng-dot"></span>
-          <span>工程与运行时层</span>
-        </div>
+        ${legendHtml}
       </div>
     </div>
     <div class="pipeline-flow-container">
@@ -630,14 +645,15 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
   return card;
 }
 
-function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios', pipeline?: PipelineStep[]): HTMLElement {
+function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios', pipeline?: PipelineStep[], customPipelineTitle?: string): HTMLElement {
   const container = document.createElement('div');
   container.className = `timeline-stream ${platform === 'ios' ? 'timeline-ios' : ''}`;
   const bridge = document.createElement('div');
   bridge.className = 'timeline-stream-bridge';
+  const bridgeTag = customPipelineTitle ? '各环节底层原理与关键策略分步详述' : '各阶段底层原理与代码演进分步详述';
   bridge.innerHTML = `
     <div class="timeline-bridge-line"></div>
-    <span class="timeline-bridge-tag">各阶段底层原理与代码演进分步详述</span>
+    <span class="timeline-bridge-tag">${bridgeTag}</span>
     <div class="timeline-bridge-line"></div>
   `;
   container.appendChild(bridge);

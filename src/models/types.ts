@@ -39,6 +39,7 @@ export interface DeepDiveSectionTitles {
   diagram?: string;
   diagramCaption?: string;
   caseStudy?: string;
+  pipeline?: string;
 }
 
 export interface DeepDiveModule {
