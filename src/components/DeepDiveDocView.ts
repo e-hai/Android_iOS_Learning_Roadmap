@@ -910,7 +910,7 @@ function formatCaseStudyBody(rawText: string): string {
       flushTable();
     }
 
-    if (!trimmed) continue;
+    if (!trimmed || trimmed === '---' || trimmed === '***' || trimmed === '___') continue;
 
     // Headings & formatting
     if (trimmed.startsWith('#### ')) {

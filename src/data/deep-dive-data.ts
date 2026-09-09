@@ -3496,8 +3496,6 @@ LeakActivity instance
   2. **读写分离锁**：改用 \`ReentrantReadWriteLock\`，读操作彼此不互斥，写操作仅在内存赋值微秒级时间内持锁。
   3. **长持锁告警监控**：通过字节码插桩监控主线程持锁等待耗时，超过 500ms 自动抓取持锁线程堆栈上报。
 
----
-
 ### 疑难案例二：【ANR 破案】CPU 饥饿型假死——主线程处于 RUNNABLE 却超时
 
 - **现场还原与表象误导**：
@@ -3527,8 +3525,6 @@ LeakActivity instance
   1. **线程调度优先级降权**：所有后台并发解码协程/线程池必须显式设置为 \`Process.THREAD_PRIORITY_BACKGROUND\`（nice 值 10），确保 CFS 调度器绝对优先保障主线程。
   2. **并发度与队列限流**：后台计算线程池最大核心线程数严禁超过 \`availableProcessors()\`，拒绝无节制并发。
   3. **复用内存池规避 kswapd**：开启 Bitmap 复用（\`BitmapFactory.Options.inBitmap\`），杜绝瞬时内存大震荡。
-
----
 
 ### 疑难案例三：【Native 内存泄漏】JNI 跨层图像处理 HardwareBuffer 与 GlobalRef 显存吞噬
 
@@ -3848,8 +3844,6 @@ onPurchasesUpdated 状态分流:
   - 发货前写入账本（标记为 \`DELIVERED_PENDING_CONSUME\`）➔ 执行发货 ➔ 执行 consume ➔ 成功后移除记录；
   - **补单时精准分流**：启动恢复扫描到未消费订单时，先查账本：**命中账本说明已发过货，仅补偿重发 \`consumePurchase\`；未命中账本说明是新掉单，执行完整发货与入账流程**。
 
----
-
 ### 策略二：断网掉单的主动自愈与多切面扫描矩阵
 
 客户端无法预测用户何时断网或强制退出，必须在生命周期的关键节点构建多重兜底扫描网：
@@ -3874,8 +3868,6 @@ onPurchasesUpdated 状态分流:
 
 - **双轨全量查询**：扫描时必须并行发起 \`queryPurchasesAsync(SUBS)\` 与 \`queryPurchasesAsync(INAPP)\`，遍历所有返回的订单，对未确认的订阅执行补确认，对滞留的消耗品核对账本执行补消费。
 
----
-
 ### 策略三：Google Play IPC 连接状态机与指数退避重试
 
 Google Play 商店本质上是运行在设备底层的独立应用，通过 AIDL Service 与客户端通信。当 Play 商店在后台被省电策略杀死或自更新时，会产生 \`onBillingServiceDisconnected\`。
@@ -3897,8 +3889,6 @@ Google Play 商店本质上是运行在设备底层的独立应用，通过 AIDL
   - 引入指数退避计时器（1s ➔ 2s ➔ 4s ➔ 8s ... 最大 32s 封顶）；
   - 当用户在前台点击发起购买按钮时，重置退避计时器，立即唤起强制重新连接。
 
----
-
 ### 策略四：并发购买防重互斥锁（Purchase In Progress Lock）
 
 - **风险隐患**：在收银台弹窗拉起瞬间，部分用户或自动化脚本会高频快速点击购买按钮，若多次向 BillingClient 提交并发请求，会导致底层状态机紊乱，抛出 \`DEVELOPER_ERROR\`，甚至引发重复扣款。
@@ -3906,8 +3896,6 @@ Google Play 商店本质上是运行在设备底层的独立应用，通过 AIDL
   - 在 SDK 门面层维持全局原子状态锁（如 \`AtomicBoolean\` 或协程互斥锁 \`Mutex\`）；
   - 当调用 \`purchase()\` 时首先抢锁，若已有购买在处理中，直接向回调抛出 \`PURCHASE_IN_PROGRESS\` 错误并拦截请求；
   - 只有在收到 \`onPurchasesUpdated\` 终态、用户主动按返回键取消（\`USER_CANCELED\`）、或遇到网络异常终止时，方可原子释放购买锁。
-
----
 
 ### 策略五：出海防刷与服务端双重校验（Server-side Verification）
 
