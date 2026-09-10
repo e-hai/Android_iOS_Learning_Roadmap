@@ -181,16 +181,7 @@ inline fun <reified T> Gson.fromJson(json: String): T = fromJson(json, object : 
             },
           },
         ],
-        diagram: `┌────────────────────────────┬─────────────────────────────┬────────────────────────────────────┐
-│ 特性类别                   │ 语法怎么写                  │ 什么时候用它 (解决什么痛点)        │
-├────────────────────────────┼─────────────────────────────┼────────────────────────────────────┤
-│ 1. 泛型型变 (out / in)     │ interface C<out T, in R>    │ 容器赋值类型不匹配，PECS 生产消费安全 │
-│ 2. 委托机制 (by)           │ val x by lazy / : I by inst │ 消除大量重复 get/set 样板或转发生命周期 │
-│ 3. 扩展 (fun / val)        │ fun View.gone()             │ 不动源码为既有类注入领域业务方法   │
-│ 4. 带接收者 Lambda         │ block: Config.() -> Unit    │ 消除多余配置前缀，设计流畅树形 DSL │
-│ 5. 内联优化 (inline)       │ inline fun measure(b)       │ 消除高阶函数 Lambda 临时对象的 GC  │
-│ 6. 泛型具现化 (reified)    │ inline fun <reified T> foo()│ 免传 T::class.java，保留运行时真实类型│
-└────────────────────────────┴─────────────────────────────┴────────────────────────────────────┘`,
+        diagram: 'kotlin-features',
         caseStudy: `### 疑难一：泛型通配与集合类型转换失败（深入 PECS 与声明处型变）
 
 - **业务场景痛点**：

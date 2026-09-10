@@ -2,6 +2,7 @@ import { deepDiveDomains } from '../data/deep-dive-data';
 import { DeepDiveDomain, DeepDiveModule, PipelineStep, StepperStep } from '../models/types';
 import { i18n } from '../services/i18n';
 import { renderArchEvolutionDiagram } from './ArchEvolutionDiagram';
+import { renderKotlinFeaturesVisual, KOTLIN_FEATURES_MARKDOWN } from './KotlinFeaturesVisual';
 import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
@@ -152,6 +153,7 @@ function renderSingleChapterView(
 
     const isArchEvolution = mod.diagram.startsWith('arch-evolution');
     const isPerfLoop = mod.diagram.startsWith('perf-loop');
+    const isKotlinFeatures = mod.diagram.startsWith('kotlin-features');
     diagramSection.innerHTML = `
       <div class="section-header" style="margin-top:24px;">
         <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
@@ -161,6 +163,8 @@ function renderSingleChapterView(
         ? `<div class="arch-evo-wrapper">${renderArchEvolutionDiagram()}</div>`
         : isPerfLoop
         ? `<div class="perf-loop-wrapper">${renderPerfLoopDiagram()}</div>`
+        : isKotlinFeatures
+        ? `<div class="kotlin-features-wrapper">${renderKotlinFeaturesVisual()}</div>`
         : `<div class="box-diagram-card">
         <div class="box-diagram-header">
           <div class="box-diagram-dots">
@@ -185,6 +189,17 @@ function renderSingleChapterView(
     copyDiagBtn?.addEventListener('click', () => {
       navigator.clipboard.writeText(mod.diagram || '');
       const span = copyDiagBtn.querySelector('span');
+      if (span) {
+        const original = span.textContent;
+        span.textContent = i18n.t('detail.deepdive.copied');
+        setTimeout(() => { span.textContent = original; }, 2000);
+      }
+    });
+
+    const copyKtBtn = diagramSection.querySelector('#btn-copy-kt-features') as HTMLButtonElement;
+    copyKtBtn?.addEventListener('click', () => {
+      navigator.clipboard.writeText(KOTLIN_FEATURES_MARKDOWN);
+      const span = copyKtBtn.querySelector('span');
       if (span) {
         const original = span.textContent;
         span.textContent = i18n.t('detail.deepdive.copied');
