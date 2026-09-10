@@ -10,7 +10,7 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
           explanation: '核心原理解析与设计哲学',
           diagram: '六大特性的设计哲学与工程破局卡片',
           diagramCaption: 'Kotlin 现代语法糖与工程提效全景图',
-          caseStudy: '三、实战场景下的疑难问题与破局方案',
+          caseStudy: '三、详细的使用例子',
         },
         explanation: `### 1. 语法糖背后的工程本质：少写样板与零开销抽象
 Kotlin 的现代语言特性并非单纯的“语法杂耍”，其核心设计哲学是**消除 Java 历史包袱中的防御性样板代码**，并在编译期通过静态推导将高级抽象抹平为高性能字节码：
