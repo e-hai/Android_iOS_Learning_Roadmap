@@ -8,11 +8,11 @@
 
 export const KOTLIN_FEATURES_MARKDOWN = `### Kotlin 六大现代特性的语言设计哲学全景图
 
-1. **泛型型变 (out / in)**
-   - 核心隐喻：一筐苹果到底能不能当成一筐水果送给别人？
-   - 历史问题：Java 中 List<Dog> 无法直接赋值给 List<Animal>，导致调用点必须繁琐地手写 ? extends Animal / ? super Dog（PECS 原则）。
-   - 设计思路：既然某些类只吐出数据或只接收数据，直接在“定义类”时一次性向编译器声明读写契约（声明处型变），全工程调用点自然转换，零通配符。
-   - 典型场景：List<out E> 只读集合、Flow<out T> 数据流、Comparable<in T>。
+1. **泛型 (Generics)**
+   - 核心隐喻：写一套模板适配万物，一筐苹果能不能当成一筐水果？
+   - 历史问题：传统泛型要么缺乏多重上界约束，要么遭遇不可赋值的“型变墙”（Java 中 List<Dog> 无法赋给 List<Animal>），迫使调用方在每个方法参数中痛苦地手写 ? extends / ? super。
+   - 设计思路：在编译期提供绝对的类型安全与极致的代码复用。通过上界约束限制范围；通过声明处型变（out 协变 / in 逆变）在类定义时一次性声明生产/消费协议，全工程调用处自然转换。
+   - 典型场景：泛型约束、List<out E> 只读集合、Flow<out T> 数据流、Comparable<in T> 消费者。
 
 2. **委托机制 (by)**
    - 核心隐喻：专业的事交给专门的代理人跑腿，主类只挂名。
@@ -77,13 +77,13 @@ export function renderKotlinFeaturesVisual(): string {
             <div class="kt-sc-title-wrap">
               <span class="kt-sc-badge num-purple">01</span>
               <div class="kt-sc-headings">
-                <h4 class="kt-sc-title">泛型型变 (out / in)</h4>
-                <span class="kt-sc-metaphor">“一筐苹果到底能不能当成一筐水果送给别人？”</span>
+                <h4 class="kt-sc-title">泛型 (Generics)</h4>
+                <span class="kt-sc-metaphor">“写一套模板适配万物，一筐苹果能不能当成一筐水果？”</span>
               </div>
             </div>
             <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-purple">out (只出不进)</span>
-              <span class="kt-pill pill-purple">in (只进不出)</span>
+              <span class="kt-pill pill-purple">上界与多重约束</span>
+              <span class="kt-pill pill-purple">out 协变 / in 逆变</span>
               <span class="kt-pill pill-gray">声明处一次生效</span>
             </div>
           </div>
@@ -92,15 +92,14 @@ export function renderKotlinFeaturesVisual(): string {
             <div class="kt-sc-box box-pain">
               <div class="kt-box-label label-pain">历史问题</div>
               <p class="kt-box-text">
-                现实中“一筐苹果”显然能当成“一筐水果”送人。但在 Java 泛型里，<code>List&lt;Apple&gt;</code> 绝不能赋给 <code>List&lt;Fruit&gt;</code>，编译器会直接报错！因为编译器害怕别人持有这个引用后，往这筐“苹果”里塞入一个香蕉。<br>
-                Java 的解法是把压力全甩给调用者：要求在调用点到处手写晦涩的通配符 <code>? extends Fruit</code> 和 <code>? super Apple</code>，导致所有人天天被 PECS 规则绕得晕头转向。
+                泛型开发中面临两大阻碍：一是类型范围不明确时难以进行多接口复合约束；二是严重的“赋值隔阂”——现实中“一筐苹果”显然能当成“一筐水果”送人，但在 Java 泛型里 <code>List&lt;Apple&gt;</code> 绝不能赋给 <code>List&lt;Fruit&gt;</code>，导致调用方不得不天天手写晦涩的 <code>? extends Fruit</code> 和 <code>? super Apple</code> 通配符，极易出错。
               </p>
             </div>
 
             <div class="kt-sc-box box-idea">
               <div class="kt-box-label label-idea">设计思路</div>
               <p class="kt-box-text">
-                “既然这个类在业务上<strong>从头到尾都只负责往外吐数据（生产者），压根不提供任何写入修改接口</strong>，为什么不在<strong>定义类的一开始</strong>就跟编译器签好协议？只要向编译器保证‘我只出不进’，编译器就可以完全放心地允许它自然向上转型，调用者再也不用手写任何通配符！”
+                “泛型要做到<strong>编译期强类型安全与最大化代码复用</strong>。对于能力边界，提供清晰的 <code>T : Comparable&lt;T&gt;</code> 上界与 <code>where</code> 多重约束；对于容器转换，直接在<strong>定义类时声明读写契约</strong>：承诺只读不写标 <code>out</code>、只写不读标 <code>in</code>，编译器完全放行安全转型，调用端零额外心智负担！”
               </p>
             </div>
           </div>
@@ -109,20 +108,25 @@ export function renderKotlinFeaturesVisual(): string {
             <div class="kt-code-header">
               <span class="kt-code-tab">代码实现</span>
             </div>
-            <pre class="kt-code-pre"><code><span class="kt-c-k">interface</span> <span class="kt-c-t">Source</span>&lt;<span class="kt-c-k">out</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">produce</span>(): <span class="kt-c-t">T</span> } <span class="kt-c-m">// out 承诺只读：编译器禁止 T 作为修改入参</span>
+            <pre class="kt-code-pre"><code><span class="kt-c-m">// 1. 泛型约束：限定 T 具备可比较性</span>
+<span class="kt-c-k">fun</span> &lt;<span class="kt-c-t">T</span> : <span class="kt-c-t">Comparable</span>&lt;<span class="kt-c-t">T</span>&gt;&gt; <span class="kt-c-f">maxOf</span>(a: <span class="kt-c-t">T</span>, b: <span class="kt-c-t">T</span>): <span class="kt-c-t">T</span> = <span class="kt-c-k">if</span> (a &gt; b) a <span class="kt-c-k">else</span> b
 
-<span class="kt-c-k">val</span> appleSource: <span class="kt-c-t">Source</span>&lt;<span class="kt-c-t">Apple</span>&gt; = ...
-<span class="kt-c-k">val</span> fruitSource: <span class="kt-c-t">Source</span>&lt;<span class="kt-c-t">Fruit</span>&gt; = appleSource <span class="kt-c-m">// 自然赋值，全工程调用处无需再写 ? extends</span></code></pre>
+<span class="kt-c-m">// 2. 声明处协变 out（生产者只出不进）：自然赋值，全工程免写 ? extends</span>
+<span class="kt-c-k">interface</span> <span class="kt-c-t">Source</span>&lt;<span class="kt-c-k">out</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">produce</span>(): <span class="kt-c-t">T</span> }
+<span class="kt-c-k">val</span> fruitSource: <span class="kt-c-t">Source</span>&lt;<span class="kt-c-t">Fruit</span>&gt; = appleSource <span class="kt-c-m">// 合法安全向上转换</span>
+
+<span class="kt-c-m">// 3. 声明处逆变 in（消费者只进不出）：父类消费者自然适配子类</span>
+<span class="kt-c-k">interface</span> <span class="kt-c-t">Sink</span>&lt;<span class="kt-c-k">in</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">consume</span>(item: <span class="kt-c-t">T</span>) }</code></pre>
           </div>
 
           <div class="kt-sc-footer-grid">
             <div class="kt-sc-foot-item">
               <span class="kt-foot-badge">底层实现</span>
-              <span>纯编译器前端类型检查约束；字节码自动降级为 Java 通配符，<strong>零包装类、零运行时性能罚款</strong>。</span>
+              <span>纯编译器前端类型推导与语法校验；JVM 字节码底层做类型擦除并自动桥接通配符，<strong>零包装类、零运行时性能罚款</strong>。</span>
             </div>
             <div class="kt-sc-foot-item">
               <span class="kt-foot-badge">典型场景</span>
-              <span>Kotlin 只读集合 <code>List&lt;out E&gt;</code>、异步数据流 <code>Flow&lt;out T&gt;</code>、消费者比较器 <code>Comparable&lt;in T&gt;</code>。</span>
+              <span>泛型约束工具、只读集合 <code>List&lt;out E&gt;</code>、异步数据流 <code>Flow&lt;out T&gt;</code>、比较器 <code>Comparable&lt;in T&gt;</code>。</span>
             </div>
           </div>
         </article>

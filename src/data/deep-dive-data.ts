@@ -15,14 +15,20 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
         explanation: `### 1. 语法糖背后的工程本质：少写样板与零开销抽象
 Kotlin 的现代语言特性并非单纯的“语法杂耍”，其核心设计哲学是**消除 Java 历史包袱中的防御性样板代码**，并在编译期通过静态推导将高级抽象抹平为高性能字节码：
 
-- **泛型型变（Variance）**：通过声明处型变（\`in\` 逆变 / \`out\` 协变）解决 Java 通配符（\`? extends\` / \`? super\`）在调用点反复声明的晦涩心智负担，达成生产消费者安全（PECS 原则）。
+- **泛型（Generics）**：通过类型参数约束、声明处型变（\`out\` 协变 / \`in\` 逆变）与类型投影，彻底攻克强类型代码复用与容器安全赋值之间的矛盾，消除 Java 通配符在调用点反复声明的心智负担。
 - **属性与类委托（Delegation）**：以约定胜于配置（Convention）的原则，通过 \`by\` 关键字将访问器转发给独立状态机，将模板逻辑（延迟加载、持久化、生命周期感知）彻底解耦抽离。
 - **扩展（Extensions）**：在无继承、无装饰器样板的前提下对已有封闭类注入专属领域语义，从根源上终结各类反模式的 \`XxxUtils\` 静态工具类堆砌。
 - **内联生态与具现化（Inline & Reified）**：攻克高阶函数 Lambda 闭包对象分配的堆内存损耗，并结合静态内联在编译期将泛型类型元数据内嵌至调用点，彻底打破 JVM 泛型类型擦除（Type Erasure）的铁律枷锁。`,
         diagram: 'kotlin-features',
-        caseStudy: `### 泛型型变：声明处协变与逆变实战
+        caseStudy: `### 泛型：约束、型变与星号投影实战
 \`\`\`kotlin
-// 1. 声明处协变 out：生产者（只读不写），天然支持子类泛型赋给父类泛型
+// 1. 泛型上界与多重约束：限定 T 必须同时满足多个接口协议
+fun <T> copyGreater(list: List<T>, threshold: T): List<T>
+    where T : Comparable<T>, T : Cloneable {
+    return list.filter { it > threshold }
+}
+
+// 2. 声明处协变 out：生产者（只读不写），天然支持子类泛型赋给父类泛型
 interface DataSource<out T> {
     fun fetch(): T // 合法：T 仅作为输出返回值
     // fun save(item: T) // 编译报错：T 不能出现在 in 位置，避免向苹果容器写入香蕉
@@ -35,7 +41,7 @@ fun printData(source: DataSource<Any>) {
 val stringSource: DataSource<String> = object : DataSource<String> { override fun fetch() = "Hello" }
 printData(stringSource) // 安全协变转换，无需繁琐的 ? extends Any
 
-// 2. 声明处逆变 in：消费者（只进不出），允许父类比较器直接用于子类
+// 3. 声明处逆变 in：消费者（只进不出），允许父类比较器直接用于子类
 interface Comparator<in T> {
     fun compare(a: T, b: T): Int // T 仅作为入参消费
 }
@@ -45,9 +51,13 @@ val anyComparator: Comparator<Any> = object : Comparator<Any> {
 }
 val strComparator: Comparator<String> = anyComparator // 安全逆变赋值
 
-// 3. 使用处投影：对双向/可变容器按需限制只读
-fun copy(from: Array<out Any>, to: Array<Any>) {
+// 4. 使用处投影与星号投影 <*>：对未知或可变容器限制读写边界
+fun copyArray(from: Array<out Any>, to: Array<Any>) {
     for (i in from.indices) to[i] = from[i] // from[i] 只能读取，禁止写入
+}
+
+fun printListSize(list: List<*>) {
+    println(list.size) // 不关心具体类型，安全访问集合公共只读属性
 }
 \`\`\`
 
