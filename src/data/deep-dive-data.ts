@@ -3780,17 +3780,110 @@ final class TaskRunner {
       {
         tag: '音视频管线',
         title: 'CameraX 帧采集 ➔ MediaCodec 硬件编码 ➔ PTS/DTS 音画同步',
-        explanation: '工业级视频录制链路：CameraX 配置 ImageAnalysis 或直接输出 Surface 至 MediaCodec 硬件编码器；MediaCodec 从 Surface 提取 YUV 数据并由硬件 ASIC 芯片实时压缩为 H.264/H.265 NALU 单元；编码器输出端轮询 dequeueOutputBuffer，提取 ByteBuffer 与 BufferInfo；通过对齐系统纳秒时钟 (System.nanoTime() / 1000)，确保视频 PTS 与音频 AudioRecord PTS 严格单调递增，最后通过 MediaMuxer 封装为 MP4 容器。',
-        codeSnippet: `// MediaCodec 配置 Surface 输入硬编码
-val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, 1080, 1920).apply {
-    setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-    setInteger(MediaFormat.KEY_BIT_RATE, 6_000_000)
-    setInteger(MediaFormat.KEY_FRAME_RATE, 60)
-    setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-}
-val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
-encoder.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
-val inputSurface = encoder.createInputSurface() // 传递给 OpenGL / CameraX`,
+        sectionTitles: {
+          pipeline: '录制管线',
+          explanation: '音视频录制与硬编架构全景详述',
+          caseStudy: '二、实战场景下的疑难问题与破局方案',
+        },
+        pipeline: [
+          { title: 'CameraX采集', subtitle: '零拷贝Surface绑定 · 规避CPU与GC开销', category: 'engineering' },
+          { title: 'OpenGL特效链', subtitle: 'OES外部纹理采样 · LUT滤镜 · 矩阵校正', category: 'engineering' },
+          { title: '音频高保真', subtitle: 'AudioRecord 48kHz PCM采集 · 环形队列缓冲', category: 'engineering' },
+          { title: 'MediaCodec硬编', subtitle: 'ASIC硬件芯片级并发压缩 · H.264/H.265/AAC', category: 'engineering' },
+          { title: 'PTS/DTS对齐', subtitle: '硬件单调时钟归一化 · 音频为主时钟模型', category: 'engineering' },
+          { title: 'MediaMuxer封装', subtitle: '双轨就绪原子栅栏 · 优雅排水写盘闭环', category: 'engineering' },
+        ],
+        explanation: `### 1. 工业级音视频录制与编码全景架构
+从 Sensor 图像传感器光电采样，到最终封装为可播放的 MP4 文件，现代 Android 音视频工程依托 6 大核心枢纽流转：
+
+- **阶段 01 · CameraX 驱动与零拷贝 Surface 绑定**
+  - **核心机制**：弃用低效的 \`ImageAnalysis\` 逐帧 CPU 内存中转（耗时且引发频繁 GC），通过 \`Preview.Builder.build()\` 将录制目标直接绑定到硬件编码器的 \`InputSurface\` 或 OpenGL FBO 离屏渲染管道，实现底层零拷贝（Zero-Copy）直通硬件。
+- **阶段 02 · OpenGL ES 离屏特效与色域矩阵校准**
+  - **核心机制**：在 CameraX 与 MediaCodec 之间接入渲染管线，通过 OES 外部纹理采样、LUT 调色、美颜滤镜以及视频旋转变换矩阵校正（\`transformMatrix\`），最后调用 \`eglSwapBuffers\` 将帧送入编码器 Surface。
+- **阶段 03 · AudioRecord PCM 高保真双通道采集**
+  - **核心机制**：通过独立的后台音频线程以 \`AudioRecord\` 驱动麦克风硬件，以 44.1kHz / 48kHz、16Bit 双声道连续拉取原始 PCM 数据流，采用环形缓冲区（RingBuffer）隔离采集与编码抖动。
+- **阶段 04 · MediaCodec 双规 ASIC 硬件编码（Video & Audio）**
+  - **视频硬编码（H.264 / H.265）**：配置 \`COLOR_FormatSurface\`，由芯片专用硬件编码器（如高通 Hexagon、联发科 APU）在几毫秒内将 YUV 压制成包含 SPS/PPS 与 IDR/P 帧的 NALU 数据单元；
+  - **音频硬编码（AAC-LC）**：通过 Byte 缓冲模式接收 PCM 原始字节，压缩编码为 ADTS / raw AAC 音频数据包。
+- **阶段 05 · PTS / DTS 纳秒对齐与单调递增校准引擎**
+  - **核心机制**：音视频不同步的本质是基准时钟漂移。采集层必须以系统单调时间（\`System.nanoTime() / 1000\` 微秒）打上初始硬件时间戳，排查负时间戳、倒退时间戳，并保证视频与音频 PTS 严格单调递增。
+- **阶段 06 · MediaMuxer 多路复用与安全封包闭环**
+  - **核心机制**：等待视频轨与音频轨均收到 \`INFO_OUTPUT_FORMAT_CHANGED\` 时，原子启动 Muxer（\`start()\`）；在锁保护下交替写入数据（\`writeSampleData\`），在录制结束时按严苛状态机优雅停止，避免 MP4 头部 \`moov\` 丢失损坏。
+
+### 2. PTS 与 DTS 底层本质：时间戳时钟、解码显示与音画同步模型
+- **PTS 与 DTS 核心差异**：
+  - **DTS（Decode Time Stamp，解码时间戳）**：指示编码包何时被送入解码器芯片执行解码。
+  - **PTS（Presentation Time Stamp，显示时间戳）**：指示该视频帧何时由渲染器在屏幕上渲染显示，或该音频帧何时从喇叭振膜播出。
+  - **为何出现时序错位**：当开启双向预测的 **B 帧（Bi-directional Frame）** 时，B 帧的解码必须依赖后面的 P 帧作为参考。因此在码流中，**后面的 P 帧必须比前面的 B 帧先解码（DTS 提前），但显示时 B 帧依然先显示（PTS 滞后）**，形成 \`DTS <= PTS\` 的交错顺序。
+  - **移动端录制黄金法则**：在手机本地实时录制场景中，工业界通常强制配置 \`KEY_COMPLEXITY\` 或基线 Profile，**禁用 B 帧（即仅包含 I 帧与 P 帧）**。此时 \`PTS == DTS\`，极大降低硬件编码延迟与同步算法复杂度。
+- **音画同步三大经典模型（AV Sync Models）**：
+  - **音频为主时钟（Audio Master，业界公认黄金标准）**：人类耳朵对声音的不连续、卡顿和颤音具有极端敏感性（超过 15ms 即可察觉），而人眼对画面微量掉帧或延迟并不敏感（可容忍 40~80ms）。因此在整个管线中，**以音频硬件采样的纳秒时钟作为全局主锚点（Master Clock）**，视频通过跳帧（丢弃晚到的帧）或重绘（拉伸重复上一帧）主动向音频 PTS 靠拢。
+  - **视频为主时钟（Video Master）**：以显示刷新率为主，音频做重采样或变速拉伸。极易导致音调变调或爆音，仅用于无音频轨道等特殊场景。
+  - **外部物理时钟参考（External Clock）**：以绝对系统墙上时间为基准，音画双轨分别计算误差，常用于跨网络多机位直播同步。
+
+### 3. MediaCodec 异步回调状态机 vs 传统同步轮询（API 21+ 最佳实践）
+- **同步轮询（Synchronous Loop）的缺陷**：在死循环中不断调用 \`dequeueOutputBuffer(timeoutUs)\`，若超时时间设小了容易引发 CPU 空转发热，设大了则引入流水线阻塞，容易导致相机掉帧。
+- **异步回调机制（MediaCodec.Callback，现代工业级推荐）**：
+  - 调用 \`setCallback(object : MediaCodec.Callback)\` 后再进行 \`configure()\`；
+  - 编码器内部线程在硬件有空闲缓冲或完成压缩输出时，通过系统事件主动触发 \`onInputBufferAvailable\` 与 \`onOutputBufferAvailable\`；
+  - 实现全事件驱动的非阻塞处理，吞吐率更平稳，配合协程或 HandlerThread 将 CPU 消耗降至最低。`,
+        caseStudy: `### 疑难一：首帧黑屏与音画不同步（开头音视频时间戳严重漂移）
+
+- **业务场景痛点**：
+  点击录制按钮后，视频编码器已从 Surface 读到画面开始生成数据包，但麦克风 \`AudioRecord\` 由于底层音频硬件驱动（HAL）启动较慢，首个音频 buffer 延迟了 150ms 甚至更晚才返回。如果直接把它们各自的采集时间写进 MP4，会导致合成出的视频**前两秒声音与对白严重错位，或者开头有画面无声音、有声音画面定格**。
+- **破局解决方案（统一单调时钟基准 + 锚点对齐截断机制）**：
+  1. **禁止直接使用 System.currentTimeMillis()**：该时钟受系统授时和网络同步修改，会发生时间倒退或突跳。必须强制使用硬件单调纳秒时钟：\`val nowUs = System.nanoTime() / 1000\`；
+  2. **双轨就绪门禁与基准时间扣除（Time Offset Normalization）**：
+     - 在启动录制时，设立等待屏障：**直到视频轨与音频轨各自产生出第一个合法数据包后，才正式启动计时**；
+     - 记录首帧有效数据的基准时间戳 \`baseTimestampUs = min(firstVideoPts, firstAudioPts)\`；
+     - 后续所有写入 Muxer 的 Sample 数据，统一减去该基准：\`bufferInfo.presentationTimeUs -= baseTimestampUs\`；
+  3. **丢弃开头的孤儿帧**：若视频首帧过早到达而音频尚未启动，在时间差阈值（如 100ms）内丢弃最早的非关键帧，直到音频正常流出，保证 MP4 容器在时间原点（0ms）完全声画对齐。
+
+### 疑难二：MediaMuxer 抛 IllegalStateException 崩溃（轨道就绪时序与状态机倒错）
+
+- **业务场景痛点**：
+  在调用 \`mediaMuxer.writeSampleData()\` 时，控制台频繁抛出 \`IllegalStateException: Muxer is not started\` 或 \`Muxer cannot write after stop\`。许多初学者在拿到视频编码器的 \`INFO_OUTPUT_FORMAT_CHANGED\` 时就立即调用 \`muxer.start()\`，殊不知音频轨此时还没有确定输出格式（Format），导致写入音频轨时抛出严重底层异常崩溃。
+- **破局解决方案（双轨格式就绪原子栅栏 + 并发安全写入队列）**：
+  1. **原子双轨门禁（Track Ready Barrier）**：
+     - 在内存维护原子状态计数器：\`val trackReadyCount = AtomicInteger(0)\`；
+     - 视频编码器输出 \`INFO_OUTPUT_FORMAT_CHANGED\` 时，将视频轨添加至 Muxer，并 \`trackReadyCount.incrementAndGet()\`；
+     - 音频编码器输出格式变更时，同理添加音频轨并递增；
+     - **仅当 \`trackReadyCount.get() == 2\`（视音频轨道均就绪）时，才触发一次性的 \`mediaMuxer.start()\`**；
+  2. **就绪前数据缓冲（Pre-start Queue）**：在 Muxer 尚未 start 之前，编码器提前生成的少量关键元数据和帧缓冲不要丢弃，暂时排入内存安全队列，待 start 瞬间一次性冲刷写入；
+  3. **线程互斥锁保护**：音视频编码位于两个不同线程，\`writeSampleData\` 必须加设同步互斥锁，严禁跨线程并发写入同一 \`MediaMuxer\` 句柄。
+
+### 疑难三：录制结束调用 muxer.stop() 瞬间崩溃或 MP4 文件损坏（缺失 moov 头部元数据）
+
+- **业务场景痛点**：
+  用户点击“停止录制”按钮，UI 层立即调用 \`mediaMuxer.stop()\` 和 \`release()\`，结果抛出 \`IllegalStateException: Failed to stop the muxer\`，并在手机相册中生成一个 0KB 或无法播放的损坏视频。
+  - **核心原因**：MP4 文件格式要求在文件末尾写入关键的 \`moov\`（Movie Header）元数据原子，里面记录了整个视频的时长、关键帧索引表与码流位置。若在编码器尚未完成排水（Drain）或未写入任何关键帧时强行关闭 Muxer，文件索引缺失直接报废。
+- **破局解决方案（EOS 信号注入与优雅排水机制 Graceful Drain）**：
+  1. **视频端通知结束**：调用 \`mediaCodec.signalEndOfInputStream()\` 向编码器 Surface 注入硬件 EOS 标记；
+  2. **音频端注入 EOS 缓冲**：向音频编码器入队一个带有 \`BUFFER_FLAG_END_OF_STREAM\` 标记的空缓冲（0 size）；
+  3. **排水循环等待（Drain Pipeline）**：持续轮询编码器输出端，直到视频轨与音频轨各自读出了带有 \`BUFFER_FLAG_END_OF_STREAM\` 的最终包，并在 \`writeSampleData\` 提交后退出循环；
+  4. **优雅停止**：只有当所有轨道完成闭环后，方可顺序执行 \`muxer.stop()\` 和 \`muxer.release()\`，确保 \`moov\` box 被完整安全地写盘落锁。
+
+### 疑难四：CameraX 动态帧率波动（丢帧/掉帧）导致视频画面像“快进或慢动作”
+
+- **业务场景痛点**：
+  在暗光环境或手机发热降频时，相机传感器（Sensor）会自动降低曝光频率（如从 30fps 掉到 15fps，每一帧曝光时间拉长）。部分开发者在向 MediaCodec 提交 Surface 时，简单按照固定步长累加时间戳（如 \`pts += 33333\` 微秒）。当实际只采集了 15 帧却按照 30 帧的固定步长写入时，播放出来的视频就会呈现不可控的**快放（鬼畜加速）或音画完全脱节**。
+- **破局解决方案（真实物理时间戳透传与智能补帧机制）**：
+  1. **严禁虚拟固定累加**：完全弃用 \`pts += 33333\` 的伪算法；
+  2. **Surface 纹理时间戳透传（updateTexImage Timestamp）**：当使用 OpenGL 离屏中转时，通过 \`surfaceTexture.timestamp\` 获取 CameraX 底层 Camera2 HAL 层生成的纳秒级硬件曝光时间戳，并使用 \`EGLExt.eglPresentationTimeANDROID(display, surface, sensorPtsNs)\` 直接通知编码器；
+  3. **防抖与掉帧平滑保护**：若两帧之间的时间跨度超过阈值（如大于 100ms，严重掉帧），可记录该空隙，在音频轨保持单调的同时，通过 OpenGL 复制上一帧数据重推编码器以维持视觉平滑，杜绝快放异象。
+
+### 疑难五：高分辨率硬编码器由于底层硬件配置冲突抛出 CodecException 崩溃
+
+- **业务场景痛点**：
+  在配置 4K（3840x2160）或 1080P 60fps 时，直接调用 \`MediaCodec.createEncoderByType("video/avc")\` 并 \`configure()\`，部分联发科或低端高通机型直接抛出 \`CodecException: Error 0xfffffc0e\` 或 \`IllegalArgumentException\` 导致无法录制。
+  - **核心原因**：不同手机 GPU/ASIC 硬件编码芯片支持的最高 Level、最大宏块数（Macroblocks）、宽高对齐（如部分机型要求宽必须是 16 的倍数）以及颜色空间配置差异巨大。
+- **破局解决方案（编码器能力自省协商与动态降级矩阵）**：
+  1. **MediaCodecList 动态自省**：在初始化前，遍历 \`MediaCodecList(REGULAR_CODECS)\` 检索指定 MIME 类型的编码器，调用 \`codecInfo.getCapabilitiesForType(mime)\` 获取 \`CodecCapabilities\`；
+  2. **安全参数裁剪**：
+     - 调用 \`capabilities.videoCapabilities.isSizeSupported(width, height)\` 检测目标分辨率是否被硬件芯片支持；
+     - 校验目标帧率 \`isFrameRateSupported(frameRate)\`；
+     - 针对不满足 16/32 字节对齐的奇数分辨率执行安全向上对齐（\`alignedWidth = (width + 15) / 16 * 16\`）；
+  3. **三级平滑降级矩阵**：若 4K 60fps 协商失败，自动退避至 1080P 60fps ➔ 1080P 30fps ➔ 720P 30fps 兼容模式，保证在数千款碎片化 Android 手机上 100% 成功起播录制。`,
       },
     ],
     ios: [
