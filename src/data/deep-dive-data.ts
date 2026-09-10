@@ -2129,13 +2129,207 @@ class UserPreferencesRepository(private val context: Context) {
     ],
     ios: [
       {
+        tag: '现代语言',
+        title: 'Swift 现代核心特性：泛型、协议导向 (POP)、属性包装器与不透明类型',
+        sectionTitles: {
+          explanation: '五大特性设计思路与底层机制',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 特性一：泛型与类型擦除（Generics & Type Erasure）
+
+**历史问题**：
+早期 Objective-C 缺乏真正的泛型系统，容器内部均退化为 \`id\` 指针，类型安全全凭开发者记忆与运行时强制转换，稍有不慎即触发 \`unrecognized selector sent to instance\` 致命崩溃。在 Swift 早期，虽然引入了静态泛型与协议关联类型（\`associatedtype\`），但带有关联类型的协议无法直接作为普通变量类型声明（报 \`Protocol can only be used as a generic constraint\`），导致异构容器存储极度困难。
+
+**设计思路**：
+Swift 采取“编译期静态多态优先”的设计哲学。对于具体泛型函数或结构体，LLVM 编译器在编译期执行泛型特化（Generics Specialization），将泛型代码针对具体类型（如 \`Int\`、\`String\`）直接展开生成专用机器码，消除装箱与虚函数寻址开销。针对关联类型协议无法直接作为类型使用的痛点，标准库设计了“类型擦除容器”（如 \`AnySequence\`、\`AnyView\`），通过内部包裹一个持有真实泛型实例并转发接口的私有类，对外隐藏具体类型。
+
+**底层实现**：
+非特化泛型底层通过传递 **Value Witness Table (VWT)** 和 **Protocol Witness Table (PWT)** 实现。VWT 负责泛型类型的内存分配、拷贝、析构与生命周期管理；PWT 负责协议方法的间接函数指针跳转。对于类引用的泛型使用单一指针元数据（Metadata Pointer），值类型则在栈上分配 24 字节的 Existential Container（前 3 个机器字用于内联存储，超出则溢出至堆），实现零类型丢失的高性能动态调度。
+
+### 特性二：协议导向编程（Protocol-Oriented Programming）
+
+**历史问题**：
+传统面向对象编程（OOP）重度依赖单一父类继承树。当业务规模膨胀时，基类往往演变为杂糅网络、埋点、生命周期等数十种能力的臃肿“上帝类”（God Class）。子类继承不得不无辜承受父类的所有状态和副作用，脆弱基类问题频发；同时 Swift 的 \`struct\`（结构体）与 \`enum\`（枚举）等极佳的高性能值类型天生不支持类继承。
+
+**设计思路**：
+POP 提倡“组合优于继承，水平扩展优于垂直继承”。将能力横向拆解为细粒度的微协议（如 \`Identifiable\`、\`Codable\`、\`Equatable\`）。结构体与类可根据需要遵守多个协议（协议组合 \`A & B\`）。更关键的是引入 **协议扩展（Protocol Extension）**，允许为协议方法提供默认实现，使得遵守协议的类型无需手写重复样板代码，优雅实现混入（Mixin）模式。
+
+**底层实现**：
+若协议方法在协议定义体中声明，调用时通过实例绑定的 **Protocol Witness Table (PWT)** 查找虚函数表，支持动态多态重写；若方法仅在协议扩展中声明（未在协议原型声明），则编译器将其视为静态分发（Direct Dispatch），直接在编译期绑定函数地址，不查虚表，消除虚函数查找开销，但不支持运行时动态多态重写。
+
+### 特性三：属性包装器（Property Wrappers）
+
+**历史问题**：
+在移动端工程中，数据读写的辅助逻辑极度繁复（例如：写入 UserDefaults 持久化、数值上下限钳制 Clamped、主线程强制赋值、状态变更通知等）。以往只能在每个属性的 \`get / set\` 计算属性中重复编写样板代码，极易遗漏或出现线程安全漏洞。
+
+**设计思路**：
+Swift 5.1 引入 \`@propertyWrapper\`，将“属性的存储与访问策略”抽象为独立的泛型结构体。通过在属性前添加注解，编译器自动将普通属性代理给包装器实例。定义 \`wrappedValue\` 作为主值读写通道，并支持可选的 \`projectedValue\`（投射值，使用 \`$\` 前缀访问），为外界暴露包装器本身的附加能力（例如 SwiftUI 中 \`@State\` 的 \`$\` 投射出双向绑定的 \`Binding\` 实例）。
+
+**底层实现**：
+对于标记了 \`@Wrapper var count: Int\` 的属性，Swift 编译器在底层自动生成一个名为 \`_count\` 的隐藏私有存储字段（类型为包装器本身 \`Wrapper<Int>\`），并将原属性 \`count\` 改写为计算属性，其 \`getter\` 与 \`setter\` 直接转发调用 \`_count.wrappedValue\`。投射值 \`$count\` 则直接映射为 \`_count.projectedValue\`。
+
+### 特性四：不透明返回类型（Opaque Types：some 与 any）
+
+**历史问题**：
+在声明式 UI（如 SwiftUI）中，视图组件通过嵌套修饰符构建（如 \`Text().padding().background()\`）。如果返回具体类型，其返回签名将膨胀为极其恐怖且脆弱的泛型嵌套类型 \`ModifiedContent<ModifiedContent<Text, _PaddingLayout>, _BackgroundModifier<Color>>\`，一旦内部调整修饰符顺序，外部接口即被严重破坏。而若返回传统协议类型，又会丢失具体类型的类型同一性并带来存在容器装箱性能开销。
+
+**设计思路**：
+Swift 5.1 引入 \`some\` 关键字（不透明返回类型，反向泛型）。函数声明 \`some View\`，对外部调用方隐藏具体类型细节，但编译器在内部严格保证返回的是唯一确定、强类型的具体类型，完美保持类型同一性与内联优化能力。Swift 5.7 进一步引入 \`any\` 关键字明确区分“存在类型（Existential Type）”，强制开发者显式写出 \`any Protocol\`，清晰表达需要动态装箱与运行时开销的意图。
+
+**底层实现**：
+\`some\` 类型在 LLVM 编译管线中被视为静态泛型具现化。编译器完全知晓其实际底层类型，不需要 Existential Container 盒子装箱，内存布局直接紧凑分配在栈上，函数调用可直接内联优化；\`any\` 类型则必须使用 24 字节存在容器分配，遇到方法调用必经 PWT 间接寻址，两者在底层指令和内存开销上界限分明。
+
+### 特性五：结果构建器（Result Builders）
+
+**历史问题**：
+在传统命令式代码中构建树状层级数据（如 HTML 树、UI 布局树、配置规则集）时，需要频繁创建临时局部数组，反复调用 \`append()\`、嵌套判断与合并，代码充斥着机械性过程式代码，层级结构难以直观阅读。
+
+**设计思路**：
+Swift 引入 \`@resultBuilder\`，允许开发者将普通的多行代码块转化为强大的领域特定语言（DSL）。通过在静态结构体中实现 \`buildBlock\`、\`buildEither\`、\`buildOptional\`、\`buildArray\` 等静态方法，编译器在 AST 解析阶段自动将花括号内的换行语句与条件控制流重写为对构建器方法的链式调用，声明式构建视图或数据树。
+
+**底层实现**：
+编译器在前端语义分析阶段改写 AST：花括号中的每个独立表达式被作为入参传递给 \`Builder.buildBlock(v1, v2, ...)\`；\`if-else\` 分支被改写为 \`Builder.buildEither(first:)\` 与 \`Builder.buildEither(second:)\`；\`for\` 循环被改写为 \`Builder.buildArray()\`。纯语法糖在编译期完成展开，运行时无任何反射解析开销。`,
+        caseStudy: `### 例子一：类型擦除 AnyRepository 与泛型特化封装
+
+\`\`\`swift
+// 1. 定义含关联类型的业务仓库协议
+protocol Repository {
+    associatedtype Entity
+    func fetch(by id: String) async throws -> Entity
+}
+
+// 2. 传统方案无法声明 var repo: Repository，需构建类型擦除盒子
+final class AnyRepository<T>: Repository {
+    private let _fetch: (String) async throws -> T
+
+    // 接收任意遵守 Repository 且关联实体匹配的具体泛型实例
+    init<R: Repository>(_ repository: R) where R.Entity == T {
+        // 将具体的 fetch 方法以闭包形式捕获，完成类型擦除
+        self._fetch = repository.fetch
+    }
+
+    func fetch(by id: String) async throws -> T {
+        return try await _fetch(id)
+    }
+}
+
+// 3. 具体实现类（编译期享受泛型特化）
+struct UserRepository: Repository {
+    typealias Entity = String
+    func fetch(by id: String) async throws -> String { "User_\\(id)" }
+}
+
+// 4. 异构容器安全存储
+class AccountViewModel {
+    // 对外隐藏具体实现类，仅暴露擦除后的统一门面
+    private let repo: AnyRepository<String>
+    init(repo: AnyRepository<String>) { self.repo = repo }
+}
+\`\`\`
+
+### 例子二：自定义属性包装器实现防抖与类型安全持久化
+
+\`\`\`swift
+// 1. 类型安全的 UserDefaults 自动持久化包装器
+@propertyWrapper
+struct Storage<T: Codable> {
+    private let key: String
+    private let defaultValue: T
+    private let storage: UserDefaults
+
+    init(key: String, defaultValue: T, storage: UserDefaults = .standard) {
+        self.key = key
+        self.defaultValue = defaultValue
+        self.storage = storage
+    }
+
+    // 主属性读写通道
+    var wrappedValue: T {
+        get {
+            guard let data = storage.data(forKey: key),
+                  let val = try? JSONDecoder().decode(T.self, from: data) else {
+                return defaultValue
+            }
+            return val
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                storage.set(data, forKey: key)
+            }
+        }
+    }
+
+    // 投射值：暴露重置默认值能力 ($setting.reset())
+    var projectedValue: Storage<T> { self }
+    func reset() { storage.removeObject(forKey: key) }
+}
+
+// 2. 业务使用（告别样板 get/set 与硬编码字符串）
+final class AppSettings {
+    @Storage(key: "is_dark_mode", defaultValue: false)
+    static var isDarkMode: Bool
+
+    @Storage(key: "auth_token", defaultValue: "")
+    static var authToken: String
+}
+\`\`\`
+
+### 例子三：POP 协议组合与默认实现构建解耦网络服务
+
+\`\`\`swift
+// 1. 细粒度能力协议拆分
+protocol APIEndpoint {
+    var baseURL: URL { get }
+    var path: String { get }
+    var method: String { get }
+}
+
+// 2. 协议扩展提供默认实现（消除样板代码）
+extension APIEndpoint {
+    var baseURL: URL { URL(string: "https://api.example.com/v1")! }
+    var method: String { "GET" }
+    
+    // 生成完整 URLRequest 默认能力
+    func makeRequest() -> URLRequest {
+        let url = baseURL.appendingPathComponent(path)
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return request
+    }
+}
+
+// 3. 授权协议与组合应用
+protocol AuthorizedEndpoint: APIEndpoint {
+    var token: String { get }
+}
+
+extension AuthorizedEndpoint {
+    func makeAuthorizedRequest() -> URLRequest {
+        var req = makeRequest()
+        req.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")
+        return req
+    }
+}
+
+// 4. 具体业务端点仅需声明差异字段
+struct UserProfileEndpoint: AuthorizedEndpoint {
+    let path = "/users/me"
+    let token: String
+}
+\`\`\``,
+      },
+      {
         tag: '并发底层',
-        title: 'Swift 并发',
+        title: 'Swift 并发：协作式线程池、结构化 Task 树与 Actor 隔离',
+        sectionTitles: {
+          caseStudy: '详细的使用例子',
+        },
         pipeline: [
           { title: '协程概念', subtitle: 'Conway 1963 · 协作式让出控制权', category: 'theory' },
           { title: '续延语义 async/await', subtitle: 'Lattner 2021 · 编译期挂起点改写', category: 'theory' },
           { title: '无栈异步栈帧', subtitle: 'Async Frame 分配于堆，释放 Worker 线程', category: 'theory' },
-          { title: 'UnsafeContinuation 接口', subtitle: '桥接异步回调与 Swift 协程状态机', category: 'engineering' },
+          { title: 'Continuation 接口', subtitle: '桥接异步回调与 Swift 协程状态机', category: 'engineering' },
           { title: '结构化 Task 树', subtitle: 'withTaskGroup 级联取消与优先级继承', category: 'engineering' },
           { title: 'Actor + 协作线程池', subtitle: '数据隔离与 CPU 核心数绑定调度', category: 'engineering' },
         ],
@@ -2148,8 +2342,8 @@ class UserPreferencesRepository(private val context: Context) {
 ### 3. 无栈异步栈帧（Async Frame）：堆上生命周期
 - **核心策略**：Swift 编译器将跨挂起点的局部变量打包存入堆上的 **Async Frame**，当前线程立即返回；异步 I/O 完成后，调度器分配空闲 Worker 从 Async Frame 恢复执行。
 
-### 4. UnsafeContinuation 接口：桥接异步回调
-- **工程实现**：通过 \`withCheckedContinuation\` / \`withUnsafeContinuation\` 将传统 Callback 回调包装为挂起函数，手动调用 \`continuation.resume(returning:)\` 推进状态。
+### 4. Continuation 接口：桥接传统异步回调
+- **工程实现**：通过 \`withCheckedThrowingContinuation\` 将传统 Callback 包装为挂起函数，手动调用 \`continuation.resume(returning:)\` 推进状态。
 
 ### 5. 结构化 Task 树：生命周期与级联取消
 - **Task 树拓扑**：父 Task 自动等待子 Task 结束；父 Task 被取消时（如 SwiftUI \`.task\` 随视图销毁），自动向下广播 \`isCancelled\` 信号。
@@ -2241,46 +2435,718 @@ actor SafeStore {
     func deposit(_ amount: Double) { balance += amount }
 }
 \`\`\``,
-      },
+        caseStudy: `### 例子一：CheckedContinuation 桥接旧版 GCD/Callback 回调
 
-      {
-        tag: '渲染底层',
-        title: 'SwiftUI AttributeGraph 属性图与 @Observable 依赖追踪',
-        explanation: 'SwiftUI 核心依赖由 C++ 编写的 AttributeGraph 属性依赖图。每个 SwiftUI View 结构体在评估 body 时，系统会自动订阅其读取的所有状态属性（如 @State, @Binding 或 Swift 5.9 的 @Observable）。AttributeGraph 将 View 与具体属性建立有向无环图 (DAG)。当某一属性值改变时，AttributeGraph 仅沿 DAG 拓扑路径精确定位并重绘受影响的子视图节点，完全避免了整棵视图树的无谓重新计算。',
-        codeSnippet: `// Swift 5.9 宏 @Observable 精确订阅追踪
-@Observable
-final class ProfileViewModel {
-    var name: String = "Alice" // 仅当 name 改变时刷新读取了 name 的组件
-    var age: Int = 28          // 仅当 age 改变时刷新读取了 age 的组件
+\`\`\`swift
+// 遗留 SDK 的 Completion Handler 回调接口
+func fetchUserInfoLegacy(userId: String, completion: @escaping (Result<String, Error>) -> Void) {
+    DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
+        completion(.success("User: \\(userId)"))
+    }
 }
 
-struct UserProfileView: View {
-    @State private var vm = ProfileViewModel()
-    var body: some View {
-        Text(vm.name) // 仅订阅了 vm.name
+// 使用 withCheckedThrowingContinuation 转换为现代 async/await
+func fetchUserInfo(userId: String) async throws -> String {
+    try await withCheckedThrowingContinuation { continuation in
+        fetchUserInfoLegacy(userId: userId) { result in
+            switch result {
+            case .success(let info):
+                // resume 只能且必须被调用一次，重复调用会触发运行时致命错误
+                continuation.resume(returning: info)
+            case .failure(let error):
+                continuation.resume(throwing: error)
+            }
+        }
     }
-}`,
+}
+\`\`\`
+
+### 例子二：TaskGroup 结构化并发批处理与并发度限流
+
+\`\`\`swift
+// 并发下载图片列表，限制最大同时下载并发数为 3
+func downloadImages(urls: [URL], maxConcurrent: Int = 3) async throws -> [URL: Data] {
+    try await withThrowingTaskGroup(of: (URL, Data).self) { group in
+        var results: [URL: Data] = [:]
+        var submitted = 0
+
+        // 1. 首先填满并发窗口
+        for url in urls.prefix(maxConcurrent) {
+            group.addTask {
+                let (data, _) = try await URLSession.shared.data(from: url)
+                return (url, data)
+            }
+            submitted += 1
+        }
+
+        // 2. 每完成一个任务，补充提交下一个，实现恒定窗口滑动
+        for try await (url, data) in group {
+            results[url] = data
+            if submitted < urls.count {
+                let nextUrl = urls[submitted]
+                group.addTask {
+                    let (d, _) = try await URLSession.shared.data(from: nextUrl)
+                    return (nextUrl, d)
+                }
+                submitted += 1
+            }
+        }
+        return results
+    }
+}
+\`\`\`
+
+### 例子三：Actor 线程隔离与 Actor Reentrancy 重入防重
+
+\`\`\`swift
+actor ImageCacheManager {
+    private var cache: [URL: UIImage] = [:]
+    // 关键：缓存进行中的 Task，防止重复请求打穿后端（Actor 重入防刷）
+    private var inFlightTasks: [URL: Task<UIImage, Error>] = [:]
+
+    func loadImage(from url: URL) async throws -> UIImage {
+        // 1. 命中内存缓存
+        if let image = cache[url] { return image }
+
+        // 2. 若已有正在下载的 Task，直接等待其结果（避免并发重复下载）
+        if let existingTask = inFlightTasks[url] {
+            return try await existingTask.value
+        }
+
+        // 3. 创建独立任务并记录在进行中表
+        let task = Task { () -> UIImage in
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard let img = UIImage(data: data) else { throw URLError(.cannotDecodeContentData) }
+            return img
+        }
+        inFlightTasks[url] = task
+
+        do {
+            // await 会让出 Actor 执行权（Reentrancy 点）
+            let img = try await task.value
+            cache[url] = img
+            inFlightTasks.removeValue(forKey: url)
+            return img
+        } catch {
+            inFlightTasks.removeValue(forKey: url)
+            throw error
+        }
+    }
+}
+\`\`\``,
       },
       {
-        tag: '网络底层',
-        title: 'URLSession 后台守护、URLProtocol 拦截与并发控制',
-        explanation: 'iOS 的 URLSession 支持 Default、Ephemeral（内存不存盘）与 Background 三种会话模式。Background URLSession 会将下载/上传任务托管给系统的 nsurlsessiond 独立守护进程；即使 App 被系统挂起或由于内存不足被杀死，下载任务仍在后台继续传输，传输完成后系统自动唤醒 App 并回调 AppDelegate 的 handleEventsForBackgroundURLSession。通过自定义 URLProtocol，可以拦截并重写全局 HTTP 请求进行 Mock、缓存与数据加解密。',
-        codeSnippet: `// 自定义 URLProtocol 拦截全局网络请求
-class CustomNetworkInterceptor: URLProtocol {
+        tag: '声明式 UI',
+        title: 'SwiftUI 运行时机制：AttributeGraph 依赖追踪与状态局部无效化',
+        sectionTitles: {
+          explanation: '四大核心机制与渲染底层',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：View 纯值类型与声明式渲染管线
+
+**历史问题**：
+UIKit 时代采用重量级引用类型（\`UIView\` / \`UIViewController\`），视图持有复杂可变状态与树状层级关系。开发者必须手动调用 \`addSubview\`、编写自动布局约束、监听事件并手动修改子视图属性（如 \`label.text = @"new"\`）。当多线程或复杂异步回调交织时，UI 视图与数据源极易脱节，引发图层重叠、状态错乱等 Bug。
+
+**设计思路**：
+SwiftUI 将 \`View\` 抽象为不可变轻量纯值类型结构体（\`struct\`）。\`body\` 计算属性是当前状态到视图界面的纯函数映射（\`UI = f(State)\`）。当状态改变时，SwiftUI 不是命令式修改现有的视图对象，而是以微秒级耗时在栈上重新计算生成新的 View 结构体描述，交由底层引擎与旧树做差异比对。
+
+**底层实现**：
+SwiftUI View 并非真正的渲染载体，它只是一份轻量级的“布局蓝图”。底层由 C++ 编写的渲染系统将 View 结构体转化为底层的 RenderNode，最终映射为 CoreAnimation 的 \`CALayer\`。因为 struct 分配在栈上，创建与销毁代价微乎其微，即便每一帧重新生成 View 实例也不会导致堆内存分配抖动。
+
+### 核心机制二：AttributeGraph 属性依赖图与局部无效化
+
+**历史问题**：
+在声明式框架中，如果每当状态改变就粗暴遍历并重新执行整棵组件树的 \`body\`，随着页面层级加深，CPU 算力将迅速耗尽，引发严重的掉帧与卡顿。
+
+**设计思路**：
+SwiftUI 内部构建了一套基于有向无环图（DAG）的高性能依赖图引擎——**AttributeGraph**。当某个 View 的 \`body\` 在求值执行时，所有被其读取的状态属性（如 \`@State\`、\`@Binding\` 或 \`@Observable\` 字段）会被自动注册为该 View 节点的上游依赖。只有当上游节点的值真正发生变化时，AttributeGraph 才会精准标记该叶子节点为无效（Invalidated），仅触发该特定节点的 \`body\` 重新求值。
+
+**底层实现**：
+AttributeGraph 运行在底层 C++ 运行时层。每个属性被封装为 Graph Node，求值时通过 TLS（线程局部存储）维护一个当前的求值上下文栈（Evaluation Context）。当调用状态属性的 \`get\` 访问器时，该属性节点与当前栈顶 View 节点建立一条有向依赖边。状态修改触发 \`AttributeGraph.invalidate()\`，引擎在下一个 VSYNC 垂直同步信号到来时沿 DAG 拓扑排序更新，消除无谓计算。
+
+### 核心机制三：@State、@Binding 与 @Observable 宏的订阅差异
+
+**历史问题**：
+在 Swift 5.9 之前，复杂状态管理依赖 Combine 框架的 \`ObservableObject\` 与 \`@Published\`。其最大缺陷是粒度过粗：只要 Class 内任何一个 \`@Published\` 属性变化，\`objectWillChange\` 发射信号，所有订阅该对象的 View 哪怕只读取了无关字段，也会被迫全量重绘刷新。
+
+**设计思路**：
+Swift 5.9 引入 **Observation 框架**（基于宏 \`@Observable\`）。不再依赖 Combine Publisher，而是在编译期通过宏展开为每个可观察属性注入属性访问拦截。当 View 的 \`body\` 读取 \`vm.title\` 时，系统仅建立 View 对 \`title\` 单一属性的精确订阅。若后续只修改了 \`vm.subtitle\`，读取了 \`title\` 的 View 绝不会发生重组刷新，真正做到了属性级别的细粒度感知。
+
+**底层实现**：
+\`@Observable\` 宏在底层自动插入一个 \`ObservationRegistrar\` 实例。在属性的 \`get\` 访问器中调用 \`registrar.access(self, keyPath: \\.title)\`，在 \`set\` 中调用 \`registrar.withMutation(of: keyPath)\`。在 SwiftUI 渲染求值期间，\`withObservationTracking\` 作用域捕获执行期读取的所有 KeyPath，实现属性维度的微观依赖图绑定。
+
+### 核心机制四：结构标识（Structural Identity）与状态重置防坑
+
+**历史问题**：
+开发者常常遇到奇怪的 UI 现象：在使用 \`if-else\` 条件分支展示不同子视图时，输入框内的文本被意外清空，或者动画出现瞬移跳变。根本原因是开发者混淆了“显式标识”与“结构标识”。
+
+**设计思路**：
+SwiftUI 视图定位依赖两种标识：
+1. **显式标识（Explicit Identity）**：通过 \`.id(uuid)\` 或 \`ForEach(items, id: \\.id)\` 显式分配唯一标识符；
+2. **结构标识（Structural Identity）**：在 \`if-else\` 条件语句中，SwiftUI 编译器将分支解析为 \`_ConditionalContent<TrueView, FalseView>\`。尽管两个分支可能返回相同的视图组件，但在类型系统拓扑中它们属于两个完全不同的层级分支。当条件切换时，旧分支节点被彻底销毁（其内部的 \`@State\` 随之销毁重置），新分支从头初始化。
+
+**底层实现**：
+AttributeGraph 沿视图层次结构的静态代码类型结构为每个节点生成一个唯一的拓扑路径（Hierarchy Path）。只有当相同路径上的节点类型保持不变时，AttributeGraph 才会将其匹配为同一个视图实例并保留其底层关联的 State 内存存储块；一旦路径或结构类型改变，旧存储立即回收。`,
+        caseStudy: `### 例子一：基于 @Observable 实现毫秒级局部刷新与状态解耦
+
+\`\`\`swift
+import SwiftUI
+import Observation
+
+// 1. Swift 5.9+ 宏驱动的细粒度可观察模型
+@Observable
+final class DashboardState {
+    var counterA: Int = 0
+    var counterB: Int = 0
+}
+
+// 2. 局部组件 A：仅读取 counterA
+struct CounterAView: View {
+    let state: DashboardState
+    var body: some View {
+        // 关键：修改 counterB 绝不会触发该 View 的 body 重新求值！
+        let _ = Self._printChanges() // 运行时控制台打印重绘原因
+        Button("A: \\(state.counterA)") {
+            state.counterA += 1
+        }
+    }
+}
+
+// 3. 局部组件 B：仅读取 counterB
+struct CounterBView: View {
+    let state: DashboardState
+    var body: some View {
+        let _ = Self._printChanges()
+        Button("B: \\(state.counterB)") {
+            state.counterB += 1
+        }
+    }
+}
+
+// 4. 根视图组装（自身不读取具体数值，完全不参与子组件的重绘）
+struct DashboardContainerView: View {
+    @State private var state = DashboardState()
+    var body: some View {
+        HStack(spacing: 20) {
+            CounterAView(state: state)
+            CounterBView(state: state)
+        }
+    }
+}
+\`\`\`
+
+### 例子二：自定义 Layout 协议实现高性能流式标签布局
+
+\`\`\`swift
+import SwiftUI
+
+// 实现自定义 Layout 协议，规避嵌套 HStack/VStack 带来的多层计算开销
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    // 1. 测量整个容器所需的理想尺寸
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if currentX + size.width > maxWidth {
+                currentX = 0
+                currentY += lineHeight + spacing
+                lineHeight = 0
+            }
+            lineHeight = max(lineHeight, size.height)
+            currentX += size.width + spacing
+        }
+        return CGSize(width: maxWidth, height: currentY + lineHeight)
+    }
+
+    // 2. 为每个子视图排版绝对位置
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX
+        var y = bounds.minY
+        var lineHeight: CGFloat = 0
+
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX {
+                x = bounds.minX
+                y += lineHeight + spacing
+                lineHeight = 0
+            }
+            view.place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(size))
+            lineHeight = max(lineHeight, size.height)
+            x += size.width + spacing
+        }
+    }
+}
+\`\`\`
+
+### 例子三：自定义 EnvironmentKey 跨组件树安全注入全局服务
+
+\`\`\`swift
+import SwiftUI
+
+// 1. 定义依赖协议
+protocol AnalyticsServiceProtocol {
+    func track(event: String)
+}
+
+struct DefaultAnalyticsService: AnalyticsServiceProtocol {
+    func track(event: String) { print("[Track]: \\(event)") }
+}
+
+// 2. 声明 EnvironmentKey
+private struct AnalyticsServiceKey: EnvironmentKey {
+    static let defaultValue: AnalyticsServiceProtocol = DefaultAnalyticsService()
+}
+
+// 3. 扩展 EnvironmentValues
+extension EnvironmentValues {
+    var analytics: AnalyticsServiceProtocol {
+        get { self[AnalyticsServiceKey.self] }
+        set { self[AnalyticsServiceKey.self] = newValue }
+    }
+}
+
+// 4. 深层子组件直接无缝读取
+struct DetailActionView: View {
+    @Environment(\\.analytics) private var analytics
+
+    var body: some View {
+        Button("提交订单") {
+            analytics.track(event: "order_submit_clicked")
+        }
+    }
+}
+\`\`\``,
+      },
+      {
+        tag: '网络流水线',
+        title: 'URLSession 现代网络架构：Actor 请求池、URLProtocol 拦截与流式数据',
+        sectionTitles: {
+          explanation: '四大核心机制与流水线设计',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：URLSession 三大会话模式与系统后台守护进程
+
+**历史问题**：
+早期移动端使用第三方网络库时，经常遭遇 App 切入后台被系统挂起（Suspended），正在进行的几百兆大文件下载被直接掐断或发生 Socket 超时重试，不仅严重消耗用户流量，且在用户再次切回前台时必须从头重来。
+
+**设计思路**：
+URLSession 设计了三种隔离形态：
+1. **.default**：持久化缓存、Cookie 与凭证到磁盘；
+2. **.ephemeral**：全内存会话，不写磁盘，专用于无痕浏览或隐私模式；
+3. **.background(id)**：将网络传输全权委托给独立的系统守护进程 **\`nsurlsessiond\`**。即使主 App 被用户划掉或被系统因低内存强杀，下载任务仍由系统级守护进程继续在后台执行。
+
+**底层实现**：
+在后台模式下，App 通过 XPC 与 \`nsurlsessiond\` 进程跨进程通信。系统传输完成后自动在后台唤醒宿主 App，并在 \`AppDelegate\` 中回调 \`handleEventsForBackgroundURLSession\`，应用重建对应会话 ID 即可直接获取下载完成的临时文件。
+
+### 核心机制二：Actor 隔离域构建无死锁并发网络客户端
+
+**历史问题**：
+传统网络层单例中维护并发请求队列、Token 刷新锁、离线重试池时，通常使用 \`os_unfair_lock\` 或 \`DispatchQueue(label: "serial")\`。在多线程并发竞争下极易出现优先级反转（Priority Inversion），甚至在嵌套派发时引发死锁崩溃。
+
+**设计思路**：
+利用 Swift 5.5+ **Actor** 的编译器安全隔离机制。将整个网络核心状态（认证 Token、活跃 Task 字典、等待队列）封装于 Actor 域内。外界所有并发网络请求通过异步 \`await client.request()\` 进入 Actor 的 Mailbox 邮箱队列按序执行，从语言级别彻底消除多线程数据竞争与手动加锁代码。
+
+**底层实现**：
+每个 Actor 底层维护一个串行执行队列。当 Task 跨越边界向 Actor 发起调用时，运行时通过原子 CAS 操作将 Task 挂载至 Actor 的待处理链表。若当前 Actor 正被其他 Task 占用，调用方立即让出底层 Worker 线程挂起，待锁释放后由定额协作线程池（Cooperative Pool）唤醒恢复。
+
+### 核心机制三：URLProtocol 核心拦截器流水线与离线 Mock
+
+**历史问题**：
+在单元测试、UI 自动化测试或弱网离线调试中，难以在不修改业务代码的前提下全局拦截网络请求，注入自定义 Mock 数据或抓包监控网络指标。
+
+**设计思路**：
+Apple 提供了底层的 **\`URLProtocol\`** 拦截机制。它是整个 \`URLSession\` 网络协议栈的最前置门面。当 \`URLSession\` 发起任何 HTTP/HTTPS 请求时，系统自顶向下遍历注册的 \`URLProtocol\` 数组。只要某个拦截器的 \`canInit(with:)\` 返回 \`true\`，该请求的整个生命周期（建立连接、发送请求、构造 Response、回传 Data）全部接管由开发者自定义操控。
+
+**底层实现**：
+\`URLProtocol\` 处于 CFNetwork 的原生层。当被激活后，开发者可以通过 \`client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)\` 和 \`client?.urlProtocol(self, didLoad: data)\` 直接向底层上报自定义的数据流，完全规避真实的物理网络 Socket 通信。
+
+### 核心机制四：AsyncSequence 流式数据下载与断点续传
+
+**历史问题**：
+处理服务器返回的大型 JSON 列表或流式事件（如 SSE、大文件）时，传统方案必须等网络数据全量传输完毕并加载进内存才开始反序列化，不仅首屏渲染延迟极高，且极易引发瞬时内存峰值导致 OOM。
+
+**设计思路**：
+利用 \`URLSession.shared.bytes(for:)\` 结合 **\`AsyncSequence\`** 异步序列。客户端随着网络数据包的到达按行或按块进行流式消费处理。配合 HTTP 标头的 \`Range: bytes=start-end\`，在网络异常中断时记录已下载字节偏移量，实现零内存压力的流式断点续传。
+
+**底层实现**：
+底层的 \`URLSessionBytesPublisher\` 将 TCP 流中的 MTU 数据包实时推送给 AsyncIterator 迭代器。每一块字节缓冲区在被处理后立即释放，避免在内存中构建庞大的临时 \`Data\` 缓冲区。`,
+        caseStudy: `### 例子一：Actor 驱动的并发请求去重与 Token 自动无感刷新
+
+\`\`\`swift
+import Foundation
+
+// 使用 Actor 保护网络请求状态与 Token 刷新原子性
+actor NetworkClient {
+    private var accessToken: String = "INITIAL_TOKEN"
+    private var isRefreshing: Bool = false
+    // 挂起等待 Token 刷新的并发任务队列
+    private var pendingRequests: [CheckedContinuation<String, Error>] = []
+
+    // 1. 发起请求主入口
+    func request(endpoint: String) async throws -> Data {
+        let token = try await validToken()
+        var request = URLRequest(url: URL(string: "https://api.example.com/\\(endpoint)")!)
+        request.setValue("Bearer \\(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        // 若遇到 401 Unauthorized，自动触发无感刷新并重试当前请求
+        if let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 401 {
+            let newToken = try await refreshToken()
+            request.setValue("Bearer \\(newToken)", forHTTPHeaderField: "Authorization")
+            let (retryData, _) = try await URLSession.shared.data(for: request)
+            return retryData
+        }
+        return data
+    }
+
+    // 2. 检查或等待可用 Token
+    private func validToken() async throws -> String {
+        if isRefreshing {
+            // 若正在刷新中，当前任务挂起进入等待队列，绝不发起重复刷新
+            return try await withCheckedThrowingContinuation { continuation in
+                pendingRequests.append(continuation)
+            }
+        }
+        return accessToken
+    }
+
+    // 3. 执行单例刷新并唤醒所有等待者
+    private func refreshToken() async throws -> String {
+        if isRefreshing { return try await validToken() }
+        isRefreshing = true
+
+        do {
+            // 模拟向授权服务器请求新 Token
+            let newToken = "REFRESHED_TOKEN_\\(UUID().uuidString)"
+            self.accessToken = newToken
+            self.isRefreshing = false
+
+            // 批量恢复所有等待的请求任务
+            for cont in pendingRequests { cont.resume(returning: newToken) }
+            pendingRequests.removeAll()
+            return newToken
+        } catch {
+            isRefreshing = false
+            for cont in pendingRequests { cont.resume(throwing: error) }
+            pendingRequests.removeAll()
+            throw error
+        }
+    }
+}
+\`\`\`
+
+### 例子二：URLProtocol 自定义拦截器实现请求加签与全链路监控
+
+\`\`\`swift
+import Foundation
+
+final class MetricsAndMockInterceptor: URLProtocol {
+    private static let handledKey = "X-MetricsAndMockInterceptor-Handled"
+
+    // 1. 判定是否接管当前请求
     override class func canInit(with request: URLRequest) -> Bool {
-        return request.value(forHTTPHeaderField: "X-Intercepted") == nil
+        // 防止递归死循环：若已处理过则放行
+        if URLProtocol.property(forKey: handledKey, in: request) != nil {
+            return false
+        }
+        return true
     }
 
+    // 2. 请求预处理（注入通用公共头与防篡改签名）
     override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        var req = request
-        req.setValue("true", forHTTPHeaderField: "X-Intercepted")
-        return req
+        var mutableReq = request
+        mutableReq.setValue("iOS_App_v1.0", forHTTPHeaderField: "X-Client-Version")
+        mutableReq.setValue(UUID().uuidString, forHTTPHeaderField: "X-Request-Trace-ID")
+        return mutableReq
     }
 
+    // 3. 核心加载管道：注入 Mock 响应或转发网络
     override func startLoading() {
-        // 自定义处理或 Mock 响应...
+        let newRequest = (request as! NSMutableURLRequest)
+        URLProtocol.setProperty(true, forKey: Self.handledKey, in: newRequest)
+
+        // 判断是否为需要 Mock 的特定接口
+        if request.url?.path.contains("/mock/user") == true {
+            let mockJson = "{\\"name\\": \\"Alice\\", \\"status\\": \\"Active\\"}".data(using: .utf8)!
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: mockJson)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+
+        // 非 Mock 请求：使用内置会话转发真实网络
+        let session = URLSession(configuration: .default)
+        session.dataTask(with: request) { [weak self] data, response, error in
+            guard let self = self else { return }
+            if let error = error {
+                self.client?.urlProtocol(self, didFailWithError: error)
+                return
+            }
+            if let response = response {
+                self.client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .allowed)
+            }
+            if let data = data {
+                self.client?.urlProtocol(self, didLoad: data)
+            }
+            self.client?.urlProtocolDidFinishLoading(self)
+        }.resume()
     }
-}`,
+
+    override func stopLoading() {}
+}
+\`\`\`
+
+### 例子三：Background URLSession 守护进程断点下载与 App 唤醒
+
+\`\`\`swift
+import UIKit
+
+final class BackgroundDownloadService: NSObject, URLSessionDownloadDelegate {
+    static let shared = BackgroundDownloadService()
+    private var backgroundSession: URLSession!
+    var backgroundCompletionHandler: (() -> Void)?
+
+    override init() {
+        super.init()
+        // 关键：后台会话标识符，必须全局唯一且恒定
+        let config = URLSessionConfiguration.background(withIdentifier: "com.app.bgdownload")
+        config.isDiscretionary = false // 是否允许系统根据网络和电量自主调度
+        config.sessionSendsLaunchEvents = true
+        self.backgroundSession = URLSession(configuration: config, delegate: self, delegateQueue: nil)
+    }
+
+    // 启动大文件后台下载任务
+    func startDownload(url: URL) {
+        let task = backgroundSession.downloadTask(with: url)
+        task.resume()
+    }
+
+    // 下载完成回调（在系统临时目录中）
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        let targetURL = FileManager.default.temporaryDirectory.appendingPathComponent(location.lastPathComponent)
+        try? FileManager.default.moveItem(at: location, to: targetURL)
+    }
+
+    // 所有后台事件处理完毕，通知系统收尾休眠
+    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        DispatchQueue.main.async {
+            self.backgroundCompletionHandler?()
+            self.backgroundCompletionHandler = nil
+        }
+    }
+}
+\`\`\``,
+      },
+      {
+        tag: '本地持久化',
+        title: 'SwiftData & CoreData：并发上下文隔离、Faulting 机制与数据迁移',
+        sectionTitles: {
+          explanation: '四大核心机制与数据引擎',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：SQLite 底层引擎与 WAL 预写日志并发读写
+
+**历史问题**：
+在传统 SQLite 默认的 Rollback Journal 模式下，当执行写事务时必须对整个数据库加互斥锁，此时所有后台或主线程的读操作全部被阻塞等待。若写操作包含批量上千条数据，主线程读取 UI 缓存时就会发生掉帧甚至触发 Watchdog 假死。
+
+**设计思路**：
+CoreData 与 SwiftData 默认全面启用 **WAL (Write-Ahead Logging)** 模式。写操作不再直接修改原始数据库文件，而是将变更记录顺序追加到独立的 \`.sqlite-wal\` 预写日志文件中。这使得**读操作与写操作可以并发并行执行（Read-During-Write）**，读线程直接读取主 DB 文件配合 WAL 内存索引，彻底消除主线程读取卡顿。
+
+**底层实现**：
+操作系统底层通过共享内存映射文件（\`.sqlite-shm\`）在多个读写线程间同步 WAL 的页指针。当 WAL 文件增长至检查点阈值（Checkpoint，通常 1000 页）或会话空闲时，SQLite 引擎自动在后台执行 Checkpoint 操作，将日志安全合并回主数据库文件。
+
+### 核心机制二：Faulting（断点延迟加载）机制与内存防爆
+
+**历史问题**：
+当从本地数据库查询用户列表时，每个用户对象可能关联着数千条交易订单记录与好友关系。如果查询用户时一次性将整棵对象关联树全部实例化并加载进内存，极少几个复杂对象就会迅速导致 App 内存突破几百兆，引发 Jetsam OOM 强杀。
+
+**设计思路**：
+CoreData 与 SwiftData 的核心基石是 **Faulting（断点延迟加载）**。当执行 \`Fetch\` 查询时，系统默认只将对象的唯一主键（\`NSManagedObjectID\` / \`PersistentIdentifier\`）和空壳对象载入内存，其所有具体属性和关联对象处于 **Fault（休眠空壳）** 状态。只有当业务代码第一次真实访问某个属性（如 \`user.name\` 或 \`user.orders\`）时，底层才会触发透明的 SQL 按需二次查询（Fire the fault）将数据灌入内存。
+
+**底层实现**：
+空壳对象内部的实例变量指针指向一个占位元数据。当访问器被调用时，CoreData 截获调用并检查对象的内部状态位；若为 Fault 状态，则立即向底层持久化存储协调器（NSPersistentStoreCoordinator）派发一条基于主键的单行精确 \`SELECT\` 语句，将物理字段拷贝填充进对象内存，并将状态位标记为 Fulfilled。
+
+### 核心机制三：ModelContext 与 NSManagedObjectContext 并发线程隔离
+
+**历史问题**：
+CoreData 的 \`NSManagedObjectContext\` 绝非线程安全。多线程开发者最常遇到的崩溃即是“跨线程直接访问托管对象”。若在主线程读取子线程查出的 ManagedObject，底层会立即抛出 \`EXC_BAD_ACCESS\` 或数据错乱。
+
+**设计思路**：
+坚持“上下文与线程强绑定”原则。SwiftData 进一步引入语言级并发模型 **\`@ModelActor\`**。通过将持久化上下文 \`ModelContext\` 彻底封装在独立的 Actor 内部，外部访问必须使用 \`await\` 异步通信。后台的大批量解析落库在独立的后台 Context 中运行，完成后自动合并通知主 Context。
+
+**底层实现**：
+传统 CoreData 使用 \`context.perform { ... }\` 确保代码在 Context 绑定的私有串行队列中执行；SwiftData 的 \`@ModelActor\` 在编译器层面由 Swift Concurrency 调度器保障所有数据访问均在 Actor 的隔离上下文中执行，彻底从语法层面封死跨线程非法访问。
+
+### 核心机制四：SchemaMigrationPlan 渐进式多版本迁移工程规范
+
+**历史问题**：
+随着应用版本迭代，数据模型不可避免会发生变更（新增字段、重命名字段、拆分表结构）。若直接上线新版模型，用户升级 App 时 CoreData 会因模型哈希（Model Hash）不匹配直接抛出 \`NSPersistentStoreIncompatibleVersionHashError\` 闪退；若简单粗暴清空数据库，又会导致用户本地离线数据彻底丢失。
+
+**设计思路**：
+建立清晰的数据库版本演进计划：
+1. **轻量级自动迁移（Lightweight Migration）**：仅增删可选字段或默认值，由系统自动完成 ALTER TABLE；
+2. **渐进式版本迁移计划（SchemaMigrationPlan）**：定义明确的版本阶段（\`VersionedSchema\` V1 ➔ V2 ➔ V3），在迁移计划中为相邻版本编写显式迁移阶段（\`MigrationStage.custom\`），在数据搬迁阶段执行精确的代码逻辑清洗与列映射。
+
+**底层实现**：
+SQLite 底层在迁移过程中创建临时表（如 \`t_user_v2_temp\`），通过执行自定义 SQL 映射将旧表数据搬迁至新表，验证成功后原子交换表名并重建所有索引，最后更新持久化存储元数据字典中的模型兼容 Hash 签名。`,
+        caseStudy: `### 例子一：@ModelActor 安全执行百万级后台数据批量写入
+
+\`\`\`swift
+import SwiftData
+import Foundation
+
+// 1. 定义数据实体
+@Model
+final class ArticleItem {
+    @Attribute(.unique) var id: String
+    var title: String
+    var content: String
+    var updateTime: Date
+
+    init(id: String, title: String, content: String, updateTime: Date = Date()) {
+        self.id = id
+        self.title = title
+        self.content = content
+        self.updateTime = updateTime
+    }
+}
+
+// 2. 使用 @ModelActor 保证后台写入线程安全与独立的 ModelContext
+@ModelActor
+actor DataBatchImporter {
+    // 系统自动合成 modelContainer 与 modelContext 属性
+
+    func importArticles(rawList: [[String: String]]) throws {
+        // 关键：分批批次保存，防止单次内存暴涨
+        let batchSize = 500
+        var count = 0
+
+        for item in rawList {
+            guard let id = item["id"], let title = item["title"], let content = item["content"] else { continue }
+            let article = ArticleItem(id: id, title: title, content: content)
+            modelContext.insert(article)
+            count += 1
+
+            if count % batchSize == 0 {
+                try modelContext.save() // 周期性落盘并释放临时内存
+            }
+        }
+        if modelContext.hasChanges {
+            try modelContext.save()
+        }
+    }
+}
+\`\`\`
+
+### 例子二：一对多与多对多关系模型建立与关联级联删除
+
+\`\`\`swift
+import SwiftData
+import Foundation
+
+@Model
+final class Author {
+    var name: String
+    // 一对多关系：一个作者拥有多篇博客，作者删除时级联删除其所有博客
+    @Relationship(deleteRule: .cascade, inverse: \\Book.author)
+    var books: [Book] = []
+
+    init(name: String) { self.name = name }
+}
+
+@Model
+final class Book {
+    var title: String
+    var author: Author?
+    // 多对多关系：一本书有多个标签，一个标签贴在多本书上
+    @Relationship(deleteRule: .nullify, inverse: \\Tag.books)
+    var tags: [Tag] = []
+
+    init(title: String, author: Author? = nil) {
+        self.title = title
+        self.author = author
+    }
+}
+
+@Model
+final class Tag {
+    var tagName: String
+    var books: [Book] = []
+
+    init(tagName: String) { self.tagName = tagName }
+}
+\`\`\`
+
+### 例子三：SchemaMigrationPlan 多阶段迁移与断网离线缓存同步
+
+\`\`\`swift
+import SwiftData
+import Foundation
+
+// 1. 定义版本化模型 V1
+enum AppSchemaV1: VersionedSchema {
+    static var versionIdentifier = Schema.Version(1, 0, 0)
+    static var models: [any PersistentModel.Type] { [UserEntity.self] }
+
+    @Model final class UserEntity {
+        var id: String
+        var fullName: String
+        init(id: String, fullName: String) { self.id = id; self.fullName = fullName }
+    }
+}
+
+// 2. 定义版本化模型 V2（将 fullName 拆分为 firstName 与 lastName）
+enum AppSchemaV2: VersionedSchema {
+    static var versionIdentifier = Schema.Version(2, 0, 0)
+    static var models: [any PersistentModel.Type] { [UserEntity.self] }
+
+    @Model final class UserEntity {
+        var id: String
+        var firstName: String
+        var lastName: String
+        init(id: String, firstName: String, lastName: String) {
+            self.id = id; self.firstName = firstName; self.lastName = lastName
+        }
+    }
+}
+
+// 3. 编写安全迁移方案
+enum AppMigrationPlan: SchemaMigrationPlan {
+    static var schemas: [any VersionedSchema.Type] { [AppSchemaV1.self, AppSchemaV2.self] }
+    static var stages: [MigrationStage] { [migrateV1toV2] }
+
+    static let migrateV1toV2 = MigrationStage.custom(
+        fromVersion: AppSchemaV1.self,
+        toVersion: AppSchemaV2.self,
+        willMigrate: { context in
+            // 迁移前提取所有 V1 旧数据做平滑逻辑清洗
+            let oldUsers = try context.fetch(FetchDescriptor<AppSchemaV1.UserEntity>())
+            for old in oldUsers {
+                let parts = old.fullName.split(separator: " ")
+                let first = String(parts.first ?? "")
+                let last = String(parts.dropFirst().joined(separator: " "))
+                // 插入符合 V2 规则的新实体...
+            }
+            try context.save()
+        },
+        didMigrate: nil
+    )
+}
+\`\`\``,
       },
     ],
   },
@@ -3018,51 +3884,393 @@ class MyApplication : Application() {
     ios: [
       {
         tag: '架构演进',
-        title: 'iOS 架构演进史（MVC ➔ VIPER ➔ MVVM）与 TCA 状态机实战',
-        explanation: 'iOS 开发同样经历了深度的架构范式转移：从最早 Apple 官方推崇的传统 MVC（被戏称为 Massive View Controller，即控制器兼管网络、布局与代理从而导致单个 VC 膨胀至数千行），到重度拆分 Router/Interactor 的 VIPER，再到引入 Combine / @Observable 驱动的响应式 MVVM。而在声明式 SwiftUI 时代，面对复杂业务与全局状态同步，TCA (The Composable Architecture) 成为了业界最严谨的单向数据流与状态机框架，从根本上保证了状态的可回溯与测试确定性。',
-        codeSnippet: `// TCA 核心结构示例
+        title: 'iOS 架构演进史（MVC ➔ VIPER ➔ MVVM）与 TCA 状态机工业级实践',
+        sectionTitles: {
+          explanation: '四大架构演进史与核心哲学',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 阶段一：传统 MVC 范式与 Massive View Controller 困局
+
+**历史问题**：
+早期 Apple 官方推崇经典的 Cocoa MVC 模式（Model-View-Controller）。但在 iOS 开发实战中，\`UIViewController\` 深度绑定了视图生命周期（\`viewDidLoad\`、\`viewWillAppear\`）。开发者被迫将网络请求、JSON 反序列化、数据缓存、页面排版、UITableView 的 Delegate/DataSource 回调全部塞入 Controller 中。这导致单个 Controller 动辄膨胀至数千甚至上万行，被业界戏称为“Massive View Controller”，单元测试几乎无法编写，代码耦合如同乱麻。
+
+**设计思路**：
+MVC 失败的核心原因是**职责划分粗糙且 Controller 缺乏独立生命周期**。View 与 Controller 强绑定，使得 Controller 无法独立于 UIKit 运行环境进行纯逻辑测试。因此后续所有架构演进的核心脉络，都是在 Controller 与 Model 之间剥离出纯粹的业务逻辑层。
+
+**底层实现**：
+在传统 MVC 下，RunLoop 事件处理（如点击手势）直接通过 Target-Action 派发给 UIViewController 内存实例。由于所有业务回调均以强引用闭包（Escaping Closure）捕获 \`self\`，若未严谨添加 \`[weak self]\`，Controller 在导航栈 pop 退出后其底层对象依然被异步网络回调持有，引发严重的内存泄漏。
+
+### 阶段二：VIPER 架构的极致拆解与过度设计反思
+
+**历史问题**：
+为彻底消灭 MVC 臃肿控制器，大型团队引入了 VIPER 模式：将单个页面严苛拆分为 View（视图）、Interactor（业务用例）、Presenter（UI 逻辑呈现）、Entity（纯数据实体）、Router（页面路由跳转）5 大组件。
+
+**设计思路**：
+VIPER 实现了极端严密的单一职责与依赖倒置原则。View 仅持有 Presenter 协议，Presenter 仅持有 Interactor 协议，所有通信均通过抽象 Protocol 接口传递。这使得每一层都可以 100% 被 Mock 替换并进行毫秒级独立单元测试。
+
+**底层实现**：
+VIPER 的致命痛点在于**严重的过度设计与接口样板代码爆炸**。一个极简的“列表下拉刷新”功能，需要修改 5 个 Swift 文件并新增十几个协议方法。在 Objective-C/Swift 运行时层，大量的接口指针间接寻址（Indirect Protocol Witness Dispatch）增加了无谓的调用栈深度；更严重的是跨层双向通信极易在 View ⟷ Presenter ⟷ Interactor 之间构建出复杂的引用环。
+
+### 阶段三：MVVM + Observation 响应式现代轻量范式
+
+**历史问题**：
+VIPER 过于沉重，而纯手写数据绑定（如 Delegate 回调）又过于繁琐。随着 Combine 与 Swift 5.9 Observation 框架的成熟，响应式 MVVM（Model-View-ViewModel）成为了主流现代架构。
+
+**设计思路**：
+ViewModel 彻底剥离 UIKit/SwiftUI 依赖，成为一个承载 UI 状态（State）与业务用例的轻量对象。View 将自身绑定到 ViewModel 的可观察属性上。当用户触发交互时，调用 ViewModel 的方法；ViewModel 改变状态属性，驱动 View 自动重绘。在 SwiftUI 中结合 \`@Observable\`，状态与视图达到了真正的属性级响应。
+
+**底层实现**：
+在 Swift 5.9+ 下，ViewModel 的可观察属性利用 \`ObservationRegistrar\` 进行读写拦截。不再需要 Combine Publisher 的堆分配订阅链条（Subscription Token），消除了内存反压（Backpressure）与闭包内存释放管理负担，极大提升了渲染性能与代码整洁度。
+
+### 阶段四：TCA 单向数据流（UDF）与确定性状态机闭环
+
+**历史问题**：
+在复杂的超大业务场景中，MVVM 依然存在痛点：ViewModel 内部的可变状态可能被多个异步任务同时修改，状态演进的时序变得不可预测；多个子 ViewModel 之间的状态同步需要繁琐的双向通信，难以排查偶发状态 Bug，无法实现 100% 的状态回溯与调试。
+
+**设计思路**：
+借鉴 Redux 与 Elm 架构，社区诞生了 **TCA (The Composable Architecture)**。确立了三大核心铁律：
+1. **单一状态源（Single Source of Truth）**：每个特性（Feature）的所有可变状态集中在不可变的 \`State\` 结构体中；
+2. **纯函数状态转移（Reducer）**：唯一改变状态的方式是发送 \`Action\`，由纯函数 \`Reduce\` 根据当前 State 与 Action 计算出下一个 State；
+3. **严格隔离副作用（Effect）**：网络请求、计时器等异步副作用全部包装在 \`Effect.run\` 中执行，通过向系统回传 Action 将异步结果带回状态机。
+
+**底层实现**：
+TCA 深度集成 Swift Concurrency。当发起 \`Effect.run\` 时，TCA 启动一个受管的结构化 \`Task\`；当 View 从树上卸载或 Action 触发 \`cancellation(id:)\` 时，TCA 自动级联向异步任务发送取消信号，彻底杜绝孤儿任务（Orphan Tasks）修改已销毁状态导致的内存野指针风险。`,
+        caseStudy: `### 例子一：TCA 完整特性状态机（State / Action / Reducer / Effect.run 并发流）
+
+\`\`\`swift
+import ComposableArchitecture
+import Foundation
+
+// 1. 定义特性的独立状态机
 @Reducer
-struct CounterFeature {
+struct UserProfileFeature {
+    // 状态容器（纯值类型，支持序列化与 Diff 比对）
+    @ObservableState
     struct State: Equatable {
-        var count = 0
-        var isLoading = false
+        var userId: String
+        var userName: String = ""
+        var isLoading: Bool = false
+        var errorMessage: String?
     }
 
+    // 所有合法行为动作的闭环枚举
     enum Action {
-        case incrementButtonTapped
-        case fetchDataResponse(Result<Int, Error>)
+        case onAppear
+        case refreshButtonTapped
+        case userProfileResponse(Result<String, Error>)
     }
 
+    // 依赖注入服务（支持自动化测试注入 Mock）
+    @Dependency(\\.userClient) var userClient
+
+    // 纯函数 Reducer：驱动状态确定性演进
     var body: some ReducerOf<Self> {
         Reduce { state, action in
             switch action {
-            case .incrementButtonTapped:
-                state.count += 1
+            case .onAppear, .refreshButtonTapped:
+                state.isLoading = true
+                state.errorMessage = nil
+                // 启动异步副作用，结果通过 Action 发回状态机
+                return .run { [userId = state.userId] send in
+                    do {
+                        let name = try await userClient.fetchName(userId)
+                        await send(.userProfileResponse(.success(name)))
+                    } catch {
+                        await send(.userProfileResponse(.failure(error)))
+                    }
+                }
+
+            case .userProfileResponse(.success(let name)):
+                state.isLoading = false
+                state.userName = name
                 return .none
-            case .fetchDataResponse(.success(let val)):
-                state.count = val
+
+            case .userProfileResponse(.failure(let error)):
+                state.isLoading = false
+                state.errorMessage = error.localizedDescription
                 return .none
             }
         }
     }
-}`,
+}
+\`\`\`
+
+### 例子二：TCA 依赖注入系统（@Dependency 与实时环境切换）
+
+\`\`\`swift
+import ComposableArchitecture
+import Foundation
+
+// 1. 契约客户端定义
+struct UserClient {
+    var fetchName: @Sendable (String) async throws -> String
+}
+
+// 2. 注入 DependencyKey（生产实现）
+extension UserClient: DependencyKey {
+    static let liveValue = Self(
+        fetchName: { id in
+            let url = URL(string: "https://api.example.com/users/\\(id)")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return String(data: data, encoding: .utf8) ?? ""
+        }
+    )
+
+    // 自动化预览与单元测试预览实现（0 网络依赖）
+    static let previewValue = Self(
+        fetchName: { _ in "Preview Alice" }
+    )
+}
+
+// 3. 注册到全局 DependencyValues 容器
+extension DependencyValues {
+    var userClient: UserClient {
+        get { self[UserClient.self] }
+        set { self[UserClient.self] = newValue }
+    }
+}
+\`\`\`
+
+### 例子三：父子特性状态隔离与 Scope 局部状态映射
+
+\`\`\`swift
+import ComposableArchitecture
+import SwiftUI
+
+// 1. 父级特性声明，内嵌子特性
+@Reducer
+struct MainDashboardFeature {
+    @ObservableState
+    struct State: Equatable {
+        var headerTitle: String = "仪表盘"
+        var profileState: UserProfileFeature.State // 内嵌子特性状态
+    }
+
+    enum Action {
+        case profileAction(UserProfileFeature.Action) // 包装子特性 Action
+        case logoutButtonTapped
+    }
+
+    var body: some ReducerOf<Self> {
+        // 挂载子特性 Reducer 并在对应作用域执行
+        Scope(state: \\.profileState, action: \\.profileAction) {
+            UserProfileFeature()
+        }
+        Reduce { state, action in
+            switch action {
+            case .logoutButtonTapped:
+                state.headerTitle = "请先登录"
+                return .none
+            case .profileAction:
+                return .none // 子特性内部事件父级可选择监听或透传
+            }
+        }
+    }
+}
+
+// 2. SwiftUI 视图绑定 Store
+struct DashboardView: View {
+    @Bindable var store: StoreOf<MainDashboardFeature>
+
+    var body: some View {
+        VStack {
+            Text(store.headerTitle)
+            // 局部切片传递给子组件，保证仅当 profileState 改变时刷新子 View
+            UserProfileView(
+                store: store.scope(state: \\.profileState, action: \\.profileAction)
+            )
+        }
+    }
+}
+\`\`\``,
       },
       {
         tag: '模块化治理',
-        title: 'SPM 多 Target 依赖注入与 XCConfig 环境隔离',
-        explanation: '对标 Android 多模块，现代 iOS 工程通过单一 SPM Package 拆分多个 Target（Domain 纯逻辑层 / Data 数据实现层 / Feature UI 层）。Feature 仅依赖 Domain 中的 Protocol，App 主 Target 组装具体实现，从而大幅提升 Xcode 增量编译速度。通过 Debug.xcconfig 与 Release.xcconfig 注入不同的 API BaseURL 与编译标记，实现零代码侵入的多环境隔离。',
-        codeSnippet: `// Package.swift 声明解耦的 Target 依赖图
+        title: 'SPM 多 Target 依赖拓扑编排、接口实现解耦与 XCConfig 环境隔离',
+        sectionTitles: {
+          explanation: '模块化四层架构与编译提效',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心维度一：单主工程臃肿与全量增量编译瓶颈
+
+**历史问题**：
+随着 iOS 项目由单人拓展至数十人团队，单 Xcode Project 文件（\`.xcodeproj\`）成为了团队灾难：多人同时增删文件频繁导致 \`project.pbxproj\` Git 冲突无法自动解决；同时，所有代码集中在一个 Target，修改一行底层工具代码，Xcode 就会因依赖分析无法隔离而触发几乎全量的重新编译，增量构建时间拉长至数分钟，严重破坏研发效能。
+
+**设计思路**：
+对标 Android 现代的 Gradle 多模块治理，iOS 现代工程全面迁移至 **Swift Package Manager (SPM)**。利用轻量、纯文本的 \`Package.swift\` 彻底取代脆弱的 \`.pbxproj\`；通过将工程按能力拆分为数十个微 Target，建立清晰的 DAG 单向无环依赖图。
+
+**底层实现**：
+SPM Target 底层被编译为独立的静态库（\`.a\`）或动态框架（\`.framework\`）。Xcode 构建系统（llbuild）利用细粒度 Target 构建图，严格限制符号暴露范围；若某一 Target 内部实现发生变动，只要其对外暴露的 \`.swiftmodule\` 公共接口签名未变，所有上游依赖 Target 均被标记为无需重编（Up-to-Date），增量构建效率提升 70% 以上。
+
+### 核心维度二：SPM Package 单仓多 Target 依赖拓扑与边界隔离
+
+**历史问题**：
+若将每个微模块都建立为一个独立的 Git 仓库，会导致多仓版本管理负担极重（发包、打 Tag、调试痛点）。
+
+**设计思路**：
+采用 **Monorepo 单仓多 Target** 策略。在主工程根目录下建立单一的 \`CoreModules\` Swift Package，在 \`Package.swift\` 内部横向划分多层 Target：
+1. **Core 基础设施层**（网络通信、安全存储、通用扩展）；
+2. **Domain 契约层**（纯 Swift 协议与 Model 实体，零三方重依赖）；
+3. **Feature 表现层**（具体业务视图与 UI 交互）。
+
+**底层实现**：
+在编译期，Swift 编译器对 Target 施加物理访问隔离。未经 \`Package.swift\` 显式 \`dependencies\` 声明的 Target 无法 \`import\` 对应模块；若不慎引发循环依赖（A 依赖 B，B 依赖 A），SPM 在生成构建图时直接拦截并抛出编译错误，从物理层根治模块循环引用。
+
+### 核心维度三：API 契约模块与 Impl 实现模块彻底解耦
+
+**历史问题**：
+在传统架构中，业务模块间常常直接交叉依赖（例如：购物车模块直接引入个人中心模块的 Class）。一旦修改被依赖模块，两个模块必须全部重新编译；同时无法独立打包单业务 Demo App 进行快速预览。
+
+**设计思路**：
+践行**依赖倒置原则（Dependency Inversion Principle）**：将每个 Feature 模块进一步切分为两个孪生 Target：
+- **\`:FeatureAPI\`**：仅包含公开的 Protocol 接口与轻量路由参数，极其纯净；
+- **\`:FeatureImpl\`**：包含所有具体实现代码、私有 UI 与复杂依赖。
+模块间只允许依赖对方的 \`:FeatureAPI\`，具体实现类在 App 顶层装配阶段通过依赖注入容器进行组装。
+
+**底层实现**：
+Swift 编译器的符号导出表中，\`:FeatureAPI\` 仅生成精简的虚方法表（PWT）声明，内存符号体积极小。上游调用方在编译期仅绑定抽象协议地址，运行时通过动态依赖查找定位到 \`:FeatureImpl\` 中的实例，实现完全的二进制级解耦。
+
+### 核心维度四：XCConfig 纯文本配置驱动多环境与编译期安全隔离
+
+**历史问题**：
+区分开发（Debug）、测试（Staging）和生产（Release）环境时，传统做法是在代码中滥用 \`#if DEBUG\` 宏，或者在 Target 的 Build Settings 图形界面中繁复修改。这极易因手抖漏配导致开发环境的 BaseURL 被打包发往生产 App Store，造成严重事故。
+
+**设计思路**：
+采用 **XCConfig 纯文本配置文件**进行多环境治理。将环境配置剥离为独立的文本文件：\`Debug.xcconfig\`、\`Release.xcconfig\`。在配置文件中定义环境变量（如 \`API_BASE_URL\`、\`APP_BUNDLE_ID\`、\`SWIFT_ACTIVE_COMPILATION_CONDITIONS\`），并通过 \`Info.plist\` 将变量安全桥接到 Swift 代码层，实现代码层零修改的环境自动化注入。
+
+**底层实现**：
+Xcode 构建预处理阶段读取 xcconfig 文件中的键值对，直接覆盖环境变量字典。编译器将 \`SWIFT_ACTIVE_COMPILATION_CONDITIONS\` 作为参数传入 \`swiftc\`，将未激活环境的代码分支直接在编译期物理剔除，防止敏感环境地址残留在最终 Mach-O 二进制文件的字符串常量区中。`,
+        caseStudy: `### 例子一：Package.swift 生产级多 Target 依赖图声明
+
+\`\`\`swift
+// swift-tools-version: 5.9
+import PackageDescription
+
 let package = Package(
-    name: "CoreModules",
+    name: "AppModules",
+    platforms: [.iOS(.v16)],
     products: [
-        .library(name: "FeatureHome", targets: ["FeatureHome"]),
+        // 对宿主主 Target 暴露的顶层库
+        .library(name: "FeatureHome", targets: ["FeatureHomeImpl"]),
+        .library(name: "FeatureUser", targets: ["FeatureUserImpl"]),
+    ],
+    dependencies: [
+        // 依赖的统一三方底层库
+        .package(url: "https://github.com/pointfreeco/swift-composable-architecture", from: "1.8.0"),
     ],
     targets: [
-        .target(name: "DomainContracts"), // 纯契约层
-        .target(name: "DataLayer", dependencies: ["DomainContracts"]),
-        .target(name: "FeatureHome", dependencies: ["DomainContracts"]) // 仅依赖契约
+        // 1. 公共底层基建
+        .target(name: "CoreNetworking"),
+        
+        // 2. 契约层：仅包含接口协议，零循环依赖
+        .target(name: "FeatureUserAPI"),
+        
+        // 3. 实现层：实现契约，私有化封装
+        .target(
+            name: "FeatureUserImpl",
+            dependencies: [
+                "FeatureUserAPI",
+                "CoreNetworking"
+            ]
+        ),
+        
+        // 4. 业务模块间依赖隔离：FeatureHome 仅依赖 UserAPI，绝不依赖 UserImpl！
+        .target(
+            name: "FeatureHomeImpl",
+            dependencies: [
+                "FeatureUserAPI",
+                .product(name: "ComposableArchitecture", package: "swift-composable-architecture")
+            ]
+        ),
     ]
-)`,
+)
+\`\`\`
+
+### 例子二：基于 Protocol 契约与依赖注入容器装配业务模块
+
+\`\`\`swift
+// ========== 1. 契约模块 (FeatureUserAPI) ==========
+public protocol UserNavigating: AnyObject {
+    func navigateToUserProfile(from vc: UIViewController, userId: String)
+}
+
+public protocol UserInfoProvider: Sendable {
+    func currentUserId() -> String?
+}
+
+// ========== 2. 依赖容器 (CoreContainer) ==========
+public final class AppContainer {
+    public static let shared = AppContainer()
+    private var factories: [String: Any] = [:]
+
+    public func register<T>(_ type: T.Type, factory: @escaping () -> T) {
+        let key = String(describing: type)
+        factories[key] = factory
+    }
+
+    public func resolve<T>(_ type: T.Type) -> T {
+        let key = String(describing: type)
+        guard let factory = factories[key] as? () -> T else {
+            fatalError("未注册的契约服务: \\(key)")
+        }
+        return factory()
+    }
+}
+
+// ========== 3. 宿主 App 在启动时统一组装 (AppDelegate) ==========
+func assembleApplicationModules() {
+    // 宿主持有所有 Impl，在这里将具体实现注入给抽象契约
+    AppContainer.shared.register(UserInfoProvider.self) {
+        UserModuleImpl() // 注入真实实现
+    }
+}
+
+// ========== 4. 业务消费方 (FeatureHome) ==========
+func showWelcomeMessage() {
+    // 仅依赖抽象协议，完全无需 import FeatureUserImpl
+    let userProvider = AppContainer.shared.resolve(UserInfoProvider.self)
+    if let id = userProvider.currentUserId() {
+        print("当前登录用户: \\(id)")
+    }
+}
+\`\`\`
+
+### 例子三：XCConfig 环境变量安全读取与 Build Settings 映射
+
+\`\`\`swift
+import Foundation
+
+// 1. 定义安全环境配置门面
+enum AppEnvironment {
+    private static let infoDict: [String: Any] = {
+        guard let dict = Bundle.main.infoDictionary else {
+            fatalError("无法获取 Info.plist")
+        }
+        return dict
+    }()
+
+    // 2. 读取通过 XCConfig 注入到 Info.plist 的变量
+    static let apiBaseURL: URL = {
+        guard let urlString = infoDict["API_BASE_URL"] as? String,
+              let url = URL(string: "https://" + urlString) else {
+            fatalError("未配置合法的 API_BASE_URL")
+        }
+        return url
+    }()
+
+    static let appEnvironmentName: String = {
+        return infoDict["APP_ENV_NAME"] as? String ?? "Production"
+    }()
+
+    static var isProduction: Bool {
+        #if PRODUCTION
+        return true
+        #else
+        return false
+        #endif
+    }
+}
+\`\`\``,
       },
     ],
   },
@@ -3398,71 +4606,361 @@ LeakActivity instance
     ],
     ios: [
       {
-        tag: '性能度量',
-        title: 'MetricKit 线上真实用户数据回传与 Instruments Time Profiler',
-        explanation: 'Apple 提供了原生的 MetricKit 框架，能够以极低功耗在后台收集设备 24 小时内的真实用户性能指标（包括 App 启动时间、挂起率、丢帧率、磁盘写入量与内存峰值）以及崩溃诊断日志 (MXCrashDiagnostic)。在开发阶段，使用 Instruments Time Profiler 开启 1ms 高频采样，结合 os_signpost 自定义埋点，能够毫秒级定位耗时瓶颈。',
-        codeSnippet: `// 注册并接收 MetricKit 线上性能与崩溃指标
-import MetricKit
+        tag: '性能工程',
+        title: 'iOS 渲染管线、RunLoop 掉帧卡顿监控与 Instruments 调优',
+        sectionTitles: {
+          explanation: '四大核心机制与底层时序',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：CoreAnimation 渲染管线与 CADisplayLink 垂直同步时序
 
-final class PerformanceMetricsManager: NSObject, MXMetricManagerSubscriber {
-    override init() {
-        super.init()
-        MXMetricManager.shared.add(self)
-    }
+**历史问题**：
+早期开发者常误以为在 \`drawRect:\` 或在主线程直接修改 View 的 Frame 会立即在屏幕上重绘，从而在交互时频繁调用触发多次排版；或者在主线程解码超大图片导致屏幕瞬间出现严重白屏和断崖式丢帧。
 
-    func didReceive(_ payloads: [MXMetricPayload]) {
-        for payload in payloads {
-            // 上报冷启动耗时与渲染丢帧指标到自建看板
-            let launchTime = payload.applicationLaunchMetrics?.histogrammedTimeToFirstDraw
-        }
-    }
-}`,
-      },
-      {
-        tag: '内存模型',
-        title: 'Swift 内存布局、Copy-On-Write (COW) 与 ARC Side Table',
-        explanation: 'Swift 的 struct 值类型默认分配在栈 (Stack) 上，当赋值或传参时进行浅拷贝。Array/Dictionary/Set 等标准集合实现了 Copy-On-Write 机制：只有在发生写操作且 isKnownUniquelyReferenced(&buffer) 发现强引用计数大于 1 时，才在堆上真正执行深拷贝。class 引用对象使用 ARC 管理；当对象被 weak 弱引用引用或引用计数超过 255 时，Swift 会为该对象动态分配一个 Side Table（副表），将弱引用指针和溢出计数移入副表，防止僵尸对象野指针崩溃。',
-        codeSnippet: `// 自定义实现 Copy-on-Write 包装器
-final class RefBox<T> {
-    var value: T
-    init(_ value: T) { self.value = value }
-}
+**设计思路**：
+iOS 的 UI 渲染严格遵循分层异步流水线：
+1. **Commit 阶段（宿主 App 进程）**：在主线程 RunLoop 的 \`kCFRunLoopBeforeWaiting\` 时机，统一打包（CA::Transaction）当前帧所有的图层树变更（Layout 测量、Display 寄宿图解压缩、Prepare 图像格式转换）；
+2. **IPC 传输阶段**：App 通过 Mach 消息将渲染事务序列化发送给独立的系统级服务进程 **Render Server (backboardd)**；
+3. **GPU 绘制阶段**：Render Server 解析图层几何信息与纹理，调用 OpenGL/Metal 命令提交给 GPU 执行光栅化；
+4. **Display 阶段**：下一个硬件垂直同步信号（VSYNC）到来时，视频控制器将当前帧缓冲区（FrameBuffer）的数据点阵逐行打到物理屏幕上。
 
-struct COWWrapper<T> {
-    private var box: RefBox<T>
-    init(_ value: T) { self.box = RefBox(value) }
+**底层实现**：
+在 ProMotion 120Hz 高刷屏上，VSYNC 周期仅有 8.33 毫秒（常规 60Hz 为 16.67 毫秒）。一旦 App 主线程因解析 JSON、数据库查询或富文本计算超过 8.33ms，当期 VSYNC 到来时 FrameBuffer 仍为旧数据，GPU 被迫重复展示上一帧，造成“掉帧（Jank / Hitch）”。
 
-    var value: T {
-        get { box.value }
-        set {
-            if !isKnownUniquelyReferenced(&box) {
-                box = RefBox(newValue) // 仅在多强引用且写入时深拷贝
-            } else {
-                box.value = newValue
+### 核心机制二：CFRunLoopObserver 主线程卡顿挂起捕获机制
+
+**历史问题**：
+线上用户反馈“滑动卡顿”，但研发在本地高配设备上难以复现；传统的 APM 性能采集若采用每隔 10ms 盲目轮询主线程堆栈，会产生极高的 CPU 功耗和电量消耗，导致性能监控工具自身劣化了 App 性能。
+
+**设计思路**：
+利用 RunLoop 状态机转换作为精准探针。RunLoop 管理着主线程的消息派发与休眠：
+\`BeforeSources\` ➔ \`AfterWaiting\` ➔ 处理 Source0 事件（点击、手势、UI刷新） ➔ \`BeforeWaiting\` ➔ 线程休眠等待 Mach Port。
+主线程绝大部分耗时卡顿发生在 **\`BeforeSources\` 或 \`AfterWaiting\` 到进入休眠之间**。在独立的后台看门狗线程中，通过 \`CFRunLoopObserver\` 监听这些关键状态转换；若在超过特定阈值（如 50ms）后主线程仍未进入下一次休眠，判定发生严重卡顿。
+
+**底层实现**：
+看门狗线程通过信号量 \`dispatch_semaphore_wait\` 阻塞等待主线程触发的信号；超时则立即利用 \`backtrace_symbols\` 或 PLCrashReporter 抓取主线程当前的内核线程调用栈，直接精准捕获导致主线程卡死的具体代码行。
+
+### 核心机制三：MetricKit 线上真实设备性能与崩溃诊断闭环
+
+**历史问题**：
+线上灰度发布时，第三方崩溃统计 SDK 往往只能抓取 Uncaught Exception，对于系统级 Watchdog 杀死（0x8badf00d "ate bad food"）、Jetsam 内存压迫强杀、后台 CPU 超限杀死几乎完全无能为力；且私有采集功耗过高容易被 Apple 后台策略降级限制。
+
+**设计思路**：
+Apple 在 iOS 13+ 推出了官方原生零开销监控框架 **\`MetricKit\`**。系统内核在底层以几乎为 0 的功耗静默采集设备 24 小时内的真实指标，并在每天或特定诊断时机将 \`MXMetricPayload\`（启动耗时、丢帧时间直方图、磁盘写入量）以及 \`MXDiagnosticPayload\`（Watchdog 挂起诊断、主线程挂起调用栈）批量回传给 App 注册的单例。
+
+**底层实现**：
+MetricKit 由独立守护进程 \`powerd\` / \`osanalyticsd\` 托管，数据全部来源于 iOS 内核级的性能计数器（PMC）与 XNU 调度器事件。App 仅需遵守 \`MXMetricManagerSubscriber\` 协议，即可在无须常驻后台线程的情况下拿到最高精度的官方能耗与稳定性日志。
+
+### 核心机制四：Instruments Time Profiler 与 os_signpost 精准埋点
+
+**历史问题**：
+在线下调优时，传统的打印时间戳（\`CFAbsoluteTimeGetCurrent()\`）代码侵入性极强，上线前容易漏删；且无法直观看到多线程并发交织时的线程切换与 CPU 核心调度状态。
+
+**设计思路**：
+采用 Apple 统一日志子系统（OSLog）中的 **\`os_signpost\`** 体系。在业务关键流程的起点与终点打入轻量事件区间。在连接 Xcode Instruments 时，Time Profiler 1ms 采样能够与自定义的 Signpost 区间在时间轴上精确对齐，直观查看耗时函数的火焰图与各 CPU 核心的占用比。
+
+**底层实现**：
+\`os_signpost\` 在底层仅向内核环形缓冲区（Ring Buffer）写入几十字节的二进制事件头，在未连接调试器或未开启系统追踪时，其 CPU 开销小于 50 纳秒，属于工业级无损埋点。`,
+        caseStudy: `### 例子一：基于 CFRunLoopObserver 实现主线程卡顿堆栈抓取器
+
+\`\`\`swift
+import Foundation
+
+final class RunLoopLagMonitor {
+    static let shared = RunLoopLagMonitor()
+    private var observer: CFRunLoopObserver?
+    private var semaphore = DispatchSemaphore(value: 0)
+    private var currentActivity: CFRunLoopActivity = .entry
+    private var isMonitoring = false
+
+    func startMonitoring(thresholdMS: Int = 50) {
+        guard !isMonitoring else { return }
+        isMonitoring = true
+
+        // 1. 创建 RunLoop 观察者，监听全部活动状态
+        var context = CFRunLoopObserverContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
+        observer = CFRunLoopObserverCreate(kCFAllocatorDefault, CFRunLoopActivity.allActivities.rawValue, true, 0, { (obs, activity, info) in
+            guard let ptr = info else { return }
+            let monitor = Unmanaged<RunLoopLagMonitor>.fromOpaque(ptr).takeUnretainedValue()
+            monitor.currentActivity = activity
+            monitor.semaphore.signal() // 状态推进，发送信号唤醒监控线程
+        }, &context)
+
+        CFRunLoopAddObserver(CFRunLoopGetMain(), observer, .commonModes)
+
+        // 2. 独立后台看门狗线程
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            while self.isMonitoring {
+                // 等待主线程信号，超时即视为卡顿
+                let waitResult = self.semaphore.wait(timeout: .now() + .milliseconds(thresholdMS))
+                if waitResult == .timedOut {
+                    // 若状态停留在 BeforeSources 或 AfterWaiting，判定主线程陷入长耗时卡顿
+                    if self.currentActivity == .beforeSources || self.currentActivity == .afterWaiting {
+                        self.captureMainThreadStack()
+                    }
+                }
             }
         }
     }
-}`,
-      },
-      {
-        tag: '故障攻坚',
-        title: 'Watchdog (0x8badf00d) 卡死分析与内存 Leaks 循环引用排查',
-        explanation: '当 iOS 主线程在启动阶段耗时超过 20 秒，或在运行中卡死超过 10 秒时，系统 Watchdog 会强制杀死 App 并抛出异常码 0x8badf00d ("ate bad food")。排查内存泄漏时，使用 Xcode Memory Graph 观察对象节点间的有向引用环，重点检查闭包捕获 self 未加 [weak self]、NSTimer/CADisplayLink 强引用 target 以及 Delegate 协议未声明为 AnyObject / weak。',
-        codeSnippet: `// 预防闭包与 Delegate 循环引用标准模式
-protocol TaskDelegate: AnyObject { // 必须继承 AnyObject 才能使用 weak
-    func taskDidFinish()
+
+    private func captureMainThreadStack() {
+        // 抓取当前线程调用栈（生产中接入 PLCrashReporter 提取主线程 Mach 线程栈）
+        print("⚠️ [Watchdog 警报]: 检测到主线程卡顿超过阈值，抓取堆栈...")
+    }
 }
+\`\`\`
 
-final class TaskRunner {
-    weak var delegate: TaskDelegate? // weak 防止循环引用
+### 例子二：os_signpost 毫秒级性能区间埋点与 Instruments 关联
 
-    func execute() {
-        DispatchQueue.global().async { [weak self] in // 闭包弱引用
-            guard let self = self else { return }
-            self.delegate?.taskDidFinish()
+\`\`\`swift
+import OSLog
+
+final class FeedTraceLogger {
+    // 1. 创建用于性能追踪的专用 OSLog 分类
+    private static let pointsOfInterest = OSLog(
+        subsystem: Bundle.main.bundleIdentifier ?? "com.app",
+        category: .pointsOfInterest // 系统保留分类，在 Instruments 中高亮显示
+    )
+
+    // 2. 追踪列表数据绑定与图片解码耗时
+    static func traceFeedRender(feedId: String, renderBlock: () -> Void) {
+        let signpostID = OSSignpostID(log: pointsOfInterest)
+        // 标记区间起点
+        os_signpost(.begin, log: pointsOfInterest, name: "FeedRender", signpostID: signpostID, "ID: %{public}@", feedId)
+
+        renderBlock() // 执行实际排版计算
+
+        // 标记区间终点
+        os_signpost(.end, log: pointsOfInterest, name: "FeedRender", signpostID: signpostID)
+    }
+}
+\`\`\`
+
+### 例子三：MetricKit 线上日级性能指标收集与聚合上报
+
+\`\`\`swift
+import MetricKit
+
+final class GlobalMetricsSubscriber: NSObject, MXMetricManagerSubscriber {
+    static let shared = GlobalMetricsSubscriber()
+
+    func start() {
+        // 向系统注册成为性能数据订阅者
+        MXMetricManager.shared.add(self)
+    }
+
+    // 1. 每日批量接收真实用户性能指标 Payload
+    func didReceive(_ payloads: [MXMetricPayload]) {
+        for metric in payloads {
+            // 获取冷启动首帧绘制时间直方图 (TimeToFirstDraw)
+            if let launchMetrics = metric.applicationLaunchMetrics {
+                let launchHistogram = launchMetrics.histogrammedTimeToFirstDraw
+                print("冷启动时间样本数: \\(launchHistogram.totalBucketCount)")
+            }
+
+            // 获取动画丢帧占比 (Scroll Hitch Time Ratio)
+            if let displayMetrics = metric.displayMetrics {
+                print("丢帧比例数据已就绪")
+            }
         }
     }
-}`,
+
+    // 2. 接收崩溃与 Watchdog 挂起诊断 Payload
+    func didReceive(_ payloads: [MXDiagnosticPayload]) {
+        for diag in payloads {
+            if let hangs = diag.hangDiagnostics {
+                for hang in hangs {
+                    print("抓取到主线程未响应挂起: \\(hang.callStackTree)")
+                }
+            }
+        }
+    }
+}
+\`\`\``,
+      },
+      {
+        tag: '内存治理',
+        title: 'ARC 内存模型、Side Table 弱引用副表与循环引用自动探测',
+        sectionTitles: {
+          explanation: '四大内存核心机制与泄漏攻坚',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：Swift 对象内存布局与 Inline RefCount
+
+**历史问题**：
+开发者常误以为 Swift 的 Class 对象和 C++ 对象完全一致，只要分配一个指针即可。但在 ARC 下，每个对象必须维护引用计数。如果在堆内存中为每个对象额外分配一个计数器结构体，会产生大量碎片化堆内存与二级指针开销。
+
+**设计思路**：
+Swift 对象的头部布局极为紧凑：
+- **第 1 个 8 字节**：指向该类型的元数据指针（Metadata Pointer / isa 指针）；
+- **第 2 个 8 字节**：内联引用计数（**Inline RefCount** 64 位无符号整数）。
+这 64 位被精打细算地划分为多个位域（Bitfields）：包含强引用计数（Strong Count）、未拥有引用计数（Unowned Count）、析构状态位（isDeiniting）以及最关键的 **副表挂载标志位（UseSideTable）**。
+
+**底层实现**：
+当对象的强引用计数增加时，底层直接执行原子的汇编位运算（\`swift_retain\`）。只要强引用计数未超过限制且没有被弱引用，所有引用计数运算全部在对象头部的 8 字节内联高速完成，无需任何外部锁或哈希表寻址。
+
+### 核心机制二：Side Table 弱引用副表与 0 野指针安全保证
+
+**历史问题**：
+在 Objective-C 中，弱引用（\`__weak\`）通过全局的弱引用哈希表实现，当对象销毁时遍历全局表置空，高并发下加锁冲突频繁。而 Swift 必须彻底杜绝僵尸对象野指针崩溃（Zombie Crashes）。
+
+**设计思路**：
+Swift 引入了 **Side Table（副表）** 架构。每个对象默认**不分配**副表以节省内存。只有在以下两种情况发生时，系统才动态为该对象在堆上分配一个 \`HeapObjectSideTableEntry\`：
+1. 对象的强引用计数发生溢出（超出内联位宽）；
+2. 该对象**第一次被一个 \`weak\` 弱引用指针指向**。
+一旦分配副表，对象头部的 64 位内联 RefCount 会将 \`UseSideTable\` 标记位置 1，其余 62 位直接转化为指向真实副表的物理内存指针。
+
+**底层实现**：
+副表内部持有真实的 Strong / Unowned / Weak 引用计数，并包含一个指向宿主对象的指针。当宿主对象强引用归零触发 \`deinit\` 后，宿主内存立即释放；但只要还有外部弱引用指针存活，副表结构体继续保留，外部 \`weak\` 读取时安全返回 \`nil\`，直到所有弱引用全部失效后副表才最终被物理回收，实现 100% 内存安全。
+
+### 核心机制三：Copy-On-Write (COW) 写时复制底层实现机理
+
+**历史问题**：
+Swift 极度推崇值类型（struct）。若一个 Array 包含 100 万条数据，每次将它传给函数或赋值给新变量都无脑执行一次深拷贝（Deep Copy），内存与 CPU 将立即被打爆。
+
+**设计思路**：
+Swift 标准库为大型容器（Array, Dictionary, Set, String）实现了 **Copy-On-Write (COW)** 机制。赋值或传参时，新变量仅仅浅拷贝（Shallow Copy）底层缓冲区的堆指针（只消耗 8 字节）。只有在真正对容器执行“写操作（Mutation）”的瞬间，系统才检查当前缓冲区是否被多个变量共享；若有共享，才现场执行真正的数据深拷贝与物理内存分离。
+
+**底层实现**：
+标准库通过运行时内置函数 **\`isKnownUniquelyReferenced(&buffer)\`** 判定。其底层直接读取该堆缓冲区的强引用计数：若计数严格等于 1，说明当前变量是全局唯一持有者，直接进行 O(1) 的就地原位修改；若计数大于 1，则现场开辟新堆内存并拷贝数据。
+
+### 核心机制四：循环引用三大高发场景与自动探测治理
+
+**历史问题**：
+在生产环境中，即便拥有强大的 ARC，内存泄漏依然频发。最隐蔽的泄漏会导致大量 UIViewController 和业务 ViewModel 在退出页面后永久驻留内存，多进几次页面即触发 Jetsam OOM 闪退。
+
+**设计思路**：
+治理强引用闭环必须锁死三大高发场景：
+1. **闭包逃逸捕获**：异步网络回调、动画闭包中直接访问 \`self.property\`，必须显式声明 \`[weak self]\`；
+2. **委托模式（Delegate）未弱化**：协议必须限定 \`AnyObject\`，声明属性必须加 \`weak\`；
+3. **响应式观察者残留**：NotificationCenter 或 Combine AnyCancellable 存储在外部全局单例中未及时取消。
+
+**底层实现**：
+利用 UIViewController 容器生命周期设计轻量级**自动化内存泄漏探测器**。在页面退出导航栈（\`viewDidDisappear\`）后，延时 2 秒检查该控制器实例是否已被释放（通过弱引用代理 WeakProxy）。若 2 秒后指针依然非空，断定发生内存泄漏，并在控制台直接打印警告堆栈。`,
+        caseStudy: `### 例子一：基于 isKnownUniquelyReferenced 实现生产级 COW 结构体
+
+\`\`\`swift
+// 1. 堆存储盒子（引用类型）
+private final class StorageBox<T> {
+    var payload: T
+    init(_ payload: T) { self.payload = payload }
+}
+
+// 2. 对外暴露的高性能值类型结构体
+struct FastBuffer<T> {
+    private var box: StorageBox<T>
+
+    init(_ value: T) {
+        self.box = StorageBox(value)
+    }
+
+    // 只读访问：直接读取，0 拷贝开销
+    var value: T {
+        return box.payload
+    }
+
+    // 变异写入：精确触发行内写时复制
+    mutating func update(_ newPayload: T) {
+        // 关键：检查堆上 box 对象的强引用计数是否唯一
+        if !isKnownUniquelyReferenced(&box) {
+            // 存在多处共享引用，现场分裂拷贝
+            self.box = StorageBox(newPayload)
+        } else {
+            // 唯一持有，原位就地修改（O(1) 极致性能）
+            self.box.payload = newPayload
+        }
+    }
+}
+\`\`\`
+
+### 例子二：Debug 自动化内存泄漏探测器（WeakProxy + 延时校验）
+
+\`\`\`swift
+import UIKit
+
+final class LeakDetector {
+    // 弱引用代理，避免检测器自身强引用目标对象
+    private final class WeakBox {
+        weak var object: AnyObject?
+        init(_ object: AnyObject) { self.object = object }
+    }
+
+    // 对任意 UIViewController 发起生命周期泄漏守卫
+    static func watchDisappearance(of viewController: UIViewController) {
+        #if DEBUG
+        let box = WeakBox(viewController)
+        let className = String(describing: type(of: viewController))
+
+        // 页面消失 2 秒后核验（留足转场动画与正常异步收尾时间）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            if box.object != nil {
+                print("🚨 [内存泄漏警报]: 控制器 \\(className) 在 pop 后未被 deinit，可能存在强引用环！")
+            }
+        }
+        #endif
+    }
+}
+
+// 在 BaseViewController 模板中无缝插桩
+class BaseViewController: UIViewController {
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        if isMovingFromParent || isBeingDismissed {
+            LeakDetector.watchDisappearance(of: self)
+        }
+    }
+}
+\`\`\`
+
+### 例子三：CADisplayLink / Timer 破除循环强引用防卡死实战
+
+\`\`\`swift
+import UIKit
+
+// 1. 弱引用中介者（Proxy），打破 CADisplayLink ➔ Target 强引用
+final class WeakDisplayLinkProxy {
+    private weak var target: AnyObject?
+    private let action: (CADisplayLink) -> Void
+
+    init(target: AnyObject, action: @escaping (CADisplayLink) -> Void) {
+        self.target = target
+        self.action = action
+    }
+
+    @objc func onTick(link: CADisplayLink) {
+        if target != nil {
+            action(link)
+        } else {
+            // 宿主已被销毁，自动解绑并停用计时器
+            link.invalidate()
+        }
+    }
+}
+
+// 2. 业务使用（杜绝内存泄漏）
+final class HeartbeatPulseView: UIView {
+    private var displayLink: CADisplayLink?
+
+    func startPulse() {
+        let proxy = WeakDisplayLinkProxy(target: self) { [weak self] link in
+            self?.renderNextFrame()
+        }
+        // CADisplayLink 内部仅强持有 proxy，不直接强持有 self
+        displayLink = CADisplayLink(target: proxy, selector: #selector(WeakDisplayLinkProxy.onTick(link:)))
+        displayLink?.add(to: .main, forMode: .common)
+    }
+
+    private func renderNextFrame() {
+        // 每帧驱动动画...
+    }
+
+    deinit {
+        // self 能够正常触发 deinit，调用 invalidate() 释放资源
+        displayLink?.invalidate()
+    }
+}
+\`\`\``,
       },
     ],
   },
@@ -3694,42 +5192,415 @@ final class TaskRunner {
     ],
     ios: [
       {
-        tag: '图形渲染',
-        title: 'Metal 低开销图形管线、CAMetalLayer 与 Shader 编译',
-        explanation: 'Metal 是 Apple 为替代 OpenGL ES 开发的原生底层图形 API，具备极低的 CPU 驱动开销与多线程渲染命令录制能力。Metal 渲染核心组件包括 MTLDevice（GPU 句柄）、MTLCommandQueue（命令队列）、MTLRenderPipelineState（着色器编译管线）与 CAMetalLayer（CoreAnimation 直通图层）。Metal Shading Language (MSL) 在 App 编译期即可预编译为 AIR 字节码，运行时无着色器编译卡顿。',
-        codeSnippet: `// Metal 基础渲染管线配置
-import MetalKit
+        tag: '音视频管线',
+        title: 'AVFoundation 采集 ➔ VideoToolbox 硬编码 ➔ CMTime 纳秒对齐全流程',
+        sectionTitles: {
+          explanation: '四大硬件级音视频核心机制',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：AVCaptureSession 物理管道与 CVPixelBuffer 内存池
 
-guard let device = MTLCreateSystemDefaultDevice(),
-      let commandQueue = device.makeCommandQueue() else { fatalError() }
+**历史问题**：
+在移动端处理 1080P 60fps 甚至 4K 相机采集时，每秒产生数十万张未经压缩的 RAW/YUV 图像。若直接在回调中将图像转换为 \`UIImage\`，频繁的内存分配与深拷贝会导致内存带宽迅速打满，产生严重的 CPU 发热降频与丢帧崩溃。
 
-let pipelineDescriptor = MTLRenderPipelineDescriptor()
-pipelineDescriptor.vertexFunction = defaultLibrary.makeFunction(name: "vertexShader")
-pipelineDescriptor.fragmentFunction = defaultLibrary.makeFunction(name: "fragmentShader")
-pipelineDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
+**设计思路**：
+AVFoundation 采用了极其高效的零拷贝数据流拓扑：
+1. **拓扑编排**：由 **\`AVCaptureSession\`** 充当物理流中枢，连接 \`AVCaptureDeviceInput\`（硬件摄像头/麦克风）与 \`AVCaptureVideoDataOutput\`；
+2. **环形缓冲池（CVPixelBufferPool）**：底层输出格式为 **\`CVPixelBuffer\`**（iOS CoreVideo 核心视频缓冲对象）。系统通过硬件专用的环形缓冲池复用物理内存，只要上一帧处理完毕立即放回池中，整个采集过程实现**零堆内存分配**。
 
-let pipelineState = try device.makeRenderPipelineState(descriptor: pipelineDescriptor)`,
+**底层实现**：
+AVCaptureVideoDataOutput 默认在指定的私有串行 GCD 队列派发 \`CMSampleBuffer\`。如果业务处理（如美颜滤镜或编码）耗时超过单帧间隔（如 16.6ms），缓冲池无法腾出可用 Buffer，系统会自动将 \`alwaysDiscardsLateVideoFrames\` 置为 true 并物理丢弃迟到帧，坚决保证时钟基准不延迟。
+
+### 核心机制二：VideoToolbox 硬件 H.264/HEVC 编码会话 (VTCompressionSession)
+
+**历史问题**：
+在移动设备上使用纯 CPU 软编码（如 libx264）压缩 1080P 视频，CPU 占用率经常飙升至 80% 以上，手机几分钟内发烫发热，电池断崖式缩水，严重影响用户体验。
+
+**设计思路**：
+Apple 在 A 系列与 M 系列芯片上集成了专用的硬件视频编码协处理器（VPU）。通过系统级 C 接口 **\`VideoToolbox\`** 中的 **\`VTCompressionSession\`**，直接将原始 YUV420 CVPixelBuffer 灌入硬件编码器。硬件直接输出压缩后的 NALU（SPS, PPS, IDR, P 帧）数据包，CPU 占用率通常不足 5%。
+
+**底层实现**：
+配置 \`VTCompressionSessionCreate\` 时，通过 \`VTSessionSetProperty\` 精确调控编码器行为：设置 \`kVTCompressionPropertyKey_ProfileLevel\` 锁定 Baseline / Main / High Profile；设置 \`kVTCompressionPropertyKey_AverageBitRate\` 控制平均码率；通过 \`kVTCompressionPropertyKey_MaxKeyFrameInterval\` 控制 GOP 关键帧间隔（通常为帧率的 1~2 倍），确保推流或录制网络断开时能快速恢复。
+
+### 核心机制三：CoreMedia CMTime 纳秒级高精度音画同步
+
+**历史问题**：
+开发者若采用浮点数（\`Double\` / \`Float\`，如 \`1.234秒\`）记录音视频时间戳，随着视频播放或录制时长的增加（如录制 1 小时），浮点数在累加过程中会产生严重的精度舍入误差（Rounding Error），最终导致音频与画面产生肉眼可见的脱节不同步。
+
+**设计思路**：
+Apple CoreMedia 框架设计了纯有理数结构体 **\`CMTime\`**：
+\`CMTime(value: Int64, timescale: Int32)\`。时间以分式表达：真实时间 = \`value / timescale\`。
+例如音频采样率为 44100Hz，则 timescale 设为 44100，每一个音频包的 value 精确自增采样点数；视频通常将 timescale 设为 600（能被 24, 25, 30, 60 整除）或 1,000,000,000（纳秒级）。有理数分数运算永远保持绝对精确，从根本上消除了累积时间漂移。
+
+**底层实现**：
+每个 \`CMSampleBuffer\` 携带有权威的 **PTS（Presentation Time Stamp 显示时间戳）** 和 **DTS（Decode Time Stamp 解码时间戳）**。在存在 B 帧（双向预测帧）的双向编码场景下，PTS 与 DTS 顺序不一致，视频渲染引擎与音频渲染引擎均基于主参考时钟（Master Clock）按照 PTS 严格同步打到输出设备上。
+
+### 核心机制四：AVAssetWriter 多轨道异步交织写入 MP4 容器
+
+**历史问题**：
+将编码后的视频与音频帧打包写入磁盘文件（.mp4/.mov）时，若直接使用普通文件 I/O 写入，往往会因为磁盘写入速度波动导致 I/O 阻塞编码线程，甚至由于音视频数据包没有均匀交织（Interleaving），导致生成的文件在网络边下边播时需要频繁 Seek 寻址。
+
+**设计思路**：
+利用 **\`AVAssetWriter\`** 与 **\`AVAssetWriterInput\`**。为视频轨和音频轨分别配置专属输入端口，通过 \`requestMediaDataWhenReady(on:using:)\` 异步流水线机制驱动。当底层磁盘缓冲就绪时，回调通知业务拉取数据写入；系统内部自动对音视频帧进行交织排版，将索引头（moov atom）与媒体数据（mdat atom）合规封装。
+
+**底层实现**：
+AVAssetWriter 底层使用双缓冲环形队列。支持在录制结束时（\`finishWriting\`）将关键的 \`moov atom\` 原数据放置在文件头部（Fast Start 快速起播优化），使得远端 CDN 下载时无需先下载完整个几个 G 的视频即可实现首秒秒开。`,
+        caseStudy: `### 例子一：AVCaptureSession 零丢帧相机配置与后台串行派发
+
+\`\`\`swift
+import AVFoundation
+import UIKit
+
+final class CameraCaptureEngine: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
+    private let session = AVCaptureSession()
+    private let captureQueue = DispatchQueue(label: "com.camera.capture.queue", qos: .userInteractive)
+
+    func setupCamera() throws {
+        session.beginConfiguration()
+        session.sessionPreset = .hd1920x1080 // 锁定 1080P 规格
+
+        // 1. 获取物理广角摄像头
+        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              let input = try? AVCaptureDeviceInput(device: device),
+              session.canAddInput(input) else {
+            throw NSError(domain: "Camera", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法初始化摄像头输入"])
+        }
+        session.addInput(input)
+
+        // 2. 配置视频数据输出通道
+        let videoOutput = AVCaptureVideoDataOutput()
+        // 设置输出像素格式为硬件最友好的 YUV 420 (Bi-Planar NV12)
+        videoOutput.videoSettings = [
+            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange)
+        ]
+        videoOutput.alwaysDiscardsLateVideoFrames = true // 关键：过载时自动丢弃迟到帧，保护时钟
+        videoOutput.setSampleBufferDelegate(self, queue: captureQueue)
+
+        if session.canAddOutput(videoOutput) {
+            session.addOutput(videoOutput)
+        }
+
+        session.commitConfiguration()
+        session.startRunning()
+    }
+
+    // 核心帧回调（运行在专用串行后台线程，绝不能有耗时阻塞操作）
+    func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        // 传递给 VideoToolbox 硬编码或 Metal GPU 渲染管线...
+    }
+}
+\`\`\`
+
+### 例子二：VideoToolbox 硬件压缩 H.264 编码器配置与回调
+
+\`\`\`swift
+import VideoToolbox
+import CoreMedia
+
+final class H264HardwareEncoder {
+    private var compressionSession: VTCompressionSession?
+
+    func setupEncoder(width: Int32, height: Int32, fps: Int32, bitRate: Int) throws {
+        // 1. 创建硬件压缩会话
+        let status = VTCompressionSessionCreate(
+            allocator: kCFAllocatorDefault,
+            width: width,
+            height: height,
+            codecType: kCMVideoCodecType_H264,
+            encoderSpecification: nil,
+            imageBufferAttributes: nil,
+            compressedDataAllocator: nil,
+            outputCallback: compressionCallback,
+            refcon: Unmanaged.passUnretained(self).toOpaque(),
+            compressionSessionOut: &compressionSession
+        )
+        guard status == noErr, let session = compressionSession else { fatalError("硬编会话创建失败") }
+
+        // 2. 配置实时编码属性
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_RealTime, value: kCFBooleanTrue)
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_ProfileLevel, value: kVTProfileLevel_H264_High_AutoLevel)
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_AverageBitRate, value: bitRate as CFTypeRef)
+        VTSessionSetProperty(session, key: kVTCompressionPropertyKey_MaxKeyFrameInterval, value: (fps * 2) as CFTypeRef) // 2秒一个GOP
+
+        VTCompressionSessionPrepareToEncodeFrames(session)
+    }
+
+    // 灌入原始 CVPixelBuffer 执行硬编
+    func encode(pixelBuffer: CVPixelBuffer, pts: CMTime, duration: CMTime) {
+        guard let session = compressionSession else { return }
+        VTCompressionSessionEncodeFrame(
+            session,
+            imageBuffer: pixelBuffer,
+            presentationTimeStamp: pts,
+            duration: duration,
+            frameProperties: nil,
+            sourceFrameRefcon: nil,
+            infoFlagsOut: nil
+        )
+    }
+}
+
+// 静态 C 回调：接收硬件输出的压缩后 NALU 数据
+private func compressionCallback(
+    outputCallbackRefCon: UnsafeMutableRawPointer?,
+    sourceFrameRefCon: UnsafeMutableRawPointer?,
+    status: OSStatus,
+    infoFlags: VTEncodeInfoFlags,
+    sampleBuffer: CMSampleBuffer?
+) {
+    guard status == noErr, let buffer = sampleBuffer else { return }
+    // 从 sampleBuffer 提取 H.264 NALU 数据并打包发送或写入文件
+}
+\`\`\`
+
+### 例子三：AVAssetWriter 异步写入 CVPixelBuffer 与 CMTime 时间戳对齐
+
+\`\`\`swift
+import AVFoundation
+
+final class MovieFileWriter {
+    private var assetWriter: AVAssetWriter?
+    private var videoInput: AVAssetWriterInput?
+    private var pixelBufferAdaptor: AVAssetWriterInputPixelBufferAdaptor?
+    private var isRecording = false
+
+    func startRecording(outputURL: URL, width: Int, height: Int) throws {
+        // 1. 初始化文件写入器
+        assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
+
+        // 2. 视频轨输出配置 (H.264 编码)
+        let outputSettings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: width,
+            AVVideoHeightKey: height
+        ]
+        videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
+        videoInput?.expectsMediaDataInRealTime = true // 声明为实时捕获模式
+
+        // 3. 像素缓冲区适配器（连接 CVPixelBuffer 与 WriterInput）
+        pixelBufferAdaptor = AVAssetWriterInputPixelBufferAdaptor(
+            assetWriterInput: videoInput!,
+            sourcePixelBufferAttributes: nil
+        )
+
+        if assetWriter!.canAdd(videoInput!) {
+            assetWriter!.add(videoInput!)
+        }
+        assetWriter!.startWriting()
+        isRecording = true
+    }
+
+    // 写入视频帧（必须严格递增 PTS，禁止传入倒序时间戳）
+    func writeFrame(pixelBuffer: CVPixelBuffer, at pts: CMTime) {
+        guard isRecording, let writer = assetWriter, let input = videoInput, let adaptor = pixelBufferAdaptor else { return }
+        if writer.status == .writing && input.isReadyForMoreMediaData {
+            adaptor.append(pixelBuffer, withPresentationTime: pts)
+        }
+    }
+
+    func finishRecording(completion: @escaping () -> Void) {
+        isRecording = false
+        videoInput?.markAsFinished()
+        assetWriter?.finishWriting {
+            completion()
+        }
+    }
+}
+\`\`\``,
       },
       {
-        tag: '音视频管线',
-        title: 'AVFoundation 帧采集 ➔ VideoToolbox 硬编码 ➔ CMTime 纳秒对齐',
-        explanation: 'iOS 音视频采集通过 AVCaptureSession 驱动 AVCaptureVideoDataOutput 输出 CVPixelBuffer 视频帧与 CMSampleBuffer 音频帧；利用 VideoToolbox 的 VTCompressionSession 开启硬件 H.264/HEVC 编码；音画同步核心依托 CoreMedia 的 CMTime 结构体（包含 value / timescale 精度表示），确保写入 AVAssetWriterInput 的时间戳连续无丢帧。',
-        codeSnippet: `// VideoToolbox 硬编码会话创建
-import VideoToolbox
+        tag: '现代图形',
+        title: 'Metal GPU 底层管线、CAMetalLayer 与 Core Image 实时滤镜渲染',
+        sectionTitles: {
+          explanation: '四大现代图形核心机制',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：Metal 低开销架构与多线程命令录制
 
-var compressionSession: VTCompressionSession?
-VTCompressionSessionCreate(
-    allocator: kCFAllocatorDefault,
-    width: 1080,
-    height: 1920,
-    codecType: kCMVideoCodecType_H264,
-    encoderSpecification: nil,
-    imageBufferAttributes: nil,
-    compressedDataAllocator: nil,
-    outputCallback: nil,
-    refcon: nil,
-    compressionSessionOut: &compressionSession
-)`,
+**历史问题**：
+OpenGL ES 时代采用全局隐式状态机（Global Context State Machine），任何一个绘制调用都需要进行繁杂的驱动状态验证，CPU 驱动开销（Driver Overhead）极高；更致命的是 OpenGL ES 是单线程模型，现代多核 CPU 无法并发向单个 Context 发送绘制指令。
+
+**设计思路**：
+Apple 在 2014 年发布了专为 Apple Silicon GPU 定制的底层图形 API——**Metal**。其核心特征是**显式、极低开销与多线程友好**：
+1. **彻底消除隐式状态机**：所有管线状态在编译期预先烘焙为不可变的 \`MTLRenderPipelineState\`；
+2. **多线程并行命令录制**：多个 Worker 线程可以同时录制各自的 \`MTLCommandBuffer\`，最终统一合并提交给硬件命令队列（\`MTLCommandQueue\`），完全释放多核 CPU 算力。
+
+**底层实现**：
+Metal 驱动层极其轻薄，仅作为用户态代码到 GPU 固件的直接映射。函数调用耗时由 OpenGL ES 的数微秒暴降至百纳秒级别，使得移动设备每帧绘制调用（Draw Calls）容量由数百次跃升至数万次。
+
+### 核心机制二：CAMetalLayer 直通图层与三缓冲交换链
+
+**历史问题**：
+在传统图形框架中，GPU 渲染完成的画面需要经过昂贵的内存拷贝才能复制到 UIKit 的屏幕寄宿图（CALayer）中；若双缓冲处理不当，极易出现画面撕裂（Tearing）或主线程等待 GPU 渲染完成的“互锁阻塞”。
+
+**设计思路**：
+CoreAnimation 原生提供了 **\`CAMetalLayer\`** 直通图层。它直接向开发者暴露底层的 **\`CAMetalDrawable\`**。渲染管线将命令直接录制并渲染到当前 Drawable 的纹理中；命令提交时调用 \`commandBuffer.present(drawable)\`，系统在硬件层面将该纹理直接注册为下一个 VSYNC 显示的帧缓冲，**全程 0 内存拷贝**。
+
+**底层实现**：
+CAMetalLayer 内部维护三缓冲交换链（Triple Buffering）。CPU 在录制帧 N+1 的命令时，GPU 正在执行帧 N 的渲染，而显示控制器正在展示帧 N-1 的屏幕点阵。通过流水线掩盖延迟，彻底跑满 120Hz ProMotion 刷新率。
+
+### 核心机制三：MSL 着色器预编译与 MTLRenderPipelineState 状态机
+
+**历史问题**：
+在 OpenGL ES 中，GLSL 着色器源码是在 App 运行时才调用 \`glCompileShader\` 现场编译为机器码。这导致每次进入 3D 场景或弹出复杂界面时，都会发生几十毫秒的严重着色器编译卡顿（Shader Jitter / Stutter）。
+
+**设计思路**：
+Metal 采用 **Metal Shading Language (MSL)**（基于 C++14）。在 Xcode 构建 App 阶段，编译器直接将 \`.metal\` 源码预编译为 AIR（Apple Intermediate Representation）字节码并打包存入 \`default.metallib\`。在 App 运行时，GPU 驱动只需将 AIR 进行极快的本地指令翻译，或者利用二进制归档缓存（\`MTLBinaryArchive\`）实现运行期 0 编译开销。
+
+**底层实现**：
+在创建 \`MTLRenderPipelineState\` 时，系统在驱动层一次性完成顶点布局校验、混合模式解析与着色器链接，生成专用的不可变二进制硬件管线状态。在主渲染循环中只需调用 \`encoder.setRenderPipelineState(pipeline)\`，执行无条件快速指针切换。
+
+### 核心机制四：CIContext 桥接 Metal 实现零拷贝 60fps 实时相机滤镜
+
+**历史问题**：
+Core Image 拥有数百个强大的图像滤镜（滤镜链 CIFilter），但若使用旧版 CPU CIContext，单张图片滤镜处理需要数百毫秒，根本无法用于 60fps 实时相机预览。
+
+**设计思路**：
+利用现代 **\`CIContext(mtlCommandQueue:)\`** 实现 Core Image 与 Metal 的无缝桥接。在相机帧到达时，将 \`CVPixelBuffer\` 零拷贝映射为 \`CIImage\`，挂载 CIFilter 滤镜链；渲染输出时直接渲染到 Metal 纹理（\`MTLTexture\`）中，整个图像处理全部在 GPU 显存内部流转，完全不出显存。
+
+**底层实现**：
+Core Image 引擎将多个 CIFilter 自动融合成单一的高性能 Metal Compute Shader（核函数融合 Kernel Fusion），消除多重滤镜渲染时的多次中间纹理往返读写（Round-trips to VRAM），轻松实现 4K 60fps 实时美颜与调色渲染。`,
+        caseStudy: `### 例子一：基于 CAMetalLayer 与 MTLCommandQueue 搭建轻量级渲染器
+
+\`\`\`swift
+import MetalKit
+import UIKit
+
+final class SimpleMetalRenderer: NSObject, MTKViewDelegate {
+    private let device: MTLDevice
+    private let commandQueue: MTLCommandQueue
+    private var pipelineState: MTLRenderPipelineState?
+
+    init?(mtkView: MTKView) {
+        // 1. 获取物理 GPU 句柄与命令队列
+        guard let defaultDevice = MTLCreateSystemDefaultDevice(),
+              let queue = defaultDevice.makeCommandQueue() else {
+            return nil
+        }
+        self.device = defaultDevice
+        self.commandQueue = queue
+        super.init()
+
+        mtkView.device = defaultDevice
+        mtkView.delegate = self
+        mtkView.clearColor = MTLClearColor(red: 0.1, green: 0.1, blue: 0.1, alpha: 1.0)
+
+        buildPipeline(mtkView: mtkView)
+    }
+
+    private func buildPipeline(mtkView: MTKView) {
+        guard let library = device.makeDefaultLibrary() else { return }
+        let pipelineDesc = MTLRenderPipelineDescriptor()
+        pipelineDesc.vertexFunction = library.makeFunction(name: "vertexShader")
+        pipelineDesc.fragmentFunction = library.makeFunction(name: "fragmentShader")
+        pipelineDesc.colorAttachments[0].pixelFormat = mtkView.colorPixelFormat
+
+        pipelineState = try? device.makeRenderPipelineState(descriptor: pipelineDesc)
+    }
+
+    func draw(in view: MTKView) {
+        // 每帧由 MTKView 内部的 CADisplayLink 触发
+        guard let drawable = view.currentDrawable,
+              let renderPassDesc = view.currentRenderPassDescriptor,
+              let pipeline = pipelineState,
+              let commandBuffer = commandQueue.makeCommandBuffer(),
+              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDesc) else {
+            return
+        }
+
+        encoder.setRenderPipelineState(pipeline)
+        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
+        encoder.endEncoding()
+
+        // 呈现当前 Drawable 并提交 GPU 执行
+        commandBuffer.present(drawable)
+        commandBuffer.commit()
+    }
+
+    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+}
+\`\`\`
+
+### 例子二：Metal Shading Language (MSL) 顶点与片段着色器
+
+\`\`\`metal
+#include <metal_stdlib>
+using namespace metal;
+
+// 顶点输出结构体
+struct VertexOut {
+    float4 position [[position]]; // [[position]] 语义修饰符表示裁剪空间坐标
+    float2 uv;
+};
+
+// 1. 顶点着色器（逐顶点运算）
+vertex VertexOut vertexShader(uint vertexID [[vertex_id]]) {
+    // 屏幕全屏三角形硬件坐标
+    float2 positions[3] = { float2(-1.0, -1.0), float2(3.0, -1.0), float2(-1.0, 3.0) };
+    float2 uvs[3] = { float2(0.0, 1.0), float2(2.0, 1.0), float2(0.0, -1.0) };
+
+    VertexOut out;
+    out.position = float4(positions[vertexID], 0.0, 1.0);
+    out.uv = uvs[vertexID];
+    return out;
+}
+
+// 2. 片段着色器（逐像素着色）
+fragment float4 fragmentShader(VertexOut in [[stage_in]],
+                               texture2d<float> videoTexture [[texture(0)]]) {
+    constexpr sampler textureSampler(mag_filter::linear, min_filter::linear);
+    float4 color = videoTexture.sample(textureSampler, in.uv);
+    // 实时灰度滤镜计算
+    float gray = dot(color.rgb, float3(0.299, 0.587, 0.114));
+    return float4(float3(gray), color.a);
+}
+\`\`\`
+
+### 例子三：CIContext 绑定 MTLCommandQueue 实现零拷贝实时相机滤镜
+
+\`\`\`swift
+import CoreImage
+import Metal
+import AVFoundation
+
+final class RealtimeCameraFilterPipeline {
+    private let device: MTLDevice
+    private let commandQueue: MTLCommandQueue
+    private let ciContext: CIContext
+
+    init() {
+        self.device = MTLCreateSystemDefaultDevice()!
+        self.commandQueue = device.makeCommandQueue()!
+        // 关键：基于 Metal CommandQueue 构建 CIContext，开启硬件级核函数融合
+        self.ciContext = CIContext(mtlCommandQueue: commandQueue)
+    }
+
+    // 处理来自 AVCaptureVideoDataOutput 的原始相机帧
+    func processFrame(pixelBuffer: CVPixelBuffer, targetTexture: MTLTexture) {
+        // 1. 零拷贝映射 CVPixelBuffer 为 CIImage
+        let inputImage = CIImage(cvPixelBuffer: pixelBuffer)
+
+        // 2. 串接 Core Image 滤镜链
+        let filter = CIFilter(name: "CISepiaTone")!
+        filter.setValue(inputImage, forKey: kCIInputImageKey)
+        filter.setValue(0.8, forKey: kCIInputIntensityKey)
+        guard let outputImage = filter.outputImage else { return }
+
+        // 3. 直接通过 Metal 渲染到上屏纹理，全程显存零拷贝
+        guard let commandBuffer = commandQueue.makeCommandBuffer() else { return }
+        ciContext.render(
+            outputImage,
+            to: targetTexture,
+            commandBuffer: commandBuffer,
+            bounds: outputImage.extent,
+            colorSpace: CGColorSpaceCreateDeviceRGB()
+        )
+        commandBuffer.commit() // 异步提交 GPU
+    }
+}
+\`\`\``,
       },
     ],
   },
@@ -3947,89 +5818,373 @@ UMP 首次网络请求检测需要与 Google 服务器握手，在欧洲网络�
     ios: [
       {
         tag: '出海订阅',
-        title: 'Apple StoreKit 2 订阅事务、JWS 验签与 Transaction.updates 监听',
-        explanation: 'StoreKit 2 全面采用 Swift Concurrency 现代化 API。所有购买记录均返回经过 Apple 官方私钥加密签名的 JWS (JSON Web Signature) Transaction 对象。客户端通过 VerificationResult 安全验证签名合法性后，必须调用 transaction.finish() 明确标记事务完成。通过在 App 启动时全局监听 Transaction.updates 异步序列，能够自动捕获后台自动续费、家庭共享变更、退款撤销以及断网恢复后的补单事件。',
-        codeSnippet: `// StoreKit 2 全局监听后台事务更新与自动补单
-func listenForTransactions() -> Task<Void, Never> {
-    return Task.detached {
-        for await result in Transaction.updates {
-            switch result {
-            case .verified(let transaction):
-                await self.deliverContent(for: transaction)
-                await transaction.finish() // 必须显式 finish
-            case .unverified(_, let error):
-                print("JWS 验签失败: \\(error)")
+        title: 'Apple StoreKit 2 现代订阅管线、JWS 验签与防掉单账本机制',
+        sectionTitles: {
+          pipeline: '支付流程',
+          explanation: 'StoreKit 2 现代支付流转与安全机制详述',
+          caseStudy: '详细的使用例子',
+        },
+        pipeline: [
+          { title: 'App Store 配置', subtitle: 'Connect 登记 Product ID、订阅群组与本地化价格', category: 'engineering' },
+          { title: '中台矩阵下发', subtitle: '商业化下发售卖 SKU 矩阵与促销 Offer 优惠签名', category: 'engineering' },
+          { title: 'Product.products 查价', subtitle: '异步拉取设备国家真实价格与本地化 Currency', category: 'engineering' },
+          { title: '发起购买', subtitle: '原子互斥锁 ➔ product.purchase(options:)', category: 'engineering' },
+          { title: 'JWS 验签与记账', subtitle: 'VerificationResult 解码 ➔ 写入 ConsumableLedger', category: 'engineering' },
+          { title: '业务履约发货', subtitle: '后端服务双向核验 ➔ 发放权益并持久化缓存', category: 'engineering' },
+          { title: 'transaction.finish', subtitle: '显式收尾 ➔ 擦除账本 ➔ 释放购买互斥锁', category: 'engineering' },
+        ],
+        explanation: `### 1. 官方配置源头：App Store Connect 订阅组与服务器环境
+- **订阅群组（Subscription Group）**：在 App Store Connect 登记商品，订阅必须归属于特定订阅群组。群组内支持升级（立即生效补差价）、降级（下个周期生效）与交叉互斥，由 Apple 统一托管排他性。
+- **三级促销定价结构**：配置 Introductory Offer（新客推介价格/免费试用）与 Promotional Offer（老客挽留促销，需要服务端基于私钥对 \`nonce\` 和时间戳加签生成的 \`Product.PurchaseOption.promotionalOffer\`）。
+- **全球税务与汇率**：Apple 统一托管全球 175 个国家/地区的本地货币、消费税扣缴与基准换算，端侧获取的即为用户 Apple ID 所属国家的法币价格。
+
+### 2. StoreKit 2 现代化架构与 JWS (JSON Web Signature) 安全签名
+- **全面并发化**：StoreKit 2 彻底抛弃旧版基于 Delegate 且极易漏单的 \`SKPaymentQueue\`，全面基于 Swift Concurrency 构建。
+- **官方加密凭据（JWS）**：每一个返回的 \`Transaction\` 实体均由 Apple 根证书私钥进行 JWS 数字签名。客户端通过 \`VerificationResult.verified(let transaction)\`，可以在本地直接校验公钥证书链，核验签名未被篡改伪造。
+- **消除本地收据解析**：不再需要解析复杂的 ASN.1 \`receipt\` 二进制文件，直接读取 Transaction 结构体中的 \`originalPurchaseDate\`、\`expirationDate\` 与 \`revocationDate\`。
+
+### 3. Transaction.updates 全局异步序列与生命周期补单
+- **常驻后台守护**：在 App 启动的第一时间必须启动监听全局异步序列 **\`Transaction.updates\`**。
+- **全场景自动补单**：用户在系统“设置”中续费、家庭共享（Family Sharing）成员获得权益、用户请求退款成功、以及此前断网掉单的交易，均会通过 \`Transaction.updates\` 自动推送到当前客户端，实现 0 丢失被动补单。
+- **finish() 终态保证**：只有当业务服务端成功发货入账后，客户端才允许调用 \`await transaction.finish()\`。未 finish 的订单会在下次 App 冷启动时由系统再次推送到序列中。
+
+### 4. 消耗品两阶段提交账本与断网掉单自愈设计
+- **两阶段事务死结**：对于钻石、金币等单次消耗型商品，用户付款扣款成功但发货瞬间断网或 App 闪退时，极易陷入“重复发货被薅羊毛”或“扣了钱未发货被投诉”的两难境地。
+- **ConsumableLedger 本地账本**：收到支付成功且验签通过后，**必须先在本地数据库写入履约账本**，标记为 \`DELIVERED_PENDING_FINISH\`；待服务端发货成功且调用 \`transaction.finish()\` 后，才物理擦除记录；冷启动扫单若发现已在账本中则仅补发 finish，彻底杜绝重复充值。`,
+        caseStudy: `### 例子一：StoreKit 2 全生命周期监听与 Transaction.updates 补单服务
+
+\`\`\`swift
+import StoreKit
+
+final class StorePaymentManager: ObservableObject {
+    static let shared = StorePaymentManager()
+    private var updatesTask: Task<Void, Never>?
+
+    init() {
+        // App 启动时立即开启监听全局事务流
+        startListeningTransactionUpdates()
+    }
+
+    // 1. 全局常驻监听异步序列
+    private func startListeningTransactionUpdates() {
+        updatesTask = Task.detached(priority: .background) {
+            for await verificationResult in Transaction.updates {
+                switch verificationResult {
+                case .verified(let transaction):
+                    // JWS 验签通过，执行安全发货
+                    await self.handleVerifiedTransaction(transaction)
+                case .unverified(_, let error):
+                    // 证书链篡改或签名非法，严重安全告警
+                    print("🚨 [JWS 验签失败]: \\(error)")
+                }
             }
         }
     }
-}`,
-      },
-      {
-        tag: '归因与合规',
-        title: 'SKAdNetwork 4.0 渠道归因、ATT 授权与 Privacy Manifest 声明',
-        explanation: '自 iOS 14.5 起，采集 IDFA 必须通过 AppTrackingTransparency (ATT) 弹窗申请权限。对于拒绝授权的用户，Apple 采用 SKAdNetwork 4.0 (SKAN) 提供聚合与差分隐私归因。自 iOS 17 起，Apple 强制要求第三方 SDK 与 App 包含 PrivacyInfo.xcprivacy (Privacy Manifest) 文件，显式声明 API 使用理由（如 UserDefaults / File Timestamp 访问原因），在 Xcode 打包归档时自动生成隐私报告，未声明的 App 将直接被 App Store Connect 拒绝提交。',
-        codeSnippet: `// 申请 ATT 广告追踪授权
-import AppTrackingTransparency
-import AdSupport
 
-func requestTrackingAuthorization() {
-    ATTrackingManager.requestTrackingAuthorization { status in
-        switch status {
-        case .authorized:
-            let idfa = ASIdentifierManager.shared().advertisingIdentifier
-            AppsFlyerLib.shared().waitForATTUserAuthorization(timeoutInterval: 60)
-        default:
-            // 降级至 SKAdNetwork 归因
+    // 2. 发起指定商品购买
+    func purchase(product: Product) async throws {
+        let result = try await product.purchase()
+        switch result {
+        case .success(let verification):
+            switch verification {
+            case .verified(let transaction):
+                await handleVerifiedTransaction(transaction)
+            case .unverified:
+                throw NSError(domain: "StoreKit", code: -1, userInfo: [NSLocalizedDescriptionKey: "签名未通过验证"])
+            }
+        case .userCancelled:
+            print("用户手动取消支付")
+        case .pending:
+            print("家长审批中或银行延迟付款中，禁止提前发货")
+        @unknown default:
             break
         }
     }
-}`,
+
+    // 3. 业务履约发货与调用 finish
+    private func handleVerifiedTransaction(_ transaction: Transaction) async {
+        // 上报业务后端核验发货...
+        let isDelivered = await BusinessBackendAPI.fulfill(transaction: transaction)
+        if isDelivered {
+            // 铁律：发货成功后必须调用 finish() 结束事务
+            await transaction.finish()
+        }
+    }
+
+    deinit {
+        updatesTask?.cancel()
+    }
+}
+\`\`\`
+
+### 例子二：消耗型商品本地持久化账本（ConsumableLedger）与两阶段履约
+
+\`\`\`swift
+import StoreKit
+import Foundation
+
+// 本地持久化账本记录
+struct LedgerEntry: Codable {
+    let transactionId: UInt64
+    let productId: String
+    let status: String // "PENDING_DELIVER" or "DELIVERED_PENDING_FINISH"
+}
+
+actor ConsumableTransactionLedger {
+    static let shared = ConsumableTransactionLedger()
+    private let storageKey = "com.store.consumable.ledger"
+
+    // 1. 记账：写入待发货状态
+    func recordTransaction(id: UInt64, productId: String) {
+        var ledger = loadLedger()
+        ledger[id] = LedgerEntry(transactionId: id, productId: productId, status: "DELIVERED_PENDING_FINISH")
+        saveLedger(ledger)
+    }
+
+    // 2. 检查是否已发货（防重复发货薅羊毛）
+    func isDelivered(id: UInt64) -> Bool {
+        return loadLedger()[id]?.status == "DELIVERED_PENDING_FINISH"
+    }
+
+    // 3. 擦除出账：成功 finish() 后删除
+    func removeEntry(id: UInt64) {
+        var ledger = loadLedger()
+        ledger.removeValue(forKey: id)
+        saveLedger(ledger)
+    }
+
+    private func loadLedger() -> [UInt64: LedgerEntry] {
+        guard let data = UserDefaults.standard.data(forKey: storageKey),
+              let dict = try? JSONDecoder().decode([UInt64: LedgerEntry].self, from: data) else {
+            return [:]
+        }
+        return dict
+    }
+
+    private func saveLedger(_ dict: [UInt64: LedgerEntry]) {
+        if let data = try? JSONEncoder().encode(dict) {
+            UserDefaults.standard.set(data, forKey: storageKey)
+        }
+    }
+}
+\`\`\`
+
+### 例子三：App Store Server API v2 服务端 JWS 签名双向核验
+
+\`\`\`swift
+import Foundation
+
+final class BusinessBackendAPI {
+    // 客户端仅上报 JWS 原始字符串，由服务端向 Apple 权威核验
+    static func fulfill(transaction: Transaction) async -> Bool {
+        // 获取底层原始签名的 JWS 载荷字符串
+        let rawJWS = transaction.jwsRepresentation
+        
+        var request = URLRequest(url: URL(string: "https://api.example.com/v1/iap/verify")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let body = ["transaction_jws": rawJWS, "product_id": transaction.productID]
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let httpRes = response as? HTTPURLResponse, httpRes.statusCode == 200 else {
+                return false
+            }
+            return true
+        } catch {
+            return false // 网络异常，不 finish()，保留本地账本待下次自动重试
+        }
+    }
+}
+\`\`\``,
       },
       {
-        tag: '归因深链',
-        title: 'Universal Links 与 SceneDelegate 路由重定向',
-        explanation: 'iOS 的 Universal Links 允许通过部署在服务器上的 apple-app-site-association (AASA) JSON 文件，将普通 HTTPS 链接直接映射至原生 App。配合 SwiftUI 的 onOpenURL 修饰符或 SceneDelegate 中的 delegate 方法，可以轻松解析跳转路径。针对新用户拉新，结合 AppsFlyer OneLink 处理延迟跳转，保障用户从社交媒体点击广告到商店下载并首次打开时，能精准承接到特定落地页。',
-        codeSnippet: `// SwiftUI 处理 Universal Links 与深链跳转
+        tag: '合规与归因',
+        title: 'iOS 隐私合规体系：ATT 授权时序、Privacy Manifest 声明与 SKAdNetwork 4.0',
+        sectionTitles: {
+          explanation: '四大合规与归因核心机制',
+          caseStudy: '详细的使用例子',
+        },
+        explanation: `### 核心机制一：AppTrackingTransparency (ATT) 弹窗时机与授权阻断
+
+**历史问题**：
+许多开发者在应用刚启动（\`application:didFinishLaunchingWithOptions:\`）时立即弹出 ATT 广告追踪授权弹窗。此时用户对 App 毫无认知，授权同意率不足 15%；更严重的是部分三方买量归因 SDK 在弹窗前就提前读取了 IDFA，直接触发 App Store 审核被拒（Rejection 5.1.2）。
+
+**设计思路**：
+建立基于用户心智模型的**价值前置引导弹窗（Soft-Ask Prompt）**：
+1. 冷启动阶段严禁无脑弹窗；
+2. 在用户完成核心首个任务后（如生成个人档案、体验核心功能），先弹出业务友好的预引导页，清晰告知“开启追踪将获得个性化优惠与无干扰广告”；
+3. 用户点击同意后，再调起系统原生 \`ATTrackingManager.requestTrackingAuthorization\` 弹窗，授权同意率可从 15% 大幅提升至 50% 以上。
+
+**底层实现**：
+在用户做出明确选择前，\`ASIdentifierManager.shared().advertisingIdentifier\` 严格返回全 0 字符串（\`00000000-0000-0000-0000-000000000000\`）。只有在状态为 \`.authorized\` 时，系统底层才放开真实设备 IDFA 读取权限。
+
+### 核心机制二：iOS 17+ PrivacyInfo.xcprivacy 隐私清单与审计门禁
+
+**历史问题**：
+长期以来，各类第三方开源 SDK（如统计、网络、持久化库）在内部私自调用敏感 API（如 \`stat()\` 读取文件修改时间、访问系统开机时间 \`sysctl\`）。开发者自身毫不知情，但在提交 App Store 时被系统自动化合规门禁直接无情拦截拒绝。
+
+**设计思路**：
+Apple 在 iOS 17 强制推行 **Privacy Manifest（隐私清单）** 制度。所有 App 与第三方 SDK 必须在包内携带 \`PrivacyInfo.xcprivacy\` 文件，明确声明两大核心内容：
+1. **收集的数据类型（NSPrivacyCollectedDataTypes）**：是否收集位置、姓名、诊断信息，以及是否与用户身份关联或用于追踪；
+2. **需要原因的 API 类型（NSPrivacyAccessedAPITypes）**：只要调用了 UserDefaults、File Timestamp、System Boot Time、Active Keyboards 等敏感 API，必须显式声明符合官方白名单的理由代码（Reason Code）。
+
+**底层实现**：
+在 Xcode 执行 Archive 归档时，构建系统自动扫描所有编译单元中的 \`.xcprivacy\` 文件，聚合生成一份完整的 \`App 隐私报告（Privacy Report）\`。App Store Connect 在上传阶段自动化核验，凡未声明理由或调用了受禁 API 的包直接被 CI 阻断。
+
+### 核心机制三：SKAdNetwork 4.0 (SKAN) 差分隐私与粗细粒度转化值
+
+**历史问题**：
+在绝大多数用户拒绝 ATT 授权的情况下，买量团队无法根据 IDFA 计算渠道投放的 ROI，投放算法陷入盲投状态。
+
+**设计思路**：
+Apple 推出了基于差分隐私的去中心化归因框架 **\`SKAdNetwork 4.0\`**：
+- **三次回传窗口（Multiple Postbacks）**：分别在 0~2 天、3~7 天、8~35 天回传 3 次数据，支持评估长期 LTV 与留存；
+- **分级转化值（Hierarchical Conversion Values）**：
+  - 高人群密度（Crowd Anonymity High）：回传 0~63 的**细粒度值（Fine-grained）**；
+  - 极低人群密度：回传 \`low\` / \`medium\` / \`high\` 的**粗粒度值（Coarse-grained）**，彻底保护单个用户隐私。
+
+**底层实现**：
+通过 \`SKAdNetwork.updatePostbackConversionValue(fineValue:coarseValue:)\` 更新状态。系统在本地维持一个带随机抖动延迟（Randomized Delay 24~48小时）的计时器，在时间窗口结束后由操作系统独立直接向广告平台服务器发送加密回传请求，App 自身无法截获或篡改回传数据。
+
+### 核心机制四：Universal Links (AASA) 深度链接与延迟归因直达
+
+**历史问题**：
+使用传统自定义 Scheme（如 \`myapp://open\`）跳转时，若用户未安装 App，浏览器会直接抛出“网页无法打开”的丑陋系统弹窗；且容易被恶意 App 在本机伪造相同 Scheme 劫持用户流量。
+
+**设计思路**：
+全面采用 **Universal Links（通用链接）**。使用标准的 HTTPS 域名（如 \`https://app.example.com/item/123\`）：
+1. **双向信任认证**：在服务器根目录部署 \`apple-app-site-association (AASA)\` JSON 配置文件，声明允许 App 打开的 Path 路由；
+2. **优雅降级**：已安装 App 则 0 延迟秒开并直达落地页；未安装 App 则无缝在 Safari 浏览器中展示对应的移动端 Web 落地页。配合 AppsFlyer OneLink 实现延迟深链（Deferred Deep Linking），首次下载后依然能精准承接活动页。
+
+**底层实现**：
+在 App 安装或更新时，系统级的 \`swcd\` (Shared Web Credentials Daemon) 自动从服务器下载并校验 AASA 文件。当用户点击 HTTPS 链接时，iOS 操作系统直接在内核路由层拦截并唤醒 App，完全杜绝了中间跳板页与劫持风险。`,
+        caseStudy: `### 例子一：ATT 价值前置引导页与 ATTrackingManager 安全授权申请
+
+\`\`\`swift
+import AppTrackingTransparency
+import AdSupport
+import SwiftUI
+
+final class TrackingPermissionManager {
+    static let shared = TrackingPermissionManager()
+
+    // 申请权限核心方法（必须在前台活跃状态下发起）
+    func requestPermissionIfAppropriate(completion: @escaping (Bool) -> Void) {
+        // 若在 iOS 14 之前，无需弹窗直接放行
+        guard #available(iOS 14.5, *) else {
+            completion(true)
+            return
+        }
+
+        // 检查当前授权状态
+        let currentStatus = ATTrackingManager.trackingAuthorizationStatus
+        guard currentStatus == .notDetermined else {
+            completion(currentStatus == .authorized)
+            return
+        }
+
+        // 调起系统原生弹窗
+        ATTrackingManager.requestTrackingAuthorization { status in
+            DispatchQueue.main.async {
+                let isAuthorized = (status == .authorized)
+                if isAuthorized {
+                    let idfa = ASIdentifierManager.shared().advertisingIdentifier.uuidString
+                    print("成功获取 IDFA: \\(idfa)")
+                }
+                completion(isAuthorized)
+            }
+        }
+    }
+}
+\`\`\`
+
+### 例子二：SKAdNetwork 4.0 粗细粒度转化值更新与窗口期管理
+
+\`\`\`swift
+import StoreKit
+
+final class SKANAttributionManager {
+    static let shared = SKANAttributionManager()
+
+    // 更新买量转化值（需在用户发生高价值行为时实时调用）
+    func updateConversionValue(totalPurchaseAmount: Double) {
+        guard #available(iOS 16.1, *) else { return }
+
+        var fineValue: Int = 0
+        var coarseValue: SKAdNetwork.CoarseConversionValue = .low
+
+        // 根据累计充值金额划分细粒度 (0~63) 与粗粒度分级
+        if totalPurchaseAmount > 100 {
+            fineValue = 60
+            coarseValue = .high
+        } else if totalPurchaseAmount > 20 {
+            fineValue = 30
+            coarseValue = .medium
+        } else if totalPurchaseAmount > 0 {
+            fineValue = 10
+            coarseValue = .low
+        }
+
+        // 异步更新给系统底层，系统自动结合人群密度决定发送 coarse 还是 fine
+        Task {
+            do {
+                try await SKAdNetwork.updatePostbackConversionValue(
+                    fineValue: fineValue,
+                    coarseValue: coarseValue
+                )
+                print("SKAN 4.0 转化值更新成功")
+            } catch {
+                print("SKAN 更新失败: \\(error)")
+            }
+        }
+    }
+}
+\`\`\`
+
+### 例子三：SwiftUI onOpenURL 与 SceneDelegate 统一深链路由分发
+
+\`\`\`swift
+import SwiftUI
+
+// 1. 全局路由调度器
+final class DeepLinkRouter: ObservableObject {
+    static let shared = DeepLinkRouter()
+    @Published var activeRoute: String?
+
+    func handle(url: URL) -> Bool {
+        // 校验是否为合法 Universal Link 域名
+        guard url.host == "app.example.com" else { return false }
+        
+        let path = url.path // 如 "/product/detail"
+        if let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
+           let queryItems = components.queryItems {
+            let itemId = queryItems.first(where: { $0.name == "id" })?.value
+            print("深链解析目标商品 ID: \\(String(describing: itemId))")
+        }
+        self.activeRoute = path
+        return true
+    }
+}
+
+// 2. 在 SwiftUI App 顶层响应
 @main
-struct MyApp: App {
+struct UniversalLinkApp: App {
+    @StateObject private var router = DeepLinkRouter.shared
+
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .onOpenURL { url in
-                    // 解析 Universal Link 路由信息
-                    if let components = URLComponents(url: url, resolvingAgainstBaseURL: true),
-                       let queryItems = components.queryItems {
-                        let campaign = queryItems.first(where: { $0.name == "campaign" })?.value
-                        // 触发页面路由
-                        Router.shared.navigate(to: url.path, with: campaign)
-                    }
+                .environmentObject(router)
+                .onOpenURL { incomingURL in
+                    // 接收系统传递进来的 Universal Link
+                    _ = router.handle(url: incomingURL)
                 }
         }
     }
-}`,
-      },
-      {
-        tag: 'AB实验',
-        title: 'Remote Config 实验下发与 Activation 策略',
-        explanation: '在 iOS 中使用 Firebase Remote Config 进行 A/B 实验时，需要处理好默认配置与云端数据的时序问题。最佳实践是打包携带一份 Default.plist 防止首屏空白。应用启动时异步执行 fetch flow 拉取最新的实验条件及百分比分流数据，拉取成功后再 activate 生效。同时利用 ExperimentalValue 动态配置 UI 参数，使得客户端可灵活参与各类多变量测试。',
-        codeSnippet: `// iOS Firebase Remote Config 实验参数拉取
-import FirebaseRemoteConfig
-
-let remoteConfig = RemoteConfig.remoteConfig()
-let settings = RemoteConfigSettings()
-settings.minimumFetchInterval = 3600
-remoteConfig.configSettings = settings
-
-remoteConfig.fetchAndActivate { status, error in
-    guard error == nil else { return }
-    if status == .successFetchedFromRemote || status == .successUsingPreFetchedData {
-        let featureFlag = remoteConfig.configValue(forKey: "enable_new_onboarding").boolValue
-        DispatchQueue.main.async {
-            // 根据 A/B 实验开关渲染新手指引
-            self.updateUI(showNewOnboarding: featureFlag)
-        }
-    }
-}`,
+}
+\`\`\``,
       },
     ],
   },
