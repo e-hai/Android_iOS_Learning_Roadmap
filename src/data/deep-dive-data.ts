@@ -8,7 +8,7 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
         title: 'Kotlin 核心特性：泛型、委托、扩展与内联具现化',
         sectionTitles: {
           explanation: '核心原理解析与设计哲学',
-          diagram: '六大特性速查与映射链路',
+          diagram: '六大特性的设计哲学与工程破局卡片',
           diagramCaption: 'Kotlin 现代语法糖与工程提效全景图',
           caseStudy: '三、实战场景下的疑难问题与破局方案',
         },
