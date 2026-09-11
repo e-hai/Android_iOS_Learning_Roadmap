@@ -210,7 +210,6 @@ function renderTaskDecoupleAnimation(): string {
             </div>
           </div>
         </div>
-      </div>
 
       <!-- Panel 2: Traditional Blocking Model (Comparison Pane) -->
       <div class="decouple-panel decouple-panel-trad" role="tabpanel" style="display: none;">
