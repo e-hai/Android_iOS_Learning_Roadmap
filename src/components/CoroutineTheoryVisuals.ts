@@ -47,38 +47,54 @@ function renderTaskDecoupleAnimation(): string {
 
       <!-- Panel 1: Coroutine Cooperative Decoupling (Default Active) -->
       <div class="decouple-panel decouple-panel-coop active" role="tabpanel">
-        <!-- Coroutine 4-Phase Stepper Tracker -->
+        <!-- Coroutine 6-Phase Stepper Tracker -->
         <div class="decouple-stepper-bar coop-stepper-bar">
           <div class="stepper-item step-p1">
             <div class="step-head">
               <span class="step-circle">1</span>
-              <span class="step-title">初始调度</span>
+              <span class="step-title">初始待命</span>
             </div>
-            <span class="step-sub">Task A 上工 · Task B 待命</span>
+            <span class="step-sub">双任务到达 · 工人就绪</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p2">
             <div class="step-head">
               <span class="step-circle">2</span>
-              <span class="step-title">遇 I/O 挂起</span>
+              <span class="step-title">A 启动计算</span>
             </div>
-            <span class="step-sub">Task A 入池 · 工位释放</span>
+            <span class="step-sub">Task A 上工 · Task B 待命</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p3">
             <div class="step-head">
               <span class="step-circle">3</span>
-              <span class="step-title">Task B 接力</span>
+              <span class="step-title">A 挂起出让</span>
             </div>
-            <span class="step-sub">工人接管 · 满载运转</span>
+            <span class="step-sub">A 移入挂起池 · 工位腾空</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle">4</span>
-              <span class="step-title">唤醒完成</span>
+              <span class="step-title">B 接力执行</span>
             </div>
-            <span class="step-sub">Task A 回落 · 双任务结算</span>
+            <span class="step-sub">工人接管 B · 满载运转</span>
+          </div>
+          <div class="stepper-arrow">→</div>
+          <div class="stepper-item step-p5">
+            <div class="step-head">
+              <span class="step-circle">5</span>
+              <span class="step-title">B 完成唤醒</span>
+            </div>
+            <span class="step-sub">B 退出 · A 回落工位</span>
+          </div>
+          <div class="stepper-arrow">→</div>
+          <div class="stepper-item step-p6">
+            <div class="step-head">
+              <span class="step-circle">6</span>
+              <span class="step-title">双任务达成</span>
+            </div>
+            <span class="step-sub">A 收尾 · 两任务全量完成</span>
           </div>
         </div>
 
@@ -119,7 +135,7 @@ function renderTaskDecoupleAnimation(): string {
                   <span class="pill-state state-a-done">已完成</span>
                 </div>
 
-                <!-- Physical Task B: Takes over empty worker slot during Phase 3, finishes and exits -->
+                <!-- Physical Task B: Takes over empty worker slot during Phase 4, finishes and exits -->
                 <div class="takeover-task-b">
                   <span class="pill-name">Task B</span>
                   <span class="pill-state state-b-run">接力执行</span>
@@ -127,6 +143,7 @@ function renderTaskDecoupleAnimation(): string {
               </div>
               <div class="col-subbar subbar-queue">
                 <span class="subbar-dot dot-standby"></span>
+                <span class="subbar-text text-q-arrival">就绪队列: Task A + Task B 到达</span>
                 <span class="subbar-text text-q-standby">就绪队列: Task B (待命候场)</span>
                 <span class="subbar-text text-q-active">就绪队列: 空 (已进入工位)</span>
               </div>
@@ -160,38 +177,54 @@ function renderTaskDecoupleAnimation(): string {
 
       <!-- Panel 2: Traditional Blocking Model (Comparison Pane) -->
       <div class="decouple-panel decouple-panel-trad" role="tabpanel" style="display: none;">
-        <!-- Traditional 4-Phase Stepper Tracker -->
+        <!-- Traditional 6-Phase Stepper Tracker -->
         <div class="decouple-stepper-bar trad-stepper-bar">
           <div class="stepper-item step-p1">
             <div class="step-head">
               <span class="step-circle circle-danger">1</span>
-              <span class="step-title">初始调度</span>
+              <span class="step-title">初始待命</span>
             </div>
-            <span class="step-sub">Task A 上工 · Task B 排队</span>
+            <span class="step-sub">双任务到达 · 工人就绪</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p2">
             <div class="step-head">
               <span class="step-circle circle-danger">2</span>
-              <span class="step-title">遇 I/O 阻塞</span>
+              <span class="step-title">A 启动计算</span>
             </div>
-            <span class="step-sub">Thread.sleep · 物理线程死锁</span>
+            <span class="step-sub">Task A 上工 · Task B 排队</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p3">
             <div class="step-head">
               <span class="step-circle circle-danger">3</span>
-              <span class="step-title">Task B 饥饿</span>
+              <span class="step-title">A 死锁阻塞</span>
             </div>
-            <span class="step-sub">排队进不去 · 工人被占</span>
+            <span class="step-sub">Thread.sleep · 物理线程死锁</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle circle-danger">4</span>
-              <span class="step-title">唤醒滞后</span>
+              <span class="step-title">B 饥饿受阻</span>
             </div>
-            <span class="step-sub">Task A 延误 · 总体耗时翻倍</span>
+            <span class="step-sub">工人被占 · Task B 进不去</span>
+          </div>
+          <div class="stepper-arrow">→</div>
+          <div class="stepper-item step-p5">
+            <div class="step-head">
+              <span class="step-circle circle-danger">5</span>
+              <span class="step-title">A 迟钝释放</span>
+            </div>
+            <span class="step-sub">A 终于唤醒 · B 刚轮到</span>
+          </div>
+          <div class="stepper-arrow">→</div>
+          <div class="stepper-item step-p6">
+            <div class="step-head">
+              <span class="step-circle circle-danger">6</span>
+              <span class="step-title">延误滞后</span>
+            </div>
+            <span class="step-sub">串行执行 · 总体耗时翻倍</span>
           </div>
         </div>
 
@@ -205,23 +238,33 @@ function renderTaskDecoupleAnimation(): string {
                 <span>OS Thread #1</span>
               </div>
               <div class="trad-lane-slot">
-                <!-- P1: Task A running normally -->
-                <div class="trad-task-pill trad-p1-run">
+                <!-- P1: Worker Idle -->
+                <div class="trad-task-pill trad-p1-idle">
+                  <span class="t-title">OS Thread #1 就绪</span>
+                  <span class="t-state">物理工人待命中...</span>
+                </div>
+                <!-- P2: Task A running normally -->
+                <div class="trad-task-pill trad-p2-run">
                   <span class="t-title">Task A</span>
                   <span class="t-state">计算中...</span>
                 </div>
-                <!-- P2 & P3: Task A blocked -->
-                <div class="trad-task-pill trad-p2-blocked">
+                <!-- P3 & P4: Task A blocked -->
+                <div class="trad-task-pill trad-p3-blocked">
                   <div class="t-row">
                     <span class="t-title text-danger">Task A</span>
                     <span class="badge-lock">死锁阻塞 (Thread.sleep)</span>
                   </div>
                   <span class="t-state text-danger">物理工人停工，1MB 栈内存死锁</span>
                 </div>
-                <!-- P4: Task A unblocks late -->
-                <div class="trad-task-pill trad-p4-finish">
+                <!-- P5: Task A unblocks late -->
+                <div class="trad-task-pill trad-p5-finish">
                   <span class="t-title text-amber">Task A</span>
                   <span class="t-state text-amber">迟钝唤醒 · 释放工人</span>
+                </div>
+                <!-- P6: Task B finally running late -->
+                <div class="trad-task-pill trad-p6-late-b">
+                  <span class="t-title text-amber">Task B (滞后上工)</span>
+                  <span class="t-state text-danger">耗时翻倍！迟来的串行计算</span>
                 </div>
               </div>
             </div>
@@ -230,20 +273,30 @@ function renderTaskDecoupleAnimation(): string {
             <div class="trad-queue-cell">
               <div class="queue-header">就绪队列</div>
               <div class="trad-queue-slot">
-                <!-- P1 & P2: Task B standby -->
+                <!-- P1: Arrival -->
+                <div class="queue-task-pill q-arrival">
+                  <span class="b-name">Task A + Task B</span>
+                  <span class="b-state">双任务到达</span>
+                </div>
+                <!-- P2 & P3: Task B standby -->
                 <div class="queue-task-pill q-standby">
                   <span class="b-name">Task B</span>
                   <span class="b-state">排队待命中</span>
                 </div>
-                <!-- P3: Task B locked out -->
+                <!-- P4: Task B locked out -->
                 <div class="queue-task-pill q-blocked">
                   <span class="b-name text-danger">Task B</span>
                   <span class="b-state text-danger">排队受阻，工人被占</span>
                 </div>
-                <!-- P4: Task B finally entering late -->
+                <!-- P5: Task B finally entering late -->
                 <div class="queue-task-pill q-late">
                   <span class="b-name text-amber">Task B</span>
                   <span class="b-state text-amber">严重延误，刚轮到它</span>
+                </div>
+                <!-- P6: Done -->
+                <div class="queue-task-pill q-done">
+                  <span class="b-name">队列已清空</span>
+                  <span class="b-state">串行执行中</span>
                 </div>
               </div>
             </div>

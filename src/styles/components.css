@@ -5897,61 +5897,89 @@ input:focus-visible,
   flex-shrink: 0;
 }
 
-/* Coroutine Stepper Pulses */
-.coop-stepper-bar .step-p1 { animation: stepPulseP1 8s infinite ease-in-out; }
-.coop-stepper-bar .step-p2 { animation: stepPulseP2 8s infinite ease-in-out; }
-.coop-stepper-bar .step-p3 { animation: stepPulseP3 8s infinite ease-in-out; }
-.coop-stepper-bar .step-p4 { animation: stepPulseP4 8s infinite ease-in-out; }
+/* Coroutine Stepper Pulses (12s 6-phase cycle) */
+.coop-stepper-bar .step-p1 { animation: stepPulseP1 12s infinite ease-in-out; }
+.coop-stepper-bar .step-p2 { animation: stepPulseP2 12s infinite ease-in-out; }
+.coop-stepper-bar .step-p3 { animation: stepPulseP3 12s infinite ease-in-out; }
+.coop-stepper-bar .step-p4 { animation: stepPulseP4 12s infinite ease-in-out; }
+.coop-stepper-bar .step-p5 { animation: stepPulseP5 12s infinite ease-in-out; }
+.coop-stepper-bar .step-p6 { animation: stepPulseP6 12s infinite ease-in-out; }
 
 @keyframes stepPulseP1 {
-  0%, 24.5% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
-  25%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  0%, 16.2% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+  16.6%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes stepPulseP2 {
-  0%, 24.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
-  25%, 49.5% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.4); }
-  50%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  0%, 16.5% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  16.6%, 32.8% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+  33.3%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes stepPulseP3 {
-  0%, 49.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
-  50%, 74.5% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
-  75%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  0%, 33.2% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  33.3%, 49.5% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.4); }
+  50.0%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes stepPulseP4 {
-  0%, 74.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
-  75%, 99.5% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.4); }
+  0%, 49.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  50.0%, 66.1% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+  66.6%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+}
+
+@keyframes stepPulseP5 {
+  0%, 66.5% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  66.6%, 82.8% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.4); }
+  83.3%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+}
+
+@keyframes stepPulseP6 {
+  0%, 83.2% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  83.3%, 99.5% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
   100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
-/* Traditional Stepper Pulses */
-.trad-stepper-bar .step-p1 { animation: tradStepPulseP1 8s infinite ease-in-out; }
-.trad-stepper-bar .step-p2 { animation: tradStepPulseP2 8s infinite ease-in-out; }
-.trad-stepper-bar .step-p3 { animation: tradStepPulseP3 8s infinite ease-in-out; }
-.trad-stepper-bar .step-p4 { animation: tradStepPulseP4 8s infinite ease-in-out; }
+/* Traditional Stepper Pulses (12s 6-phase cycle) */
+.trad-stepper-bar .step-p1 { animation: tradStepPulseP1 12s infinite ease-in-out; }
+.trad-stepper-bar .step-p2 { animation: tradStepPulseP2 12s infinite ease-in-out; }
+.trad-stepper-bar .step-p3 { animation: tradStepPulseP3 12s infinite ease-in-out; }
+.trad-stepper-bar .step-p4 { animation: tradStepPulseP4 12s infinite ease-in-out; }
+.trad-stepper-bar .step-p5 { animation: tradStepPulseP5 12s infinite ease-in-out; }
+.trad-stepper-bar .step-p6 { animation: tradStepPulseP6 12s infinite ease-in-out; }
 
 @keyframes tradStepPulseP1 {
-  0%, 24.5% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
-  25%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  0%, 16.2% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+  16.6%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes tradStepPulseP2 {
-  0%, 24.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
-  25%, 49.5% { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
-  50%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  0%, 16.5% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  16.6%, 32.8% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.4); }
+  33.3%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes tradStepPulseP3 {
-  0%, 49.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
-  50%, 74.5% { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
-  75%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  0%, 33.2% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  33.3%, 49.5% { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+  50.0%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes tradStepPulseP4 {
-  0%, 74.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
-  75%, 99.5% { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+  0%, 49.9% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  50.0%, 66.1% { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.4); }
+  66.6%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+}
+
+@keyframes tradStepPulseP5 {
+  0%, 66.5% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  66.6%, 82.8% { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
+  83.3%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+}
+
+@keyframes tradStepPulseP6 {
+  0%, 83.2% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  83.3%, 99.5% { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.4); }
   100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
@@ -6026,16 +6054,22 @@ input:focus-visible,
   transition: all 0.3s;
 }
 
-.trad-p1-run { animation: animTradP1 8s infinite ease-in-out; }
-.trad-p2-blocked {
-  animation: animTradP2 8s infinite ease-in-out;
+.trad-p1-idle { animation: animTradP1Idle 12s infinite ease-in-out; }
+.trad-p2-run { animation: animTradP2Run 12s infinite ease-in-out; }
+.trad-p3-blocked {
+  animation: animTradP3Blocked 12s infinite ease-in-out;
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.08);
 }
-.trad-p4-finish {
-  animation: animTradP4 8s infinite ease-in-out;
+.trad-p5-finish {
+  animation: animTradP5Finish 12s infinite ease-in-out;
   border-color: #f59e0b;
   background: rgba(245, 158, 11, 0.08);
+}
+.trad-p6-late-b {
+  animation: animTradP6LateB 12s infinite ease-in-out;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .t-title {
@@ -6105,17 +6139,19 @@ input:focus-visible,
   transition: all 0.3s;
 }
 
-.q-standby { animation: animQStandby 8s infinite ease-in-out; }
+.q-arrival { animation: animQArrival 12s infinite ease-in-out; }
+.q-standby { animation: animQStandby 12s infinite ease-in-out; }
 .q-blocked {
-  animation: animQBlocked 8s infinite ease-in-out;
+  animation: animQBlocked 12s infinite ease-in-out;
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.12);
 }
 .q-late {
-  animation: animQLate 8s infinite ease-in-out;
+  animation: animQLate 12s infinite ease-in-out;
   border-color: #f59e0b;
   background: rgba(245, 158, 11, 0.1);
 }
+.q-done { animation: animQDone 12s infinite ease-in-out; }
 
 .b-name {
   font-weight: 700;
@@ -6127,95 +6163,63 @@ input:focus-visible,
   color: var(--color-ink-muted);
 }
 
-/* Traditional Model Keyframes - Synchronized to 8.0s 4-phase clock */
-@keyframes animTradP1 {
-  0%, 24.5% {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-  25%, 100% {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-4px);
-  }
+/* Traditional Model Keyframes (12s 6-phase cycle) */
+@keyframes animTradP1Idle {
+  0%, 16.2% { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  16.6%, 100% { opacity: 0; pointer-events: none; transform: translateY(-4px); }
 }
 
-@keyframes animTradP2 {
-  0%, 24.9% {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(4px);
-  }
-  25%, 74.5% {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-  75%, 100% {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-4px);
-  }
+@keyframes animTradP2Run {
+  0%, 16.5% { opacity: 0; pointer-events: none; transform: translateY(4px); }
+  16.6%, 32.8% { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  33.3%, 100% { opacity: 0; pointer-events: none; transform: translateY(-4px); }
 }
 
-@keyframes animTradP4 {
-  0%, 74.9% {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(4px);
-  }
-  75%, 97% {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateY(0);
-  }
-  97.5%, 100% {
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-4px);
-  }
+@keyframes animTradP3Blocked {
+  0%, 33.2% { opacity: 0; pointer-events: none; transform: translateY(4px); }
+  33.3%, 66.1% { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  66.6%, 100% { opacity: 0; pointer-events: none; transform: translateY(-4px); }
+}
+
+@keyframes animTradP5Finish {
+  0%, 66.5% { opacity: 0; pointer-events: none; transform: translateY(4px); }
+  66.6%, 82.8% { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  83.3%, 100% { opacity: 0; pointer-events: none; transform: translateY(-4px); }
+}
+
+@keyframes animTradP6LateB {
+  0%, 83.2% { opacity: 0; pointer-events: none; transform: translateY(4px); }
+  83.3%, 99.5% { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  100% { opacity: 0; pointer-events: none; transform: translateY(-4px); }
+}
+
+@keyframes animQArrival {
+  0%, 16.2% { opacity: 1; pointer-events: auto; }
+  16.6%, 100% { opacity: 0; pointer-events: none; }
 }
 
 @keyframes animQStandby {
-  0%, 49.5% {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  50%, 100% {
-    opacity: 0;
-    pointer-events: none;
-  }
+  0%, 16.5% { opacity: 0; pointer-events: none; }
+  16.6%, 49.5% { opacity: 1; pointer-events: auto; }
+  50.0%, 100% { opacity: 0; pointer-events: none; }
 }
 
 @keyframes animQBlocked {
-  0%, 49.9% {
-    opacity: 0;
-    pointer-events: none;
-  }
-  50%, 74.5% {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  75%, 100% {
-    opacity: 0;
-    pointer-events: none;
-  }
+  0%, 49.9% { opacity: 0; pointer-events: none; }
+  50.0%, 66.1% { opacity: 1; pointer-events: auto; }
+  66.6%, 100% { opacity: 0; pointer-events: none; }
 }
 
 @keyframes animQLate {
-  0%, 74.9% {
-    opacity: 0;
-    pointer-events: none;
-  }
-  75%, 97% {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  97.5%, 100% {
-    opacity: 0;
-    pointer-events: none;
-  }
+  0%, 66.5% { opacity: 0; pointer-events: none; }
+  66.6%, 82.8% { opacity: 1; pointer-events: auto; }
+  83.3%, 100% { opacity: 0; pointer-events: none; }
+}
+
+@keyframes animQDone {
+  0%, 83.2% { opacity: 0; pointer-events: none; }
+  83.3%, 99.5% { opacity: 1; pointer-events: auto; }
+  100% { opacity: 0; pointer-events: none; }
 }
 
 @keyframes animLockPulse {
@@ -6285,8 +6289,8 @@ input:focus-visible,
   font-size: 12px;
 }
 
-.guide-to-pool { animation: animGuideToPool 8s infinite ease-in-out; }
-.guide-to-thread { animation: animGuideToThread 8s infinite ease-in-out; }
+.guide-to-pool { animation: animGuideToPool 12s infinite ease-in-out; }
+.guide-to-thread { animation: animGuideToThread 12s infinite ease-in-out; }
 
 /* Left / Right 2-Column Grid */
 .coop-lr-grid {
@@ -6439,11 +6443,12 @@ input:focus-visible,
   white-space: nowrap;
 }
 
-.text-q-standby { animation: animSubbarQStandby 8s infinite ease-in-out; }
-.text-q-active { animation: animSubbarQActive 8s infinite ease-in-out; }
+.text-q-arrival { animation: animSubbarQArrival 12s infinite ease-in-out; }
+.text-q-standby { animation: animSubbarQStandby 12s infinite ease-in-out; }
+.text-q-active { animation: animSubbarQActive 12s infinite ease-in-out; }
 
-.text-pool-idle { animation: animSubbarPoolIdle 8s infinite ease-in-out; }
-.text-pool-active { animation: animSubbarPoolActive 8s infinite ease-in-out; }
+.text-pool-idle { animation: animSubbarPoolIdle 12s infinite ease-in-out; }
+.text-pool-active { animation: animSubbarPoolActive 12s infinite ease-in-out; }
 
 /* Dynamic Physical Task Pills in Coroutine Grid */
 .flight-task-a {
@@ -6462,7 +6467,7 @@ input:focus-visible,
   box-shadow: var(--shadow-xs);
   box-sizing: border-box;
   z-index: 2;
-  animation: animFlightTaskA 8s infinite ease-in-out;
+  animation: animFlightTaskA 12s infinite ease-in-out;
   will-change: transform, border-color, background, box-shadow;
 }
 
@@ -6482,7 +6487,7 @@ input:focus-visible,
   box-shadow: var(--shadow-xs);
   box-sizing: border-box;
   z-index: 1;
-  animation: animTakeoverTaskB 8s infinite ease-in-out;
+  animation: animTakeoverTaskB 12s infinite ease-in-out;
   will-change: transform, opacity;
 }
 
@@ -6505,19 +6510,19 @@ input:focus-visible,
 .state-a-run {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
-  animation: animTagARun 8s infinite ease-in-out;
+  animation: animTagARun 12s infinite ease-in-out;
 }
 
 .state-a-pool {
   background: rgba(14, 165, 233, 0.15);
   color: #0ea5e9;
-  animation: animTagAPool 8s infinite ease-in-out;
+  animation: animTagAPool 12s infinite ease-in-out;
 }
 
 .state-a-done {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
-  animation: animTagADone 8s infinite ease-in-out;
+  animation: animTagADone 12s infinite ease-in-out;
 }
 
 .state-b-run {
@@ -6525,44 +6530,58 @@ input:focus-visible,
   color: #10b981;
 }
 
-/* Keyframe Animations for Left-to-Right Physical Flight */
+/* Keyframe Animations for Left-to-Right Physical Flight (12s 6-phase cycle) */
 @keyframes animFlightTaskA {
-  /* Phase 1 (0% - 24.5%): On Left worker slot, executing calculation */
-  0%, 24.5% {
+  /* Phase 1 (0% - 16.2%): In queue, worker is empty */
+  0%, 16.2% {
+    opacity: 0;
     transform: translate3d(0, 0, 0);
     border-color: #10b981;
     background: var(--color-surface);
     box-shadow: var(--shadow-xs);
   }
-  /* Phase 2 (25% - 28.5%): Glides horizontally from Left to Right pool */
-  28.5% {
-    transform: translate3d(calc(100% + var(--coop-gap, 16px)), 0, 0);
-    border-color: #0ea5e9;
-    background: rgba(14, 165, 233, 0.08);
-    box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
-  }
-  /* Phase 2 & 3 (28.5% - 74.5%): Rests in Right suspended pool */
-  74.5% {
-    transform: translate3d(calc(100% + var(--coop-gap, 16px)), 0, 0);
-    border-color: #0ea5e9;
-    background: rgba(14, 165, 233, 0.08);
-    box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
-  }
-  /* Phase 4 (75% - 78.5%): Glides horizontally back from Right to Left worker */
-  78.5% {
+  /* Phase 2 (16.6% - 32.8%): On Left worker slot, executing calculation */
+  16.6%, 32.8% {
+    opacity: 1;
     transform: translate3d(0, 0, 0);
     border-color: #10b981;
     background: var(--color-surface);
     box-shadow: var(--shadow-xs);
   }
-  /* Phase 4 (78.5% - 97%): Finishes execution on worker */
-  97% {
+  /* Phase 3 (33.3% - 49.5%): Glides horizontally from Left to Right pool */
+  36.5%, 49.5% {
+    opacity: 1;
+    transform: translate3d(calc(100% + var(--coop-gap, 16px)), 0, 0);
+    border-color: #0ea5e9;
+    background: rgba(14, 165, 233, 0.08);
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
+  }
+  /* Phase 4 (50.0% - 66.1%): Rests in Right suspended pool while Task B executes */
+  50.0%, 66.1% {
+    opacity: 1;
+    transform: translate3d(calc(100% + var(--coop-gap, 16px)), 0, 0);
+    border-color: #0ea5e9;
+    background: rgba(14, 165, 233, 0.08);
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
+  }
+  /* Phase 5 (66.6% - 82.8%): Glides horizontally back from Right to Left worker */
+  69.5%, 82.8% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+    border-color: #10b981;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-xs);
+  }
+  /* Phase 6 (83.3% - 99.5%): Finishes execution on worker */
+  83.3%, 99.5% {
+    opacity: 1;
     transform: translate3d(0, 0, 0);
     border-color: #10b981;
     background: var(--color-surface);
     box-shadow: var(--shadow-xs);
   }
   100% {
+    opacity: 0;
     transform: translate3d(0, 0, 0);
     border-color: #10b981;
     background: var(--color-surface);
@@ -6570,25 +6589,26 @@ input:focus-visible,
 }
 
 @keyframes animTagARun {
-  0%, 24.5% { opacity: 1; }
-  25%, 100% { opacity: 0; }
+  0%, 16.5% { opacity: 0; }
+  16.6%, 32.8% { opacity: 1; }
+  33.3%, 100% { opacity: 0; }
 }
 
 @keyframes animTagAPool {
-  0%, 24.9% { opacity: 0; }
-  25.5%, 74.5% { opacity: 1; }
-  75%, 100% { opacity: 0; }
+  0%, 33.2% { opacity: 0; }
+  33.3%, 66.1% { opacity: 1; }
+  66.6%, 100% { opacity: 0; }
 }
 
 @keyframes animTagADone {
-  0%, 74.9% { opacity: 0; }
-  75.5%, 97% { opacity: 1; }
-  97.5%, 100% { opacity: 0; }
+  0%, 66.5% { opacity: 0; }
+  66.6%, 99.5% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
-/* Phase 3 Exclusive: Task B executes on the vacated Worker Thread */
+/* Phase 4 Exclusive: Task B executes on the vacated Worker Thread */
 @keyframes animTakeoverTaskB {
-  0%, 49.5% {
+  0%, 49.9% {
     opacity: 0;
     transform: translateY(8px) scale(0.96);
     pointer-events: none;
@@ -6598,12 +6618,12 @@ input:focus-visible,
     transform: translateY(0) scale(1);
     pointer-events: auto;
   }
-  71.5% {
+  63.5% {
     opacity: 1;
     transform: translateY(0) scale(1);
     pointer-events: auto;
   }
-  74.5% {
+  66.1% {
     opacity: 0;
     transform: translateY(-8px) scale(0.96);
     pointer-events: none;
@@ -6616,38 +6636,44 @@ input:focus-visible,
 }
 
 @keyframes animGuideToPool {
-  0%, 24.5% { opacity: 0.3; color: var(--color-ink-faint); }
-  25%, 49.5% { opacity: 1; color: #0ea5e9; }
-  50%, 100% { opacity: 0.3; color: var(--color-ink-faint); }
+  0%, 33.2% { opacity: 0.3; color: var(--color-ink-faint); }
+  33.3%, 49.5% { opacity: 1; color: #0ea5e9; }
+  50.0%, 100% { opacity: 0.3; color: var(--color-ink-faint); }
 }
 
 @keyframes animGuideToThread {
-  0%, 74.5% { opacity: 0.3; color: var(--color-ink-faint); }
-  75%, 99.5% { opacity: 1; color: #10b981; }
-  100% { opacity: 0.3; color: var(--color-ink-faint); }
+  0%, 66.5% { opacity: 0.3; color: var(--color-ink-faint); }
+  66.6%, 82.8% { opacity: 1; color: #10b981; }
+  83.3%, 100% { opacity: 0.3; color: var(--color-ink-faint); }
+}
+
+@keyframes animSubbarQArrival {
+  0%, 16.2% { opacity: 1; color: #0ea5e9; font-weight: 600; }
+  16.6%, 100% { opacity: 0; }
 }
 
 @keyframes animSubbarQStandby {
-  0%, 49.5% { opacity: 1; color: #0ea5e9; font-weight: 600; }
-  50%, 100% { opacity: 0; }
+  0%, 16.5% { opacity: 0; }
+  16.6%, 49.5% { opacity: 1; color: #0ea5e9; font-weight: 600; }
+  50.0%, 100% { opacity: 0; }
 }
 
 @keyframes animSubbarQActive {
   0%, 49.9% { opacity: 0; }
-  50%, 97% { opacity: 1; color: var(--color-ink-muted); font-weight: 500; }
-  97.5%, 100% { opacity: 0; }
+  50.0%, 99.5% { opacity: 1; color: var(--color-ink-muted); font-weight: 500; }
+  100% { opacity: 0; }
 }
 
 @keyframes animSubbarPoolIdle {
-  0%, 24.5% { opacity: 1; }
-  25%, 74.5% { opacity: 0; }
-  75%, 100% { opacity: 1; }
+  0%, 32.8% { opacity: 1; }
+  33.3%, 66.1% { opacity: 0; }
+  66.6%, 100% { opacity: 1; }
 }
 
 @keyframes animSubbarPoolActive {
-  0%, 24.9% { opacity: 0; }
-  25.5%, 74.5% { opacity: 1; color: #0ea5e9; font-weight: 600; }
-  75%, 100% { opacity: 0; }
+  0%, 33.2% { opacity: 0; }
+  33.3%, 66.1% { opacity: 1; color: #0ea5e9; font-weight: 600; }
+  66.6%, 100% { opacity: 0; }
 }
 
 /* --- Stage 02: CPS Continuation Baton --- */
