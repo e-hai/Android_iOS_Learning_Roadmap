@@ -5701,12 +5701,132 @@ input:focus-visible,
   font-size: 11px;
 }
 
-/* --- Stage 01: Decouple Task & Worker (v2 Dual-Track Synchronized Stepper) --- */
-.anim-title-strong {
-  font-size: 13px;
-  font-weight: 700;
+/* --- Stage 01: Decouple Task & Worker (v3 Segmented Switcher & Single Stage) --- */
+
+/* Segmented Control Switcher */
+.decouple-switch-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.decouple-segmented-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 3px 4px;
+  border-radius: 9999px;
+  box-shadow: var(--shadow-xs);
+}
+
+.decouple-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: inherit;
+  user-select: none;
+}
+
+.decouple-tab-btn:hover {
   color: var(--color-ink);
-  margin-left: 4px;
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.04));
+}
+
+.decouple-tab-btn.active[data-target="coop"] {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border-color: rgba(16, 185, 129, 0.3);
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.1);
+}
+
+.decouple-tab-btn.active[data-target="trad"] {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.1);
+}
+
+.decouple-tab-btn .tab-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.decouple-tab-btn .badge-coop {
+  background: rgba(16, 185, 129, 0.18);
+  color: #10b981;
+}
+
+.decouple-tab-btn.active .badge-coop {
+  background: #10b981;
+  color: #ffffff;
+}
+
+.decouple-tab-btn .badge-trad {
+  background: rgba(239, 68, 68, 0.18);
+  color: #ef4444;
+}
+
+.decouple-tab-btn.active .badge-trad {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+.decouple-panel {
+  display: none;
+  animation: fadeInPanel 0.25s ease;
+}
+
+.decouple-panel.active {
+  display: block;
+}
+
+.decouple-card[data-active-mode="coop"] .decouple-panel-coop { display: block; }
+.decouple-card[data-active-mode="coop"] .decouple-panel-trad { display: none; }
+.decouple-card[data-active-mode="trad"] .decouple-panel-coop { display: none; }
+.decouple-card[data-active-mode="trad"] .decouple-panel-trad { display: block; }
+
+@keyframes fadeInPanel {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.single-stage {
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.coop-stage-canvas.single-stage {
+  border-left: 3.5px solid #10b981;
+}
+
+.trad-stage-canvas.single-stage {
+  border-left: 3.5px solid #ef4444;
+}
+
+.circle-danger {
+  border-color: rgba(239, 68, 68, 0.4) !important;
+  color: #ef4444 !important;
 }
 
 .decouple-stepper-bar {
@@ -5774,10 +5894,11 @@ input:focus-visible,
   flex-shrink: 0;
 }
 
-.step-p1 { animation: stepPulseP1 8s infinite ease-in-out; }
-.step-p2 { animation: stepPulseP2 8s infinite ease-in-out; }
-.step-p3 { animation: stepPulseP3 8s infinite ease-in-out; }
-.step-p4 { animation: stepPulseP4 8s infinite ease-in-out; }
+/* Coroutine Stepper Pulses */
+.coop-stepper-bar .step-p1 { animation: stepPulseP1 8s infinite ease-in-out; }
+.coop-stepper-bar .step-p2 { animation: stepPulseP2 8s infinite ease-in-out; }
+.coop-stepper-bar .step-p3 { animation: stepPulseP3 8s infinite ease-in-out; }
+.coop-stepper-bar .step-p4 { animation: stepPulseP4 8s infinite ease-in-out; }
 
 @keyframes stepPulseP1 {
   0%, 23% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.35); }
@@ -5802,75 +5923,33 @@ input:focus-visible,
   99%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
-.stage-decouple-v2 {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Traditional Stepper Pulses */
+.trad-stepper-bar .step-p1 { animation: tradStepPulseP1 8s infinite ease-in-out; }
+.trad-stepper-bar .step-p2 { animation: tradStepPulseP2 8s infinite ease-in-out; }
+.trad-stepper-bar .step-p3 { animation: tradStepPulseP3 8s infinite ease-in-out; }
+.trad-stepper-bar .step-p4 { animation: tradStepPulseP4 8s infinite ease-in-out; }
+
+@keyframes tradStepPulseP1 {
+  0%, 23% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.35); }
+  25%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
-.decouple-model-box {
-  border-radius: 8px;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+@keyframes tradStepPulseP2 {
+  0%, 23% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  25%, 48% { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.35); }
+  50%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
-.model-traditional {
-  border-left: 3.5px solid #ef4444;
+@keyframes tradStepPulseP3 {
+  0%, 48% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  50%, 73% { background: rgba(239, 68, 68, 0.15); color: #ef4444; border-color: rgba(239, 68, 68, 0.35); }
+  75%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
-.model-coroutine {
-  border-left: 3.5px solid #10b981;
-}
-
-.model-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.banner-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.model-badge {
-  font-size: 11px;
-  font-weight: 800;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.badge-danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-
-.badge-success {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-}
-
-.model-desc {
-  font-size: 11.5px;
-  color: var(--color-ink-muted);
-}
-
-.model-state-indicator {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
+@keyframes tradStepPulseP4 {
+  0%, 73% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  75%, 98% { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border-color: rgba(245, 158, 11, 0.35); }
+  99%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 .model-content-row {

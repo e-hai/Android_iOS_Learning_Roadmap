@@ -780,6 +780,27 @@ function renderTimelineExplanation(
     `;
 
     container.appendChild(item);
+
+    // Wire up Segmented Control tab switching for Decouple Animation
+    item.querySelectorAll<HTMLButtonElement>('.decouple-tab-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const card = btn.closest('.decouple-card');
+        if (!card) return;
+        const target = btn.dataset.target || 'coop';
+        card.setAttribute('data-active-mode', target);
+        card.querySelectorAll('.decouple-tab-btn').forEach((b) => {
+          const isActive = b === btn;
+          b.classList.toggle('active', isActive);
+          b.setAttribute('aria-selected', String(isActive));
+        });
+        card.querySelectorAll<HTMLElement>('.decouple-panel').forEach((panel) => {
+          const match = panel.classList.contains(`decouple-panel-${target}`);
+          panel.classList.toggle('active', match);
+          panel.style.display = match ? 'block' : 'none';
+        });
+      });
+    });
   });
 
   return container;
