@@ -31,14 +31,6 @@ export function renderCoroutineStageAnimation(stageIndex: number): string {
 function renderTaskDecoupleAnimation(): string {
   return `
     <div class="coroutine-anim-card decouple-card">
-      <div class="coroutine-anim-header">
-        <div class="anim-badge-wrap">
-          <span class="anim-badge anim-badge-emerald">动态推演 01</span>
-          <span class="anim-title-strong">任务与载体解耦（协作式出让物理执行权）</span>
-        </div>
-        <span class="anim-hint">💡 鼠标悬停可暂停 · 顶部步进器同频驱动两端命运反差</span>
-      </div>
-
       <!-- 4-Phase Synchronized Dual-Track Stepper Tracker -->
       <div class="decouple-stepper-bar">
         <div class="stepper-item step-p1">
