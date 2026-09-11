@@ -247,6 +247,22 @@ function renderSingleChapterView(
     container.appendChild(extSection);
   }
 
+  // Section: Principle Clarification & Compiler Demystification (原理的解惑)
+  if (mod.theoryFaq) {
+    const faqSection = document.createElement('section');
+    faqSection.className = 'chapter-content-section theory-faq-section';
+    faqSection.innerHTML = `
+      <div class="section-header" style="margin-top:28px;">
+        <div class="section-header-bar ${platform === 'ios' ? 'ios-bar' : ''}"></div>
+        <h2 class="section-header-title">${mod.sectionTitles?.theoryFaq ?? '原理的解惑'}</h2>
+      </div>
+      <div class="case-study-list ${platform === 'ios' ? 'deepdive-ios' : ''}">
+        ${formatCaseStudyHtml(mod.theoryFaq, platform)}
+      </div>
+    `;
+    container.appendChild(faqSection);
+  }
+
   // Section: Production Code / Implementation
   if (mod.codeSnippet) {
     const codeSection = document.createElement('section');

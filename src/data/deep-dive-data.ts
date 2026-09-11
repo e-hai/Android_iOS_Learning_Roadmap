@@ -324,6 +324,92 @@ Job 工厂函数
     ├── SharedFlow<T>                      ← 共享流
     └── Channel<E>                         ← 通道
 \`\`\``,
+        theoryFaq: `### 一、编译器变形全景：谁变成了 Continuation？谁变成了状态机与步骤？
+
+在 JVM 字节码层面，**完全不存在线程的概念，纯粹是 Kotlin 编译器的一场 AST 语法树重构与状态机降级变换**。
+
+#### 1. 谁变成了 Continuation？
+- **函数签名层面（CPS 变换）**：所有声明了 \`suspend\` 的函数，编译后参数末尾均被**强行注入隐式回调参数** \`completion: Continuation<T>\`，原本的返回值被擦除为 \`Object\`（既可返回真实业务数据，也可返回挂起标识单例 \`COROUTINE_SUSPENDED\`）。
+- **对象实体层面**：只要函数内包含挂起点，编译器就会为其生成一个继承自 \`ContinuationImpl\` 的**匿名内部类**。**这个匿名类实例本身就是一个 Continuation**，它既是当前函数的状态机载体，也是向上层调用者交接结果的回调凭证。
+
+#### 2. 谁变成了状态机？
+**就是这个生成的 \`ContinuationImpl\` 匿名类！**
+它内部包含：
+1. **状态标识指针**：\`int label = 0\`；
+2. **现场保存槽位**：成员变量（如 \`Object L\$0\`, \`Object L\$1\`），用来跨挂起点暂存局部变量；
+3. **状态步进核心**：重写 \`invokeSuspend(Object result)\`，函数原本的业务逻辑被全量搬迁进该方法，并被一个巨大的 \`switch(this.label)\` 包裹。
+
+#### 3. 谁变成了状态机中的每个步骤？
+**每个挂起点调用（Suspension Call Point）就是一道状态分水岭！**
+若函数有 N 个挂起点，就会被精确切分成 **N + 1 个 Case 分支**：
+- **\`case 0\`**：函数入口执行到第 1 个挂起函数调用前，发起异步调用并传入自身状态机。若返回 \`COROUTINE_SUSPENDED\`，当前物理线程立即弹栈退出；
+- **\`case 1\`**：第 1 个挂起点异步完成被唤醒，带着数据重新进入 \`invokeSuspend\`。从 \`result\` 提取数据并存入 \`L\$0\` 恢复现场，继续执行业务，直到第 2 个挂起函数调用前；
+- **\`case N\`**：最后一个挂起完成，组装最终结果，通过外部传入的 \`completion.resumeWith()\` 向上层状态机交差。
+
+\`\`\`java
+// 逆向反编译视角：编译器生成的等价伪代码
+class LoadDashboardStateMachine extends ContinuationImpl {
+    int label = 0;
+    Object result;
+    Object L$0; // 跨挂起点暂存现场变量
+
+    public Object invokeSuspend(Object res) {
+        this.result = res;
+        this.label |= Integer.MIN_VALUE;
+        return loadDashboard(null, this);
+    }
+}
+\`\`\`
+
+### 二、常见写法透视：scope.launch、withContext 与自定义 suspend 函数
+
+开发者日常写的最频繁的 3 种协程代码，在编译器眼里的变形各不相同：
+
+| 常见写法 | 谁变成了 Continuation？ | 谁变成了状态机？ | 状态机步骤如何切割？ | 线程调度表现 |
+| :--- | :--- | :--- | :--- | :--- |
+| **\`scope.launch { ... }\`** | 花括号内的 Lambda 闭包 | 该 Lambda 生成的 \`SuspendLambda\` 匿名类（**根状态机**） | 闭包内的每个挂起点切一个 \`case\` | 依赖 scope 绑定的上下文初始派发 |
+| **\`suspend fun foo()\`** | 编译期强行注入的隐式实参 \`\$completion\` | 该方法生成的 \`ContinuationImpl\` 匿名类（**子状态机**） | 方法体内的每个挂起点切一个 \`case\` | 沿用调用方的当前执行线程 |
+| **\`withContext(IO) { ... }\`** | 既接收外层 Continuation，自身也是挂起点 | 外层状态机被其切分；内层闭包也生成一个包装类 | 作为外层的一个 \`case\`；内层执行完触发外层恢复 | 挂起当前线程，在 IO 线程池执行完再 post 切回原线程 |
+
+- **\`scope.launch\`**：\`launch\` 本身是普通函数（无 CPS），它创建 \`StandaloneCoroutine\`，将花括号生成的 \`SuspendLambda\` 根状态机提交给调度器开启第一步。
+- **自定义 \`suspend fun\`**：属于层级调用的子状态机，内部持有一份父级 \`completion\` 引用。最深层的叶子函数执行完毕后，顺着 \`completion\` 链表自底向上反向逐级唤醒（**用堆内存链表复刻了硬件调用栈**）。
+- **\`withContext\`**：具有双重身份。在外层是挂起点切断代码；在内层将闭包打包为 \`Runnable\` 投递至指定线程池，完成后通过 \`resumeWith\` 切回原调度器。
+
+### 三、挂起点判定机制：编译器如何知道这里该切分状态机？
+
+- **符号元数据（Symbol Metadata）**：编译器在语义分析阶段解析被调用函数的声明，检查是否有 \`suspend\` 修饰符（底层对应 \`isSuspend == true\`）或类型是否为 \`suspend () -> T\`。
+- **控制流图切割（CFG Splitting）**：在后端 IR Lowering 阶段（\`SuspendLambdaLowering\`），编译器将所有打上 \`isSuspendCall\` 标记的调用节点视为**切割刀刃**。在此处断开当前 BasicBlock，自增 \`label\`，将当前状态机自身作为最后一个参数注入，并紧跟一段挂起安全检查：
+  \`\`\`java
+  if (result == Intrinsics.COROUTINE_SUSPENDED) return COROUTINE_SUSPENDED;
+  \`\`\`
+- **独立编译原则**：编译器在编译调用方时**只认接口签名契约**。即使被调函数内部全是纯同步代码，只要签名带 \`suspend\`，调用方就必须生成状态机分支；这也是 IDE 会警告 **\`Redundant 'suspend' modifier\`** 的底层原因（避免无意义的状态机拆分与栈帧开销）。
+
+### 四、阻塞 I/O 的致命陷阱：为什么未声明 suspend 的 I/O 会击穿协程？
+
+这是工程排错中最隐蔽的**“假协程、真阻塞”**陷阱：
+
+- **编译器视角**：没有 \`suspend\` 修饰符，编译器完全当成普通函数编译，零 CPS 变换、零状态机切分。
+- **运行时现场**：由于没有挂起点，代码无法返回 \`COROUTINE_SUSPENDED\`，**物理工位根本不会被出让**！底层物理线程直接被内核系统调用焊死（处于 \`BLOCKED / WAITING\`），1MB 物理栈内存常驻死等。
+- **灾难后果**：
+  1. 若在 \`Dispatchers.Main\` 上调用：**直接引发界面掉帧卡死甚至 Android ANR 崩溃**；
+  2. 若在 \`Dispatchers.Default\` 上调用：由于其最大线程数严格等于 CPU 核心数（通常仅 4~8 个），几个阻塞调用就会耗尽所有计算线程，**导致全局其他原本流畅的计算型协程全线饿死（Thread Starvation）**！
+- **救赎之道**：必须使用 \`withContext(Dispatchers.IO)\` 将其隔离转移至 64 容限的弹性阻塞线程池替死，或用 \`suspendCancellableCoroutine\` 将底层异步回调封装为真正的挂起函数。
+
+### 五、真假非阻塞与架构终局：withContext(IO) 替死 vs 操作系统多路复用（epoll）
+
+Kotlin 协程处理 I/O 存在两个截然不同的底层阵营：
+
+1. **传统磁盘与遗留调用（假非阻塞·线程转移）**：
+   - 诸如 \`File.readText()\`、JDBC 数据库查询，底层操作系统 POSIX \`read()\` 就是物理阻塞的。
+   - 其本质**确实就是 \`withContext(Dispatchers.IO)\` 线程替死**。靠上限 64 线程的弹性线程池派工兵承担物理阻塞，属于工伤代偿。
+2. **现代网络高并发（真非阻塞·事件驱动）**：
+   - Ktor、OkHttp 异步请求的本质**绝不是线程池**（否则几百个网络并发就会打爆 64 线程）。
+   - 其底层真实本质是：**\`suspendCancellableCoroutine\` + 操作系统多路复用（Linux \`epoll\` / Mac \`kqueue\`）**。
+   - 发起请求后向内核注册 FD 监听，函数退出，**物理线程占用数为 0**；十万挂起连接仅消耗少量堆上的 Continuation 内存；数据包到达时由内核唤醒单个 Selector 线程，调用 \`resume()\` 精准复活对应协程。
+3. **Java 的演进与宿命**：
+   - Java 早在 2002 年（JDK 1.4）就通过 Java NIO 封装了 \`epoll\`，但纯事件驱动破坏了语言控制流，陷入了回调地狱；
+   - **Kotlin 的突破在于编译器前端的 CPS 翻译**：让开发者写同步代码，编译器自动桥接底层的非阻塞 epoll 回调；
+   - **Java 的终极反击（JDK 21 虚拟线程 Project Loom）**：直接在 JVM 底层重写 \`read()\` 和 \`sleep()\`，在虚拟机内核层面自动挂接 epoll，实现了无需语法着色的真协程。`,
         caseStudy: `### 一、viewModelScope 场景下 Job 与 SupervisorJob 的行为差异
 
 \`viewModelScope\` 内部实际的 Context 是 \`SupervisorJob() + Dispatchers.Main.immediate\`。为了搞清楚这个选择背后的原因，用 \`Job()\` 和 \`SupervisorJob()\` 各写一组对照代码，分两轮实验：先看不装异常处理器时的差异，再看装了 \`CoroutineExceptionHandler\` 之后差异是否还成立。

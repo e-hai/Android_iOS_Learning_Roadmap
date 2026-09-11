@@ -40,6 +40,7 @@ export interface DeepDiveSectionTitles {
   diagramCaption?: string;
   caseStudy?: string;
   pipeline?: string;
+  theoryFaq?: string;
 }
 
 export interface DeepDiveModule {
@@ -50,6 +51,7 @@ export interface DeepDiveModule {
   metaphor?: DeepDiveMetaphor; // Optional cognitive metaphor & golden memory formula
   explanation?: string;  // Optional deep dive explanation (supports rich structured paragraphs)
   extendedDeepDive?: string; // Optional extended top-down deep dive analysis
+  theoryFaq?: string;        // Optional principle clarification & compilation demystification (原理的解惑)
   caseStudy?: string;    // Optional in-depth case study & reflection
   stepper?: StepperStep[]; // Optional interactive step-by-step state machine runner
   diagram?: string;      // Optional Unicode Box Diagram for architecture/timing/state machine
