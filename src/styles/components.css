@@ -6232,14 +6232,14 @@ input:focus-visible,
   user-select: none;
 }
 
-/* Heap Sub-Grid (Ready Queue + Suspended Pool) */
+/* Heap Sub-Grid (Ready Queue + Suspended Pool + Completed Area) */
 .heap-sub-grid {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 12px;
+  grid-template-columns: 1fr 1fr 1.1fr;
+  gap: 10px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .heap-sub-grid {
     grid-template-columns: 1fr;
   }
@@ -6274,6 +6274,10 @@ input:focus-visible,
   background: #8b5cf6;
 }
 
+.dot-done {
+  background: #10b981;
+}
+
 .sub-cell-slot {
   position: relative;
   height: 48px;
@@ -6282,17 +6286,22 @@ input:focus-visible,
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .slot-queue {
   border: 1px dashed rgba(14, 165, 233, 0.35);
-  gap: 8px;
+  gap: 6px;
 }
 
 .slot-pool {
   border: 1px dashed rgba(139, 92, 246, 0.35);
   justify-content: center;
+}
+
+.slot-done {
+  border: 1px dashed rgba(16, 185, 129, 0.35);
+  gap: 6px;
 }
 
 .region-footer-hint {
@@ -6325,7 +6334,7 @@ input:focus-visible,
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: 5px;
   box-sizing: border-box;
   font-size: 11px;
@@ -6344,7 +6353,8 @@ input:focus-visible,
 .task-action {
   font-size: 10px;
   font-weight: 700;
-  margin-left: 8px;
+  margin-left: 6px;
+  white-space: nowrap;
 }
 
 /* Task A Styling */
@@ -6377,11 +6387,17 @@ input:focus-visible,
 }
 
 .slot-pool .task-entity {
-  width: 170px;
+  width: 100%;
 }
 
 .slot-queue .task-entity {
-  width: 130px;
+  flex: 1;
+  min-width: 0;
+}
+
+.slot-done .task-entity {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ==========================================================================
@@ -6392,8 +6408,9 @@ input:focus-visible,
 .coop-vertical-stack .task-in-thread,
 .coop-vertical-stack .task-in-queue-a,
 .coop-vertical-stack .task-in-queue-b,
-.coop-vertical-stack .task-in-queue-b-done,
-.coop-vertical-stack .task-in-pool {
+.coop-vertical-stack .task-in-pool,
+.coop-vertical-stack .task-in-done-a,
+.coop-vertical-stack .task-in-done-b {
   display: none;
 }
 
@@ -6401,66 +6418,81 @@ input:focus-visible,
 .coop-vertical-stack .thread-idle-hint { display: none; }
 .coop-vertical-stack .queue-empty-hint { display: none; }
 .coop-vertical-stack .pool-empty-hint   { display: block; }
+.coop-vertical-stack .done-empty-hint   { display: block; }
 
 /* --- STEP 1: 初始待命 ---
    Thread: 空闲
    Queue: Task A + Task B
    Pool: 空闲
+   Done: 空闲
 */
 .coop-vertical-stack[data-active-step="1"] .thread-idle-hint { display: block; }
 .coop-vertical-stack[data-active-step="1"] .task-in-queue-a { display: flex; }
 .coop-vertical-stack[data-active-step="1"] .task-in-queue-b { display: flex; }
 .coop-vertical-stack[data-active-step="1"] .pool-empty-hint { display: block; }
+.coop-vertical-stack[data-active-step="1"] .done-empty-hint { display: block; }
 
 /* --- STEP 2: A 启动计算 ---
    Thread: Task A (计算中)
    Queue: Task B (待命排队)
    Pool: 空闲
+   Done: 空闲
 */
 .coop-vertical-stack[data-active-step="2"] .slot-thread .task-a { display: flex; }
 .coop-vertical-stack[data-active-step="2"] .slot-thread .action-thread-a::after { content: "计算中..."; }
 .coop-vertical-stack[data-active-step="2"] .task-in-queue-b { display: flex; }
 .coop-vertical-stack[data-active-step="2"] .pool-empty-hint { display: block; }
+.coop-vertical-stack[data-active-step="2"] .done-empty-hint { display: block; }
 
 /* --- STEP 3: A 挂起出让 ---
    Thread: 空闲 (工人腾空)
    Queue: Task B (准备出列)
    Pool: Task A (挂起等待 I/O，0 线程)
+   Done: 空闲
 */
 .coop-vertical-stack[data-active-step="3"] .thread-idle-hint { display: block; }
 .coop-vertical-stack[data-active-step="3"] .task-in-queue-b { display: flex; }
 .coop-vertical-stack[data-active-step="3"] .task-in-pool { display: flex; }
 .coop-vertical-stack[data-active-step="3"] .pool-empty-hint { display: none; }
+.coop-vertical-stack[data-active-step="3"] .done-empty-hint { display: block; }
 
 /* --- STEP 4: B 接力执行 ---
    Thread: Task B (接力满载计算)
    Queue: 队列已清空
    Pool: Task A (仍在挂起)
+   Done: 空闲
 */
 .coop-vertical-stack[data-active-step="4"] .slot-thread .task-b { display: flex; }
 .coop-vertical-stack[data-active-step="4"] .queue-empty-hint { display: block; }
 .coop-vertical-stack[data-active-step="4"] .task-in-pool { display: flex; }
 .coop-vertical-stack[data-active-step="4"] .pool-empty-hint { display: none; }
+.coop-vertical-stack[data-active-step="4"] .done-empty-hint { display: block; }
 
 /* --- STEP 5: B 完成唤醒 ---
    Thread: Task A (唤醒回落工位恢复执行)
-   Queue: Task B (已完成，驻留堆内存)
+   Queue: 队列已清空
    Pool: 空闲
+   Done: Task B 进入已完成区
 */
 .coop-vertical-stack[data-active-step="5"] .slot-thread .task-a { display: flex; }
 .coop-vertical-stack[data-active-step="5"] .slot-thread .action-thread-a::after { content: "唤醒收尾"; }
-.coop-vertical-stack[data-active-step="5"] .task-in-queue-b-done { display: flex; }
+.coop-vertical-stack[data-active-step="5"] .queue-empty-hint { display: block; }
 .coop-vertical-stack[data-active-step="5"] .pool-empty-hint { display: block; }
+.coop-vertical-stack[data-active-step="5"] .task-in-done-b { display: flex; }
+.coop-vertical-stack[data-active-step="5"] .done-empty-hint { display: none; }
 
 /* --- STEP 6: 双任务达成 ---
-   Thread: Task A (已完成，单工人达成两任务)
-   Queue: Task B (已完成，驻留堆内存)
+   Thread: 工人待命中 (全量任务收尾交差)
+   Queue: 队列已清空
    Pool: 空闲
+   Done: Task A + Task B 均位于已完成区！
 */
-.coop-vertical-stack[data-active-step="6"] .slot-thread .task-a { display: flex; }
-.coop-vertical-stack[data-active-step="6"] .slot-thread .action-thread-a::after { content: "已完成"; }
-.coop-vertical-stack[data-active-step="6"] .task-in-queue-b-done { display: flex; }
+.coop-vertical-stack[data-active-step="6"] .thread-idle-hint { display: block; }
+.coop-vertical-stack[data-active-step="6"] .queue-empty-hint { display: block; }
 .coop-vertical-stack[data-active-step="6"] .pool-empty-hint { display: block; }
+.coop-vertical-stack[data-active-step="6"] .task-in-done-a { display: flex; }
+.coop-vertical-stack[data-active-step="6"] .task-in-done-b { display: flex; }
+.coop-vertical-stack[data-active-step="6"] .done-empty-hint { display: none; }
 
 /* --- Stage 02: CPS Continuation Baton --- */
 .stage-cps {

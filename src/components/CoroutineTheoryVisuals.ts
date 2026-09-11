@@ -162,11 +162,6 @@ function renderTaskDecoupleAnimation(): string {
                       <div class="task-badge badge-task-b">Task B</div>
                       <span class="task-action">就绪排队</span>
                     </div>
-                    <!-- Task B in heap during Step 5, 6 (Completed) -->
-                    <div class="task-entity task-b task-in-queue-b-done">
-                      <div class="task-badge badge-task-b">Task B</div>
-                      <span class="task-action">已完成</span>
-                    </div>
                   </div>
                 </div>
 
@@ -181,7 +176,28 @@ function renderTaskDecoupleAnimation(): string {
                     <!-- Task A in pool during Step 3, 4 -->
                     <div class="task-entity task-a task-in-pool">
                       <div class="task-badge badge-task-a">Task A</div>
-                      <span class="task-action">挂起中 (0 线程)</span>
+                      <span class="task-action">挂起等待 I/O</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Sub-Container 3: Completed Area -->
+                <div class="heap-sub-cell cell-done">
+                  <div class="sub-cell-header">
+                    <span class="sub-cell-dot dot-done"></span>
+                    <span class="sub-cell-title">已完成区 (Completed)</span>
+                  </div>
+                  <div class="sub-cell-slot slot-done">
+                    <div class="slot-bg-hint done-empty-hint">暂无完成任务</div>
+                    <!-- Task B enters completed during Step 5 and remains in Step 6 -->
+                    <div class="task-entity task-b task-in-done-b">
+                      <div class="task-badge badge-task-b">Task B</div>
+                      <span class="task-action">已完成</span>
+                    </div>
+                    <!-- Task A enters completed during Step 6 -->
+                    <div class="task-entity task-a task-in-done-a">
+                      <div class="task-badge badge-task-a">Task A</div>
+                      <span class="task-action">已完成</span>
                     </div>
                   </div>
                 </div>
