@@ -5701,7 +5701,7 @@ input:focus-visible,
   font-size: 11px;
 }
 
-/* --- Stage 01: Decouple Task & Worker (v2 Crystal-Clear 4-Phase Stepper) --- */
+/* --- Stage 01: Decouple Task & Worker (v2 Dual-Track Synchronized Stepper) --- */
 .anim-title-strong {
   font-size: 13px;
   font-weight: 700;
@@ -5725,20 +5725,24 @@ input:focus-visible,
 
 .stepper-item {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-ink-muted);
-  padding: 3px 8px;
-  border-radius: 9999px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
   transition: all 0.3s ease;
   white-space: nowrap;
 }
 
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .step-circle {
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -5749,6 +5753,18 @@ input:focus-visible,
   border: 1px solid var(--color-border);
   color: var(--color-ink-muted);
   flex-shrink: 0;
+}
+
+.step-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.step-sub {
+  font-size: 10px;
+  color: var(--color-ink-muted);
+  margin-left: 23px;
 }
 
 .stepper-arrow {
@@ -5764,26 +5780,26 @@ input:focus-visible,
 .step-p4 { animation: stepPulseP4 8s infinite ease-in-out; }
 
 @keyframes stepPulseP1 {
-  0%, 22% { background: rgba(16, 185, 129, 0.15); color: #10b981; }
-  26%, 100% { background: transparent; color: var(--color-ink-muted); }
+  0%, 23% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.35); }
+  25%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes stepPulseP2 {
-  0%, 22% { background: transparent; color: var(--color-ink-muted); }
-  26%, 48% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
-  52%, 100% { background: transparent; color: var(--color-ink-muted); }
+  0%, 23% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  25%, 48% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.35); }
+  50%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes stepPulseP3 {
-  0%, 48% { background: transparent; color: var(--color-ink-muted); }
-  52%, 74% { background: rgba(16, 185, 129, 0.15); color: #10b981; }
-  78%, 100% { background: transparent; color: var(--color-ink-muted); }
+  0%, 48% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  50%, 73% { background: rgba(16, 185, 129, 0.15); color: #10b981; border-color: rgba(16, 185, 129, 0.35); }
+  75%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 @keyframes stepPulseP4 {
-  0%, 74% { background: transparent; color: var(--color-ink-muted); }
-  78%, 98% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
-  99%, 100% { background: transparent; color: var(--color-ink-muted); }
+  0%, 73% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
+  75%, 98% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; border-color: rgba(14, 165, 233, 0.35); }
+  99%, 100% { background: transparent; color: var(--color-ink-muted); border-color: transparent; }
 }
 
 .stage-decouple-v2 {
@@ -5818,6 +5834,13 @@ input:focus-visible,
   gap: 8px;
 }
 
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .model-badge {
   font-size: 11px;
   font-weight: 800;
@@ -5840,6 +5863,15 @@ input:focus-visible,
   color: var(--color-ink-muted);
 }
 
+.model-state-indicator {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+}
+
 .model-content-row {
   display: grid;
   grid-template-columns: 1.4fr 1fr;
@@ -5857,10 +5889,12 @@ input:focus-visible,
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 6px;
   background: rgba(239, 68, 68, 0.05);
   border: 1.5px dashed rgba(239, 68, 68, 0.35);
+  position: relative;
+  min-height: 56px;
 }
 
 .worker-tag {
@@ -5886,25 +5920,66 @@ input:focus-visible,
   box-shadow: 0 0 6px #10b981;
 }
 
-.trad-task-cell {
+.trad-lane-slot {
+  position: relative;
+  flex: 1;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+.trad-task-pill {
+  position: absolute;
+  left: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 11.5px;
+  transition: all 0.3s;
 }
 
-.trad-task-name {
-  font-size: 12px;
+.trad-p1-run { animation: animTradP1 8s infinite ease-in-out; }
+.trad-p2-blocked {
+  animation: animTradP2 8s infinite ease-in-out;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.trad-p4-finish {
+  animation: animTradP4 8s infinite ease-in-out;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.t-title {
+  font-size: 11.5px;
   font-weight: 700;
   color: var(--color-ink);
 }
 
-.trad-lock-pulse {
+.t-state {
+  font-size: 10px;
+  color: var(--color-ink-muted);
+}
+
+.t-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.badge-lock {
+  font-size: 9.5px;
   font-weight: 700;
   color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
   animation: animLockPulse 2.5s infinite ease-in-out;
 }
 
@@ -5925,17 +6000,38 @@ input:focus-visible,
   font-weight: 600;
 }
 
-.trad-blocked-task {
+.trad-queue-slot {
+  position: relative;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+}
+
+.queue-task-pill {
+  position: absolute;
+  left: 0;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
   font-size: 11px;
-  color: #ef4444;
-  font-weight: 600;
-  background: rgba(239, 68, 68, 0.08);
-  padding: 5px 8px;
+  padding: 4px 8px;
   border-radius: 4px;
-  animation: animBlockedShake 2.5s infinite ease-in-out;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  transition: all 0.3s;
+}
+
+.q-standby { animation: animQStandby 8s infinite ease-in-out; }
+.q-blocked {
+  animation: animQBlocked 8s infinite ease-in-out;
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+}
+.q-late {
+  animation: animQLate 8s infinite ease-in-out;
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
 }
 
 .b-name {
@@ -5943,9 +6039,9 @@ input:focus-visible,
   color: var(--color-ink);
 }
 
-.b-status {
+.b-state {
   font-size: 10px;
-  color: #ef4444;
+  color: var(--color-ink-muted);
 }
 
 .model-verdict {
@@ -6014,6 +6110,45 @@ input:focus-visible,
   align-items: center;
 }
 
+.coop-pool-pill {
+  position: absolute;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+  width: 100%;
+  max-width: 280px;
+  transition: all 0.3s;
+}
+
+.pool-pill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.pool-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+}
+
+.pool-desc {
+  font-size: 9.5px;
+  color: var(--color-ink-muted);
+}
+
+.coop-pool-task-a { animation: animTaskAInPool 8s infinite ease-in-out; }
+
 .coop-trajectory-row {
   display: flex;
   align-items: center;
@@ -6030,13 +6165,8 @@ input:focus-visible,
   gap: 4px;
 }
 
-.traj-up {
-  animation: animTrajUp 8s infinite ease-in-out;
-}
-
-.traj-down {
-  animation: animTrajDown 8s infinite ease-in-out;
-}
+.traj-up { animation: animTrajUp 8s infinite ease-in-out; }
+.traj-down { animation: animTrajDown 8s infinite ease-in-out; }
 
 .coop-worker-lane {
   display: flex;
@@ -6059,6 +6189,9 @@ input:focus-visible,
 }
 
 .coop-task-pill {
+  position: absolute;
+  left: 0;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -6095,11 +6228,6 @@ input:focus-visible,
   color: #10b981;
 }
 
-.state-suspend {
-  background: rgba(14, 165, 233, 0.15);
-  color: #0ea5e9;
-}
-
 .state-full {
   background: rgba(16, 185, 129, 0.2);
   color: #047857;
@@ -6115,32 +6243,9 @@ input:focus-visible,
   color: var(--color-ink-muted);
 }
 
-.task-a-in-pool {
-  position: absolute;
-  right: 0;
-  animation: animTaskAInPool 8s infinite ease-in-out;
-}
-
-.task-a-running {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  animation: animTaskARunning 8s infinite ease-in-out;
-}
-
-.task-b-running {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  animation: animTaskBRunning 8s infinite ease-in-out;
-}
-
-.task-a-resumed {
-  position: absolute;
-  left: 0;
-  width: 100%;
-  animation: animTaskAResumed 8s infinite ease-in-out;
-}
+.coop-p1-task-a { animation: animTaskARunning 8s infinite ease-in-out; }
+.coop-p3-task-b { animation: animTaskBRunning 8s infinite ease-in-out; }
+.coop-p4-task-a { animation: animTaskAResumed 8s infinite ease-in-out; }
 
 .footer-insight {
   display: flex;
@@ -6161,9 +6266,44 @@ input:focus-visible,
   flex-shrink: 0;
 }
 
+/* --- Keyframe Animations for Dual Tracks --- */
 @keyframes animLockPulse {
   0%, 100% { transform: scale(1); opacity: 0.85; }
   50% { transform: scale(1.03); opacity: 1; filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.4)); }
+}
+
+@keyframes animTradP1 {
+  0%, 23% { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  25%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+}
+
+@keyframes animTradP2 {
+  0%, 23% { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  25%, 73% { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  75%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+}
+
+@keyframes animTradP4 {
+  0%, 73% { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  75%, 98% { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  99%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+}
+
+@keyframes animQStandby {
+  0%, 48% { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  50%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+}
+
+@keyframes animQBlocked {
+  0%, 48% { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  50%, 73% { opacity: 1; transform: translateY(0); pointer-events: auto; animation-name: animBlockedShake; }
+  75%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
+}
+
+@keyframes animQLate {
+  0%, 73% { opacity: 0; transform: translateY(8px); pointer-events: none; }
+  75%, 98% { opacity: 1; transform: translateY(0); pointer-events: auto; }
+  99%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
 }
 
 @keyframes animBlockedShake {
@@ -6172,38 +6312,38 @@ input:focus-visible,
   30%, 60% { transform: translateX(2px); }
 }
 
-@keyframes animTaskAInPool {
-  0%, 22% { opacity: 0; transform: translateY(16px); pointer-events: none; }
-  26%, 74% { opacity: 1; transform: translateY(0); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
-  78%, 100% { opacity: 0; transform: translateY(16px); pointer-events: none; }
+@keyframes animTaskARunning {
+  0%, 23% { opacity: 1; transform: translateY(-50%); pointer-events: auto; border-color: #10b981; }
+  25%, 100% { opacity: 0; transform: translateY(-90%); pointer-events: none; }
 }
 
-@keyframes animTaskARunning {
-  0%, 22% { opacity: 1; transform: translateY(-50%); pointer-events: auto; border-color: #10b981; }
-  26%, 100% { opacity: 0; transform: translateY(-90%); pointer-events: none; }
+@keyframes animTaskAInPool {
+  0%, 23% { opacity: 0; transform: translateY(16px); pointer-events: none; }
+  25%, 73% { opacity: 1; transform: translateY(0); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
+  75%, 100% { opacity: 0; transform: translateY(16px); pointer-events: none; }
 }
 
 @keyframes animTaskBRunning {
   0%, 48% { opacity: 0; transform: translateY(-50%) translateX(25px); pointer-events: none; }
-  52%, 74% { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; border-color: #10b981; background: rgba(16, 185, 129, 0.12); box-shadow: 0 0 12px rgba(16, 185, 129, 0.25); }
-  78%, 100% { opacity: 0; transform: translateY(-50%) translateX(-25px); pointer-events: none; }
+  50%, 73% { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; border-color: #10b981; background: rgba(16, 185, 129, 0.12); box-shadow: 0 0 12px rgba(16, 185, 129, 0.25); }
+  75%, 100% { opacity: 0; transform: translateY(-50%) translateX(-25px); pointer-events: none; }
 }
 
 @keyframes animTaskAResumed {
-  0%, 74% { opacity: 0; transform: translateY(-50%) scale(0.9); pointer-events: none; }
-  78%, 98% { opacity: 1; transform: translateY(-50%) scale(1); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
+  0%, 73% { opacity: 0; transform: translateY(-50%) scale(0.9); pointer-events: none; }
+  75%, 98% { opacity: 1; transform: translateY(-50%) scale(1); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
   99%, 100% { opacity: 0; transform: translateY(-50%) scale(0.95); pointer-events: none; }
 }
 
 @keyframes animTrajUp {
-  0%, 22% { opacity: 0.25; color: var(--color-ink-faint); }
-  26%, 48% { opacity: 1; color: #0ea5e9; transform: translateY(-2px); }
-  52%, 100% { opacity: 0.25; color: var(--color-ink-faint); }
+  0%, 23% { opacity: 0.25; color: var(--color-ink-faint); }
+  25%, 48% { opacity: 1; color: #0ea5e9; transform: translateY(-2px); }
+  50%, 100% { opacity: 0.25; color: var(--color-ink-faint); }
 }
 
 @keyframes animTrajDown {
-  0%, 74% { opacity: 0.25; color: var(--color-ink-faint); }
-  78%, 98% { opacity: 1; color: #10b981; transform: translateY(2px); }
+  0%, 73% { opacity: 0.25; color: var(--color-ink-faint); }
+  75%, 98% { opacity: 1; color: #10b981; transform: translateY(2px); }
   99%, 100% { opacity: 0.25; color: var(--color-ink-faint); }
 }
 
