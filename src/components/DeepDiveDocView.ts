@@ -6,6 +6,7 @@ import { renderKotlinFeaturesVisual, KOTLIN_FEATURES_MARKDOWN } from './KotlinFe
 import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
+import { renderCoroutineStageAnimation } from './CoroutineTheoryVisuals';
 
 export function renderDeepDiveDocView(
   currentStageId: string,
@@ -93,7 +94,7 @@ function renderSingleChapterView(
       </div>
     `;
     principleSection.appendChild(renderPipelineFlowCard(mod.pipeline, platform, mod.sectionTitles?.pipeline));
-    principleSection.appendChild(renderTimelineExplanation(mod.explanation || '', platform, mod.pipeline, mod.sectionTitles?.pipeline));
+    principleSection.appendChild(renderTimelineExplanation(mod.explanation || '', platform, mod.pipeline, mod.sectionTitles?.pipeline, mod.title));
     container.appendChild(principleSection);
   } else {
     // Cognitive Metaphor & Formula Card (if present on traditional modules)
@@ -700,7 +701,13 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
   return card;
 }
 
-function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios', pipeline?: PipelineStep[], customPipelineTitle?: string): HTMLElement {
+function renderTimelineExplanation(
+  rawText: string,
+  platform: 'android' | 'ios',
+  pipeline?: PipelineStep[],
+  customPipelineTitle?: string,
+  moduleTitle?: string
+): HTMLElement {
   const container = document.createElement('div');
   container.className = `timeline-stream ${platform === 'ios' ? 'timeline-ios' : ''}`;
   const bridge = document.createElement('div');
@@ -747,6 +754,11 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
     const badgeNumber = String(idx + 1).padStart(2, '0');
     const tagText = isTheory ? '理论与策略' : '工程与运行时';
 
+    let animHtml = '';
+    if (moduleTitle === 'Kotlin 协程' || (!moduleTitle && platform === 'android' && sec.includes('CPS 续体传递风格'))) {
+      animHtml = renderCoroutineStageAnimation(idx);
+    }
+
     const item = document.createElement('div');
     item.className = 'timeline-item';
 
@@ -762,6 +774,7 @@ function renderTimelineExplanation(rawText: string, platform: 'android' | 'ios',
         </div>
         <div class="timeline-card-content">
           ${formatCaseStudyBody(bodyText)}
+          ${animHtml}
         </div>
       </div>
     `;
