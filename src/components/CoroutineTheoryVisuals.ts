@@ -70,11 +70,7 @@ function renderTaskDecoupleAnimation(): string {
         <!-- Track 1: Traditional Blocking Model -->
         <div class="decouple-model-box model-traditional">
           <div class="model-banner">
-            <div class="banner-left">
-              <span class="model-badge badge-danger">传统线程模型 (强绑定)</span>
-              <span class="model-desc">任务与物理工人强行绑定 · 遇到 I/O 阻塞死等</span>
-            </div>
-            <span class="model-state-indicator text-danger">⚠️ 强绑定缺陷展示</span>
+            <span class="model-badge badge-danger">传统线程模型 (强绑定)</span>
           </div>
 
           <div class="model-content-row">
@@ -137,11 +133,7 @@ function renderTaskDecoupleAnimation(): string {
         <!-- Track 2: Coroutine Cooperative Yielding Model -->
         <div class="decouple-model-box model-coroutine">
           <div class="model-banner">
-            <div class="banner-left">
-              <span class="model-badge badge-success">协程解耦模型 (协作式让权)</span>
-              <span class="model-desc">任务与物理工人彻底解耦 · 遇等待出让工位，工人 100% 运转</span>
-            </div>
-            <span class="model-state-indicator text-success">⚡ 零阻塞复用破局</span>
+            <span class="model-badge badge-success">协程解耦模型 (协作式让权)</span>
           </div>
 
           <div class="coop-stage-canvas">
