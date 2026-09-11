@@ -6392,6 +6392,7 @@ input:focus-visible,
 .coop-vertical-stack .task-in-thread,
 .coop-vertical-stack .task-in-queue-a,
 .coop-vertical-stack .task-in-queue-b,
+.coop-vertical-stack .task-in-queue-b-done,
 .coop-vertical-stack .task-in-pool {
   display: none;
 }
@@ -6443,22 +6444,22 @@ input:focus-visible,
 
 /* --- STEP 5: B 完成唤醒 ---
    Thread: Task A (唤醒回落工位恢复执行)
-   Queue: 队列已清空
+   Queue: Task B (已完成，驻留堆内存)
    Pool: 空闲
 */
 .coop-vertical-stack[data-active-step="5"] .slot-thread .task-a { display: flex; }
 .coop-vertical-stack[data-active-step="5"] .slot-thread .action-thread-a::after { content: "唤醒收尾"; }
-.coop-vertical-stack[data-active-step="5"] .queue-empty-hint { display: block; }
+.coop-vertical-stack[data-active-step="5"] .task-in-queue-b-done { display: flex; }
 .coop-vertical-stack[data-active-step="5"] .pool-empty-hint { display: block; }
 
 /* --- STEP 6: 双任务达成 ---
    Thread: Task A (已完成，单工人达成两任务)
-   Queue: 队列已清空
+   Queue: Task B (已完成，驻留堆内存)
    Pool: 空闲
 */
 .coop-vertical-stack[data-active-step="6"] .slot-thread .task-a { display: flex; }
-.coop-vertical-stack[data-active-step="6"] .slot-thread .action-thread-a::after { content: "已完成 · 双任务达成"; }
-.coop-vertical-stack[data-active-step="6"] .queue-empty-hint { display: block; }
+.coop-vertical-stack[data-active-step="6"] .slot-thread .action-thread-a::after { content: "已完成"; }
+.coop-vertical-stack[data-active-step="6"] .task-in-queue-b-done { display: flex; }
 .coop-vertical-stack[data-active-step="6"] .pool-empty-hint { display: block; }
 
 /* --- Stage 02: CPS Continuation Baton --- */
