@@ -54,7 +54,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p1">
             <div class="step-head">
               <span class="step-circle">1</span>
-              <span class="step-title">① 初始计算</span>
+              <span class="step-title">初始计算</span>
             </div>
             <span class="step-sub">Task A 占用线程执行</span>
           </div>
@@ -62,7 +62,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p2">
             <div class="step-head">
               <span class="step-circle">2</span>
-              <span class="step-title">② 遇 I/O 挂起</span>
+              <span class="step-title">遇 I/O 挂起</span>
             </div>
             <span class="step-sub">脱钩让权，腾出工位</span>
           </div>
@@ -70,7 +70,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p3">
             <div class="step-head">
               <span class="step-circle">3</span>
-              <span class="step-title">③ Task B 接力</span>
+              <span class="step-title">Task B 接力</span>
             </div>
             <span class="step-sub">工人无缝接手，100% 运转</span>
           </div>
@@ -78,7 +78,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle">4</span>
-              <span class="step-title">④ 数据就绪唤醒</span>
+              <span class="step-title">数据就绪唤醒</span>
             </div>
             <span class="step-sub">Task A 回落收尾，双任务完成</span>
           </div>
@@ -106,12 +106,12 @@ function renderTaskDecoupleAnimation(): string {
           <!-- Trajectory Arrows -->
           <div class="coop-trajectory-row">
             <div class="traj-arrow traj-up">
-              <span>② 挂起脱钩出让 (Yield)</span>
+              <span>挂起脱钩出让 (Yield)</span>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
             </div>
             <div class="traj-arrow traj-down">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
-              <span>④ 数据就绪唤醒 (Resume)</span>
+              <span>数据就绪唤醒 (Resume)</span>
             </div>
           </div>
 
@@ -126,7 +126,7 @@ function renderTaskDecoupleAnimation(): string {
               <div class="coop-task-pill coop-p1-task-a">
                 <div class="pill-title-row">
                   <span class="task-title">Task A 正在执行</span>
-                  <span class="pill-state-tag state-run">阶段 ① 运行</span>
+                  <span class="pill-state-tag state-run">执行中</span>
                 </div>
                 <div class="pill-detail">执行到挂起点准备出让...</div>
               </div>
@@ -135,7 +135,7 @@ function renderTaskDecoupleAnimation(): string {
               <div class="coop-task-pill coop-p3-task-b">
                 <div class="pill-title-row">
                   <span class="task-title text-success">⚡ Task B 无缝接力执行！</span>
-                  <span class="pill-state-tag state-full">阶段 ③ 100% 满负荷</span>
+                  <span class="pill-state-tag state-full">100% 满负荷</span>
                 </div>
                 <div class="pill-detail">工人零卡顿，无缝处理新任务（零阻塞）</div>
               </div>
@@ -144,7 +144,7 @@ function renderTaskDecoupleAnimation(): string {
               <div class="coop-task-pill coop-p4-task-a">
                 <div class="pill-title-row">
                   <span class="task-title text-accent">Task A 接力恢复！</span>
-                  <span class="pill-state-tag state-resume">阶段 ④ 双任务完成</span>
+                  <span class="pill-state-tag state-resume">双任务完成</span>
                 </div>
                 <div class="pill-detail">Task B 已提前完成，Task A 回落线程继续后续逻辑</div>
               </div>
@@ -164,7 +164,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p1">
             <div class="step-head">
               <span class="step-circle circle-danger">1</span>
-              <span class="step-title">① 初始计算</span>
+              <span class="step-title">初始计算</span>
             </div>
             <span class="step-sub">Task A 占用线程执行</span>
           </div>
@@ -172,7 +172,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p2">
             <div class="step-head">
               <span class="step-circle circle-danger">2</span>
-              <span class="step-title">② 遇 I/O 等待</span>
+              <span class="step-title">遇 I/O 等待</span>
             </div>
             <span class="step-sub">Thread.sleep 死锁阻塞</span>
           </div>
@@ -180,7 +180,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p3">
             <div class="step-head">
               <span class="step-circle circle-danger">3</span>
-              <span class="step-title">③ Task B 到来</span>
+              <span class="step-title">Task B 到来</span>
             </div>
             <span class="step-sub">进不去！排队严重饥饿</span>
           </div>
@@ -188,7 +188,7 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle circle-danger">4</span>
-              <span class="step-title">④ 数据就绪唤醒</span>
+              <span class="step-title">数据就绪唤醒</span>
             </div>
             <span class="step-sub">Task A 延误释放，Task B 滞后</span>
           </div>
