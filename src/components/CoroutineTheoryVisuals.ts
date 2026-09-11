@@ -26,94 +26,166 @@ export function renderCoroutineStageAnimation(stageIndex: number): string {
 
 /**
  * 阶段 01 动画：任务与载体解耦（协作式出让物理执行权）
- * 动态对比：传统物理线程阻塞卡死 vs 协程挂起出让、线程无缝复用
+ * 动态对比：传统物理线程阻塞卡死（Task B 进不来） vs 协程挂起脱钩出让、线程无缝接力新任务
  */
 function renderTaskDecoupleAnimation(): string {
   return `
-    <div class="coroutine-anim-card">
+    <div class="coroutine-anim-card decouple-card">
       <div class="coroutine-anim-header">
         <div class="anim-badge-wrap">
           <span class="anim-badge anim-badge-emerald">动态推演 01</span>
-          <span class="anim-hint">协作式出让执行权 · 悬停可暂停观察</span>
+          <span class="anim-title-strong">任务与载体解耦（协作式出让物理执行权）</span>
         </div>
-        <div class="anim-legend-row">
-          <span class="legend-pill pill-thread">Worker Thread (物理工人)</span>
-          <span class="legend-pill pill-task-a">Task A (协程任务)</span>
-          <span class="legend-pill pill-task-b">Task B (就绪任务)</span>
+        <span class="anim-hint">💡 鼠标悬停可暂停 · 对比传统线程卡死 vs 协程无缝接力</span>
+      </div>
+
+      <!-- 4-Phase Synchronized Stepper Tracker -->
+      <div class="decouple-stepper-bar">
+        <div class="stepper-item step-p1">
+          <span class="step-circle">1</span>
+          <span class="step-text">Task A 占用线程运行</span>
+        </div>
+        <div class="stepper-arrow">➔</div>
+        <div class="stepper-item step-p2">
+          <span class="step-circle">2</span>
+          <span class="step-text">遇 I/O 挂起脱钩出让</span>
+        </div>
+        <div class="stepper-arrow">➔</div>
+        <div class="stepper-item step-p3">
+          <span class="step-circle">3</span>
+          <span class="step-text">线程无缝接力 Task B</span>
+        </div>
+        <div class="stepper-arrow">➔</div>
+        <div class="stepper-item step-p4">
+          <span class="step-circle">4</span>
+          <span class="step-text">I/O 就绪恢复 Task A</span>
         </div>
       </div>
 
-      <div class="coroutine-anim-stage stage-decouple">
-        <!-- Track 1: Traditional Thread Blocking -->
-        <div class="decouple-track-row">
-          <div class="decouple-track-label">
-            <span class="label-badge text-danger">传统模型</span>
-            <span class="label-desc">线程阻塞死等 (1MB+ 内存卡死 · CPU 空耗)</span>
+      <div class="coroutine-anim-stage stage-decouple-v2">
+        <!-- Comparison Model 1: Traditional Blocking -->
+        <div class="decouple-model-box model-traditional">
+          <div class="model-banner">
+            <span class="model-badge badge-danger">传统线程模型 (强绑定)</span>
+            <span class="model-desc">1 个任务绑定 1 个物理工人 · 遇 I/O 线程阻塞死等</span>
           </div>
-          <div class="decouple-track-canvas">
-            <div class="thread-lane lane-blocked">
-              <div class="thread-worker-pill worker-danger">OS Thread #1</div>
-              <div class="task-pill task-pill-blocked">
-                <span class="pill-text">Task A (发起网络 I/O)</span>
-                <span class="pill-status status-danger">Thread.sleep / 阻塞死等中...</span>
+          <div class="model-content-row">
+            <!-- Worker Lane -->
+            <div class="trad-lane">
+              <div class="worker-tag tag-danger">
+                <span class="worker-dot"></span>
+                <span>OS Thread #1</span>
               </div>
-              <div class="block-lock-icon">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <span>线程被锁死</span>
+              <div class="trad-task-cell">
+                <div class="trad-task-name">Task A (发起网络 I/O)</div>
+                <div class="trad-lock-pulse">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <span>Thread.sleep 阻塞卡死！</span>
+                </div>
               </div>
             </div>
+            <!-- Outside Queue: Task B is locked out -->
+            <div class="trad-queue-cell">
+              <div class="queue-header">就绪队列 (被堵在门外)</div>
+              <div class="trad-blocked-task">
+                <span class="b-name">Task B</span>
+                <span class="b-status">⛔ 无法执行 (等工人解锁)</span>
+              </div>
+            </div>
+          </div>
+          <div class="model-verdict verdict-danger">
+            代价：物理线程 1MB 内存被锁死，CPU 资源空耗，后续任务陷入饥饿等待！
           </div>
         </div>
 
-        <!-- Track 2: Coroutine Cooperative Yielding -->
-        <div class="decouple-track-row mt-3">
-          <div class="decouple-track-label">
-            <span class="label-badge text-success">协程破局</span>
-            <span class="label-desc">挂起出让控制权 (0 阻塞 · 物理线程无缝接力新任务)</span>
+        <!-- Comparison Model 2: Coroutine Cooperative Yielding -->
+        <div class="decouple-model-box model-coroutine">
+          <div class="model-banner">
+            <span class="model-badge badge-success">协程解耦模型 (协作式让权)</span>
+            <span class="model-desc">任务与物理工人彻底解绑 · 挂起时不占线程，工人满负荷运转</span>
           </div>
-          <div class="decouple-track-canvas">
-            <!-- Worker Thread Lane -->
-            <div class="thread-lane lane-coop">
-              <div class="thread-worker-pill worker-success">Worker Thread #1</div>
-              
-              <!-- Mutually Exclusive Slot for Task B and Task A -->
-              <div class="thread-task-slot">
-                <!-- Dynamic Task B sliding into thread -->
-                <div class="task-pill task-pill-active-b">
-                  <span class="pill-text">Task B (立即接力执行)</span>
-                  <span class="pill-status status-active">100% 线程利用率</span>
-                </div>
 
-                <!-- Re-enter Task A container -->
-                <div class="task-pill task-pill-resume-a">
-                  <span class="pill-text">Task A (I/O 就绪唤醒)</span>
-                  <span class="pill-status status-resume">恢复执行后续计算</span>
+          <div class="coop-stage-canvas">
+            <!-- Top: Suspended Floating Zone -->
+            <div class="coop-pool-zone">
+              <div class="pool-zone-header">
+                <span class="pool-zone-dot"></span>
+                <span>待续挂起池 (不占物理线程，仅为堆上轻量对象句柄)</span>
+              </div>
+              <div class="pool-floating-area">
+                <!-- Task A lifts up here during Phase 2 & 3 -->
+                <div class="coop-task-pill task-a-in-pool">
+                  <div class="pill-title-row">
+                    <span class="task-title">Task A</span>
+                    <span class="pill-state-tag state-suspend">出让执行权 · 等待 I/O</span>
+                  </div>
+                  <div class="pill-detail">物理线程被完全释放</div>
                 </div>
               </div>
             </div>
 
-            <!-- Suspended Floating Pool above/beside -->
-            <div class="suspend-pool-box">
-              <div class="suspend-pool-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M10 15l5-3-5-3v6z"/></svg>
-                <span>待续挂起池 (Suspended Pool)</span>
+            <!-- Middle: Dynamic Migration Trajectory Indicator -->
+            <div class="coop-trajectory-row">
+              <div class="traj-arrow traj-up">
+                <span>① 挂起脱钩出让 (Yield)</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
               </div>
-              <!-- Floating Task A -->
-              <div class="task-pill task-pill-suspended-a">
-                <span class="pill-text">Task A (已脱离物理线程)</span>
-                <span class="pill-status status-waiting">挂起等待底层数据中...</span>
+              <div class="traj-arrow traj-down">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+                <span>③ 数据就绪唤醒 (Resume)</span>
               </div>
             </div>
+
+            <!-- Bottom: Worker Thread Execution Lane -->
+            <div class="coop-worker-lane">
+              <div class="worker-tag tag-success">
+                <span class="worker-dot dot-live"></span>
+                <span>Worker Thread #1 (物理工人)</span>
+              </div>
+
+              <!-- Shared Slot for dynamic tasks inside the worker -->
+              <div class="coop-lane-slot">
+                <!-- Phase 1: Task A runs initially -->
+                <div class="coop-task-pill task-a-running">
+                  <div class="pill-title-row">
+                    <span class="task-title">Task A 正在执行</span>
+                    <span class="pill-state-tag state-run">执行中</span>
+                  </div>
+                  <div class="pill-detail">即将遇到挂起点...</div>
+                </div>
+
+                <!-- Phase 3: Task B seamlessly runs on the thread while Task A is in pool -->
+                <div class="coop-task-pill task-b-running">
+                  <div class="pill-title-row">
+                    <span class="task-title text-success">⚡ Task B 无缝换入！</span>
+                    <span class="pill-state-tag state-full">0 阻塞 · 100% 线程复用</span>
+                  </div>
+                  <div class="pill-detail">处理其他业务计算，工人一秒不停歇</div>
+                </div>
+
+                <!-- Phase 4: Task A resumes back on thread -->
+                <div class="coop-task-pill task-a-resumed">
+                  <div class="pill-title-row">
+                    <span class="task-title text-accent">Task A 接力恢复！</span>
+                    <span class="pill-state-tag state-resume">网络就绪</span>
+                  </div>
+                  <div class="pill-detail">继续执行挂起点之后的剩余代码</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="model-verdict verdict-success">
+            破局：遇等待任务主动腾出工位，物理工人立刻接手新任务，吞吐量提升 100 倍！
           </div>
         </div>
       </div>
 
       <div class="coroutine-anim-footer">
-        <span class="footer-step-chip">1. 遇挂起点主动出让</span>
-        <span class="footer-arrow">➔</span>
-        <span class="footer-step-chip">2. 物理线程拉取 Task B 运行</span>
-        <span class="footer-arrow">➔</span>
-        <span class="footer-step-chip">3. 数据到来唤醒 Task A 恢复</span>
+        <div class="footer-insight">
+          <span class="insight-badge">核心认知</span>
+          <span>协程不是“更轻的物理线程”，而是一套<strong>任务与工人的动态出让协议</strong>。</span>
+        </div>
       </div>
     </div>
   `;

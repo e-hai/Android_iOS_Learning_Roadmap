@@ -5701,230 +5701,510 @@ input:focus-visible,
   font-size: 11px;
 }
 
-/* --- Stage 01: Decouple Task & Worker --- */
-.stage-decouple {
+/* --- Stage 01: Decouple Task & Worker (v2 Crystal-Clear 4-Phase Stepper) --- */
+.anim-title-strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-ink);
+  margin-left: 4px;
+}
+
+.decouple-stepper-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stepper-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
+  padding: 3px 8px;
+  border-radius: 9999px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.step-circle {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  color: var(--color-ink-muted);
+  flex-shrink: 0;
+}
+
+.stepper-arrow {
+  color: var(--color-ink-faint);
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-p1 { animation: stepPulseP1 8s infinite ease-in-out; }
+.step-p2 { animation: stepPulseP2 8s infinite ease-in-out; }
+.step-p3 { animation: stepPulseP3 8s infinite ease-in-out; }
+.step-p4 { animation: stepPulseP4 8s infinite ease-in-out; }
+
+@keyframes stepPulseP1 {
+  0%, 22% { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+  26%, 100% { background: transparent; color: var(--color-ink-muted); }
+}
+
+@keyframes stepPulseP2 {
+  0%, 22% { background: transparent; color: var(--color-ink-muted); }
+  26%, 48% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+  52%, 100% { background: transparent; color: var(--color-ink-muted); }
+}
+
+@keyframes stepPulseP3 {
+  0%, 48% { background: transparent; color: var(--color-ink-muted); }
+  52%, 74% { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+  78%, 100% { background: transparent; color: var(--color-ink-muted); }
+}
+
+@keyframes stepPulseP4 {
+  0%, 74% { background: transparent; color: var(--color-ink-muted); }
+  78%, 98% { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+  99%, 100% { background: transparent; color: var(--color-ink-muted); }
+}
+
+.stage-decouple-v2 {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-.decouple-track-row {
+.decouple-model-box {
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 10px;
 }
 
-.decouple-track-label {
+.model-traditional {
+  border-left: 3.5px solid #ef4444;
+}
+
+.model-coroutine {
+  border-left: 3.5px solid #10b981;
+}
+
+.model-banner {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 8px;
-  font-size: 12px;
 }
 
-.label-badge {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 1px 6px;
+.model-badge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
   border-radius: 4px;
 }
 
-.label-badge.text-danger {
+.badge-danger {
   background: rgba(239, 68, 68, 0.15);
   color: #ef4444;
 }
 
-.label-badge.text-success {
+.badge-success {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
 }
 
-.label-desc {
-  color: var(--color-ink-muted);
+.model-desc {
   font-size: 11.5px;
+  color: var(--color-ink-muted);
 }
 
-.decouple-track-canvas {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
+.model-content-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+  align-items: stretch;
 }
 
-.thread-lane {
-  flex: 1;
-  min-width: 260px;
+@media (max-width: 640px) {
+  .model-content-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trad-lane {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 6px;
-  position: relative;
-  overflow: hidden;
-}
-
-.lane-blocked {
-  background: rgba(239, 68, 68, 0.06);
+  background: rgba(239, 68, 68, 0.05);
   border: 1.5px dashed rgba(239, 68, 68, 0.35);
 }
 
-.lane-coop {
-  background: rgba(16, 185, 129, 0.06);
-  border: 1.5px dashed rgba(16, 185, 129, 0.35);
-}
-
-.thread-worker-pill {
+.worker-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 700;
-  padding: 5px 10px;
-  border-radius: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 
-.worker-danger {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.3);
+.worker-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
-.worker-success {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  border: 1px solid rgba(16, 185, 129, 0.3);
+.worker-dot.dot-live {
+  box-shadow: 0 0 6px #10b981;
 }
 
-.task-pill {
+.trad-task-cell {
   display: flex;
   flex-direction: column;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 11.5px;
-  border: 1px solid transparent;
-  transition: all var(--transition-fast);
+  gap: 2px;
 }
 
-.task-pill-blocked {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.35);
-  animation: animBlockedPulse 2.8s infinite ease-in-out;
+.trad-task-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-ink);
 }
 
-.status-danger {
-  font-size: 10.5px;
-  color: #ef4444;
-  font-weight: 600;
-}
-
-.block-lock-icon {
-  margin-left: auto;
+.trad-lock-pulse {
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
+  color: #ef4444;
+  animation: animLockPulse 2.5s infinite ease-in-out;
+}
+
+.trad-queue-cell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--color-surface-sunken);
+  border: 1px dashed var(--color-border);
+}
+
+.queue-header {
+  font-size: 10.5px;
+  color: var(--color-ink-faint);
+  font-weight: 600;
+}
+
+.trad-blocked-task {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #ef4444;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.08);
+  padding: 5px 8px;
+  border-radius: 4px;
+  animation: animBlockedShake 2.5s infinite ease-in-out;
+}
+
+.b-name {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.b-status {
+  font-size: 10px;
   color: #ef4444;
 }
 
-.suspend-pool-box {
-  background: var(--color-surface-sunken);
-  border: 1px dashed var(--color-border);
-  border-radius: 6px;
-  padding: 8px 12px;
+.model-verdict {
+  font-size: 11px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.verdict-danger {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.verdict-success {
+  background: rgba(16, 185, 129, 0.08);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.coop-stage-canvas {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  min-width: 180px;
 }
 
-.suspend-pool-title {
+.coop-pool-zone {
+  background: rgba(14, 165, 233, 0.05);
+  border: 1.5px dashed rgba(14, 165, 233, 0.35);
+  border-radius: 6px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 5px;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 52px;
+  flex-wrap: wrap;
+}
+
+.pool-zone-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-ink-muted);
 }
 
-.task-pill-suspended-a {
-  background: rgba(14, 165, 233, 0.1);
-  border: 1px dashed #0ea5e9;
-  color: var(--color-ink);
-  animation: animSuspendFloat 6s infinite ease-in-out;
+.pool-zone-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  flex-shrink: 0;
 }
 
-.status-waiting {
-  font-size: 10px;
-  color: #0ea5e9;
-  font-weight: 600;
+.pool-floating-area {
+  min-width: 240px;
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  position: relative;
+  min-height: 38px;
+  align-items: center;
 }
 
-.thread-task-slot {
+.coop-trajectory-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 2px 20px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--color-ink-faint);
+}
+
+.traj-arrow {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.traj-up {
+  animation: animTrajUp 8s infinite ease-in-out;
+}
+
+.traj-down {
+  animation: animTrajDown 8s infinite ease-in-out;
+}
+
+.coop-worker-lane {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1.5px dashed rgba(16, 185, 129, 0.35);
+  position: relative;
+  min-height: 56px;
+}
+
+.coop-lane-slot {
   position: relative;
   flex: 1;
-  min-height: 46px;
+  min-height: 42px;
   display: flex;
   align-items: center;
 }
 
-.thread-task-slot .task-pill {
+.coop-task-pill {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: 11.5px;
+  transition: all 0.3s;
+}
+
+.pill-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.task-title {
+  font-weight: 700;
+  color: var(--color-ink);
+  font-size: 12px;
+}
+
+.pill-state-tag {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.state-run {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+.state-suspend {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+}
+
+.state-full {
+  background: rgba(16, 185, 129, 0.2);
+  color: #047857;
+}
+
+.state-resume {
+  background: rgba(14, 165, 233, 0.2);
+  color: #0369a1;
+}
+
+.pill-detail {
+  font-size: 10.5px;
+  color: var(--color-ink-muted);
+}
+
+.task-a-in-pool {
+  position: absolute;
+  right: 0;
+  animation: animTaskAInPool 8s infinite ease-in-out;
+}
+
+.task-a-running {
   position: absolute;
   left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  white-space: nowrap;
+  width: 100%;
+  animation: animTaskARunning 8s infinite ease-in-out;
 }
 
-.task-pill-active-b {
-  background: rgba(16, 185, 129, 0.15);
-  border: 1px solid #10b981;
-  color: var(--color-ink);
-  animation: animTaskBRun 6s infinite ease-in-out;
+.task-b-running {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  animation: animTaskBRunning 8s infinite ease-in-out;
 }
 
-.status-active {
+.task-a-resumed {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  animation: animTaskAResumed 8s infinite ease-in-out;
+}
+
+.footer-insight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--color-ink-muted);
+}
+
+.insight-badge {
   font-size: 10px;
-  color: #10b981;
-  font-weight: 600;
-}
-
-.task-pill-resume-a {
-  background: rgba(14, 165, 233, 0.18);
-  border: 1px solid #0ea5e9;
+  font-weight: 800;
+  background: var(--color-surface);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
   color: var(--color-ink);
-  animation: animTaskAResume 6s infinite ease-in-out;
+  flex-shrink: 0;
 }
 
-.status-resume {
-  font-size: 10px;
-  color: #0ea5e9;
-  font-weight: 600;
+@keyframes animLockPulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.03); opacity: 1; filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.4)); }
 }
 
-@keyframes animBlockedPulse {
-  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(239, 68, 68, 0)); }
-  50% { transform: scale(1.02); filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.35)); }
+@keyframes animBlockedShake {
+  0%, 100% { transform: translateX(0); }
+  15%, 45% { transform: translateX(-2px); }
+  30%, 60% { transform: translateX(2px); }
 }
 
-@keyframes animSuspendFloat {
-  0%, 15% { opacity: 0.4; transform: translateY(4px); }
-  25%, 65% { opacity: 1; transform: translateY(-3px); }
-  75%, 100% { opacity: 0.3; transform: translateY(4px); }
+@keyframes animTaskAInPool {
+  0%, 22% { opacity: 0; transform: translateY(16px); pointer-events: none; }
+  26%, 74% { opacity: 1; transform: translateY(0); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
+  78%, 100% { opacity: 0; transform: translateY(16px); pointer-events: none; }
 }
 
-@keyframes animTaskBRun {
-  0%, 15% { opacity: 0; transform: translateY(-50%) translateX(25px); pointer-events: none; }
-  22%, 60% { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; }
-  68%, 100% { opacity: 0; transform: translateY(-50%) translateX(-25px); pointer-events: none; }
+@keyframes animTaskARunning {
+  0%, 22% { opacity: 1; transform: translateY(-50%); pointer-events: auto; border-color: #10b981; }
+  26%, 100% { opacity: 0; transform: translateY(-90%); pointer-events: none; }
 }
 
-@keyframes animTaskAResume {
-  0%, 65% { opacity: 0; transform: translateY(-50%) scale(0.85); pointer-events: none; }
-  72%, 92% { opacity: 1; transform: translateY(-50%) scale(1); pointer-events: auto; }
-  98%, 100% { opacity: 0; transform: translateY(-50%) scale(0.95); pointer-events: none; }
+@keyframes animTaskBRunning {
+  0%, 48% { opacity: 0; transform: translateY(-50%) translateX(25px); pointer-events: none; }
+  52%, 74% { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; border-color: #10b981; background: rgba(16, 185, 129, 0.12); box-shadow: 0 0 12px rgba(16, 185, 129, 0.25); }
+  78%, 100% { opacity: 0; transform: translateY(-50%) translateX(-25px); pointer-events: none; }
+}
+
+@keyframes animTaskAResumed {
+  0%, 74% { opacity: 0; transform: translateY(-50%) scale(0.9); pointer-events: none; }
+  78%, 98% { opacity: 1; transform: translateY(-50%) scale(1); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
+  99%, 100% { opacity: 0; transform: translateY(-50%) scale(0.95); pointer-events: none; }
+}
+
+@keyframes animTrajUp {
+  0%, 22% { opacity: 0.25; color: var(--color-ink-faint); }
+  26%, 48% { opacity: 1; color: #0ea5e9; transform: translateY(-2px); }
+  52%, 100% { opacity: 0.25; color: var(--color-ink-faint); }
+}
+
+@keyframes animTrajDown {
+  0%, 74% { opacity: 0.25; color: var(--color-ink-faint); }
+  78%, 98% { opacity: 1; color: #10b981; transform: translateY(2px); }
+  99%, 100% { opacity: 0.25; color: var(--color-ink-faint); }
 }
 
 /* --- Stage 02: CPS Continuation Baton --- */
