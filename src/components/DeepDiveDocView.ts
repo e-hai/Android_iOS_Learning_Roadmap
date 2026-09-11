@@ -822,10 +822,10 @@ function renderTimelineExplanation(
           coopStack.setAttribute('data-active-step', step);
         }
 
-        // If in trad panel, update data-active-step on trad-stage-canvas
-        const tradCanvas = panel.querySelector<HTMLElement>('.trad-stage-canvas');
-        if (tradCanvas) {
-          tradCanvas.setAttribute('data-active-step', step);
+        // If in trad panel, update data-active-step on trad-vertical-stack or trad-stage-canvas
+        const tradStack = panel.querySelector<HTMLElement>('.trad-vertical-stack') || panel.querySelector<HTMLElement>('.trad-stage-canvas');
+        if (tradStack) {
+          tradStack.setAttribute('data-active-step', step);
         }
       });
     });

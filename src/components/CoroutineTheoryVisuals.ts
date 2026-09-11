@@ -265,77 +265,125 @@ function renderTaskDecoupleAnimation(): string {
           </div>
         </div>
 
-        <!-- Traditional Single-Stage Canvas (Interactive Step Controlled) -->
-        <div class="trad-stage-canvas single-stage" data-active-step="1">
-          <div class="model-content-row">
-            <!-- Worker Lane -->
-            <div class="trad-lane">
-              <div class="worker-tag tag-danger">
-                <span class="worker-dot"></span>
-                <span>OS Thread #1</span>
+        <!-- Traditional Vertical Stack (Interactive Step Controlled) -->
+        <div class="trad-vertical-stack" data-active-step="1">
+          <!-- Top Container: Physical OS Thread (Danger Border) -->
+          <div class="arch-region region-thread region-thread-trad">
+            <div class="region-header">
+              <div class="region-title-wrap">
+                <span class="region-dot dot-danger"></span>
+                <span class="region-title">物理线程区</span>
+                <span class="region-mono">OS Thread #1 (内核调度)</span>
               </div>
-              <div class="trad-lane-slot">
-                <!-- P1: Worker Idle -->
-                <div class="trad-task-pill trad-p1-idle">
-                  <span class="t-title">OS Thread #1 就绪</span>
-                  <span class="t-state">物理工人待命中...</span>
+              <span class="region-tag tag-danger-pill">1MB 栈内存强绑定</span>
+            </div>
+
+            <div class="thread-slot-container slot-thread slot-thread-trad">
+              <div class="slot-bg-hint trad-idle-hint">物理工人待命中...</div>
+
+              <!-- Step 2: Task A Computing -->
+              <div class="task-entity task-a trad-task-a-calc">
+                <div class="task-badge badge-task-a">Task A</div>
+                <span class="task-action">计算中...</span>
+              </div>
+
+              <!-- Step 3 & 4: Task A Deadlocked / Blocked -->
+              <div class="task-entity task-a trad-task-a-blocked">
+                <div class="task-badge badge-task-a">Task A</div>
+                <span class="task-action text-danger">死锁阻塞 (Thread.sleep)</span>
+              </div>
+
+              <!-- Step 5: Task A Late Resume -->
+              <div class="task-entity task-a trad-task-a-late">
+                <div class="task-badge badge-task-a">Task A</div>
+                <span class="task-action">迟钝唤醒 · 释放工人</span>
+              </div>
+
+              <!-- Step 6: Task B Finally Runs Late -->
+              <div class="task-entity task-b trad-task-b-late">
+                <div class="task-badge badge-task-b">Task B</div>
+                <span class="task-action text-danger">滞后上工 · 总体耗时翻倍</span>
+              </div>
+            </div>
+
+            <div class="region-footer-hint">
+              <span class="footer-dot dot-danger"></span>
+              <span>遇 I/O 阻塞调用 Thread.sleep · 物理线程与 1MB 栈内存全量锁死死等</span>
+            </div>
+          </div>
+
+          <!-- Bottom Container: Heap Memory / Scheduling Queue -->
+          <div class="arch-region region-heap region-heap-trad">
+            <div class="region-header">
+              <div class="region-title-wrap">
+                <span class="region-dot dot-heap"></span>
+                <span class="region-title">就绪与完成区</span>
+                <span class="region-mono">OS Scheduling & Memory</span>
+              </div>
+              <span class="region-tag tag-heap">排队受阻无法出让</span>
+            </div>
+
+            <div class="heap-sub-grid trad-heap-grid">
+              <!-- Sub-Container 1: Ready Queue -->
+              <div class="heap-sub-cell cell-queue">
+                <div class="sub-cell-header">
+                  <span class="sub-cell-dot dot-queue"></span>
+                  <span class="sub-cell-title">任务就绪队列 (Ready Queue)</span>
                 </div>
-                <!-- P2: Task A running normally -->
-                <div class="trad-task-pill trad-p2-run">
-                  <span class="t-title">Task A</span>
-                  <span class="t-state">计算中...</span>
-                </div>
-                <!-- P3 & P4: Task A blocked -->
-                <div class="trad-task-pill trad-p3-blocked">
-                  <div class="t-row">
-                    <span class="t-title text-danger">Task A</span>
-                    <span class="badge-lock">死锁阻塞 (Thread.sleep)</span>
+                <div class="sub-cell-slot slot-queue">
+                  <div class="slot-bg-hint trad-queue-empty-hint">队列已清空</div>
+
+                  <!-- Step 1: Both in queue -->
+                  <div class="task-entity task-a trad-queue-a">
+                    <div class="task-badge badge-task-a">Task A</div>
+                    <span class="task-action">就绪待命</span>
                   </div>
-                  <span class="t-state text-danger">物理工人停工，1MB 栈内存死锁</span>
+                  <div class="task-entity task-b trad-queue-b-normal">
+                    <div class="task-badge badge-task-b">Task B</div>
+                    <span class="task-action">排队待命中</span>
+                  </div>
+
+                  <!-- Step 3 & 4: Task B Blocked / Starved -->
+                  <div class="task-entity task-b trad-queue-b-starved">
+                    <div class="task-badge badge-task-b">Task B</div>
+                    <span class="task-action text-danger">排队受阻 · 工人被占</span>
+                  </div>
+
+                  <!-- Step 5: Task B Late Entering -->
+                  <div class="task-entity task-b trad-queue-b-delay">
+                    <div class="task-badge badge-task-b">Task B</div>
+                    <span class="task-action text-amber">严重延误 · 刚轮到</span>
+                  </div>
                 </div>
-                <!-- P5: Task A unblocks late -->
-                <div class="trad-task-pill trad-p5-finish">
-                  <span class="t-title text-amber">Task A</span>
-                  <span class="t-state text-amber">迟钝唤醒 · 释放工人</span>
+              </div>
+
+              <!-- Sub-Container 2: Completed Area -->
+              <div class="heap-sub-cell cell-done">
+                <div class="sub-cell-header">
+                  <span class="sub-cell-dot dot-done"></span>
+                  <span class="sub-cell-title">已完成区 (Completed)</span>
                 </div>
-                <!-- P6: Task B finally running late -->
-                <div class="trad-task-pill trad-p6-late-b">
-                  <span class="t-title text-amber">Task B (滞后上工)</span>
-                  <span class="t-state text-danger">耗时翻倍！迟来的串行计算</span>
+                <div class="sub-cell-slot slot-done">
+                  <div class="slot-bg-hint trad-done-empty-hint">暂无完成任务</div>
+
+                  <!-- Step 5: Task A Completed Late -->
+                  <div class="task-entity task-a trad-done-a">
+                    <div class="task-badge badge-task-a">Task A</div>
+                    <span class="task-action">延误完成</span>
+                  </div>
+
+                  <!-- Step 6: Task B Finally Completed -->
+                  <div class="task-entity task-b trad-done-b">
+                    <div class="task-badge badge-task-b">Task B</div>
+                    <span class="task-action">滞后完成</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Outside Waiting Queue -->
-            <div class="trad-queue-cell">
-              <div class="queue-header">就绪队列</div>
-              <div class="trad-queue-slot">
-                <!-- P1: Arrival -->
-                <div class="queue-task-pill q-arrival">
-                  <span class="b-name">Task A + Task B</span>
-                  <span class="b-state">双任务到达</span>
-                </div>
-                <!-- P2 & P3: Task B standby -->
-                <div class="queue-task-pill q-standby">
-                  <span class="b-name">Task B</span>
-                  <span class="b-state">排队待命中</span>
-                </div>
-                <!-- P4: Task B locked out -->
-                <div class="queue-task-pill q-blocked">
-                  <span class="b-name text-danger">Task B</span>
-                  <span class="b-state text-danger">排队受阻，工人被占</span>
-                </div>
-                <!-- P5: Task B finally entering late -->
-                <div class="queue-task-pill q-late">
-                  <span class="b-name text-amber">Task B</span>
-                  <span class="b-state text-amber">严重延误，刚轮到它</span>
-                </div>
-                <!-- P6: Done -->
-                <div class="queue-task-pill q-done">
-                  <span class="b-name">队列已清空</span>
-                  <span class="b-state">串行执行中</span>
-                </div>
-              </div>
+            <div class="region-footer-hint">
+              <span class="footer-dot dot-danger"></span>
+              <span>无挂起协作机制 · Task A 阻塞期间 Task B 只能死等饥饿 · 串行执行耗时翻倍</span>
             </div>
           </div>
         </div>
