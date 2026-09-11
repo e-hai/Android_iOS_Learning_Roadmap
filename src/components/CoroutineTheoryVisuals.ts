@@ -31,16 +31,14 @@ export function renderCoroutineStageAnimation(stageIndex: number): string {
 function renderTaskDecoupleAnimation(): string {
   return `
     <div class="coroutine-anim-card decouple-card" data-active-mode="coop">
-      <!-- Top Segmented Switcher Controls -->
+      <!-- Top Segmented Switcher Controls (Zero icons) -->
       <div class="decouple-switch-toolbar">
         <div class="decouple-segmented-control" role="tablist">
           <button type="button" class="decouple-tab-btn active" data-target="coop" role="tab" aria-selected="true">
-            <span class="tab-icon">⚡</span>
             <span class="tab-label">协程协作解耦</span>
             <span class="tab-badge badge-coop">推荐 · 零阻塞</span>
           </button>
           <button type="button" class="decouple-tab-btn" data-target="trad" role="tab" aria-selected="false">
-            <span class="tab-icon">🛑</span>
             <span class="tab-label">传统线程阻塞</span>
             <span class="tab-badge badge-trad">对照组 · 死锁缺陷</span>
           </button>
@@ -58,7 +56,7 @@ function renderTaskDecoupleAnimation(): string {
             </div>
             <span class="step-sub">Task A 占用线程执行</span>
           </div>
-          <div class="stepper-arrow">➔</div>
+          <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p2">
             <div class="step-head">
               <span class="step-circle">2</span>
@@ -66,7 +64,7 @@ function renderTaskDecoupleAnimation(): string {
             </div>
             <span class="step-sub">脱钩让权，腾出工位</span>
           </div>
-          <div class="stepper-arrow">➔</div>
+          <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p3">
             <div class="step-head">
               <span class="step-circle">3</span>
@@ -74,7 +72,7 @@ function renderTaskDecoupleAnimation(): string {
             </div>
             <span class="step-sub">工人无缝接手，100% 运转</span>
           </div>
-          <div class="stepper-arrow">➔</div>
+          <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle">4</span>
@@ -84,76 +82,60 @@ function renderTaskDecoupleAnimation(): string {
           </div>
         </div>
 
-        <!-- Coroutine Single-Stage Canvas -->
+        <!-- Continuous Spatial Two-Tier Coroutine Stage -->
         <div class="coop-stage-canvas single-stage">
-          <!-- Top: Suspended Floating Pool -->
-          <div class="coop-pool-zone">
-            <div class="pool-zone-header">
-              <span class="pool-zone-dot"></span>
-              <span>待续挂起池 (仅占堆内存轻量对象，0 物理线程消耗)</span>
-            </div>
-            <div class="pool-floating-area">
-              <div class="coop-pool-pill coop-pool-task-a">
-                <div class="pool-pill-row">
-                  <span class="task-title text-blue">Task A (挂起脱钩)</span>
-                  <span class="pool-tag">等待底层数据通知</span>
-                </div>
-                <span class="pool-desc">已主动让出物理工人，不占任何 CPU 资源</span>
+          <!-- Tier 1: Suspended Waiting Area (Pool) -->
+          <div class="coop-tier tier-pool">
+            <div class="tier-header">
+              <div class="tier-label">
+                <span class="tier-dot dot-pool"></span>
+                <span>挂起等待区 (堆内存 · 0 物理线程消耗)</span>
               </div>
+              <span class="tier-hint">任务遇 I/O 主动让位，在此挂起等待</span>
+            </div>
+            <div class="tier-slot slot-pool">
+              <span class="slot-idle-text">Task A 挂起就绪位</span>
             </div>
           </div>
 
-          <!-- Trajectory Arrows -->
-          <div class="coop-trajectory-row">
-            <div class="traj-arrow traj-up">
-              <span>挂起脱钩出让 (Yield)</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-            </div>
-            <div class="traj-arrow traj-down">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
-              <span>数据就绪唤醒 (Resume)</span>
-            </div>
+          <!-- Subtle Connector Track -->
+          <div class="coop-transfer-connector">
+            <span class="transfer-guide guide-up">让出执行权 ↑</span>
+            <span class="transfer-guide guide-down">↓ 唤醒回落</span>
           </div>
 
-          <!-- Worker Thread Execution Lane -->
-          <div class="coop-worker-lane">
-            <div class="worker-tag tag-success">
-              <span class="worker-dot dot-live"></span>
-              <span>Worker Thread #1 (物理工人)</span>
+          <!-- Tier 2: Physical Worker Thread -->
+          <div class="coop-tier tier-thread">
+            <div class="tier-header">
+              <div class="tier-label">
+                <span class="tier-dot dot-thread"></span>
+                <span>Worker Thread #1 (物理工人)</span>
+              </div>
+              <span class="tier-status">CPU 执行工位</span>
             </div>
-            <div class="coop-lane-slot">
-              <!-- P1: Task A running -->
-              <div class="coop-task-pill coop-p1-task-a">
-                <div class="pill-title-row">
-                  <span class="task-title">Task A 正在执行</span>
-                  <span class="pill-state-tag state-run">执行中</span>
-                </div>
-                <div class="pill-detail">执行到挂起点准备出让...</div>
+            <div class="tier-slot slot-thread">
+              <!-- Background cue when thread is free -->
+              <div class="thread-idle-cue">工位已释放 · 物理工人空闲中</div>
+
+              <!-- Physical Task A: Ascends to pool on I/O, descends back on resume -->
+              <div class="flight-task-a">
+                <span class="pill-name">Task A (网络请求)</span>
+                <span class="pill-state state-a-run">正在执行</span>
+                <span class="pill-state state-a-pool">挂起等待 I/O (让出工位)</span>
+                <span class="pill-state state-a-done">数据就绪 · 恢复收尾</span>
               </div>
 
-              <!-- P3: Task B seamlessly takes over -->
-              <div class="coop-task-pill coop-p3-task-b">
-                <div class="pill-title-row">
-                  <span class="task-title text-success">⚡ Task B 无缝接力执行！</span>
-                  <span class="pill-state-tag state-full">100% 满负荷</span>
-                </div>
-                <div class="pill-detail">工人零卡顿，无缝处理新任务（零阻塞）</div>
-              </div>
-
-              <!-- P4: Task A resumes -->
-              <div class="coop-task-pill coop-p4-task-a">
-                <div class="pill-title-row">
-                  <span class="task-title text-accent">Task A 接力恢复！</span>
-                  <span class="pill-state-tag state-resume">双任务完成</span>
-                </div>
-                <div class="pill-detail">Task B 已提前完成，Task A 回落线程继续后续逻辑</div>
+              <!-- Physical Task B: Slides in when slot is empty, completes and exits -->
+              <div class="takeover-task-b">
+                <span class="pill-name">Task B (界面渲染)</span>
+                <span class="pill-state state-b-run">接力执行中 (100% 线程复用)</span>
               </div>
             </div>
           </div>
         </div>
 
         <div class="model-verdict verdict-success">
-          <strong>协程破局</strong>：任务遇到 I/O 主动让出工人，工人立即接力处理 Task B，两项任务重叠高效完成，吞吐量翻倍！
+          <strong>协程破局</strong>：任务遇到 I/O 主动脱钩让出工人，工人立即接力处理 Task B，两项任务重叠高效完成，吞吐量翻倍！
         </div>
       </div>
 
@@ -168,7 +150,7 @@ function renderTaskDecoupleAnimation(): string {
             </div>
             <span class="step-sub">Task A 占用线程执行</span>
           </div>
-          <div class="stepper-arrow">➔</div>
+          <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p2">
             <div class="step-head">
               <span class="step-circle circle-danger">2</span>
@@ -176,7 +158,7 @@ function renderTaskDecoupleAnimation(): string {
             </div>
             <span class="step-sub">Thread.sleep 死锁阻塞</span>
           </div>
-          <div class="stepper-arrow">➔</div>
+          <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p3">
             <div class="step-head">
               <span class="step-circle circle-danger">3</span>
@@ -184,7 +166,7 @@ function renderTaskDecoupleAnimation(): string {
             </div>
             <span class="step-sub">进不去！排队严重饥饿</span>
           </div>
-          <div class="stepper-arrow">➔</div>
+          <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle circle-danger">4</span>
@@ -213,7 +195,7 @@ function renderTaskDecoupleAnimation(): string {
                 <div class="trad-task-pill trad-p2-blocked">
                   <div class="t-row">
                     <span class="t-title text-danger">Task A 发起网络 I/O</span>
-                    <span class="badge-lock">⛔ Thread.sleep 锁死！</span>
+                    <span class="badge-lock">Thread.sleep 死锁阻塞</span>
                   </div>
                   <span class="t-state text-danger">物理工人被迫停工，1MB 内存被死锁，CPU 空耗</span>
                 </div>
@@ -237,12 +219,12 @@ function renderTaskDecoupleAnimation(): string {
                 <!-- P3: Task B locked out -->
                 <div class="queue-task-pill q-blocked">
                   <span class="b-name text-danger">Task B</span>
-                  <span class="b-state text-danger">🛑 进不去！工人被占用</span>
+                  <span class="b-state text-danger">排队进不去，工人被占用</span>
                 </div>
                 <!-- P4: Task B finally entering late -->
                 <div class="queue-task-pill q-late">
                   <span class="b-name text-amber">Task B</span>
-                  <span class="b-state text-amber">⚠️ 延误已久，刚轮到它</span>
+                  <span class="b-state text-amber">排队延误，刚轮到它</span>
                 </div>
               </div>
             </div>

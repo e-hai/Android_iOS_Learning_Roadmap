@@ -6145,284 +6145,277 @@ input:focus-visible,
 .coop-stage-canvas {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.coop-tier {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
 }
 
-.coop-pool-zone {
-  background: rgba(14, 165, 233, 0.05);
-  border: 1.5px dashed rgba(14, 165, 233, 0.35);
-  border-radius: 6px;
-  padding: 8px 12px;
+.tier-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  min-height: 52px;
-  flex-wrap: wrap;
+  font-size: 11px;
+  font-weight: 600;
 }
 
-.pool-zone-header {
+.tier-label {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  font-weight: 600;
   color: var(--color-ink-muted);
 }
 
-.pool-zone-dot {
+.tier-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #0ea5e9;
   flex-shrink: 0;
 }
 
-.pool-floating-area {
-  min-width: 240px;
-  flex: 1;
-  display: flex;
-  justify-content: flex-end;
-  position: relative;
-  min-height: 38px;
-  align-items: center;
+.dot-pool { background: #0ea5e9; }
+.dot-thread { background: #10b981; box-shadow: 0 0 5px #10b981; }
+
+.tier-hint {
+  font-size: 10px;
+  color: var(--color-ink-faint);
+  font-weight: 500;
 }
 
-.coop-pool-pill {
-  position: absolute;
-  right: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 5px 10px;
-  border-radius: 6px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  font-size: 11px;
-  width: 100%;
-  max-width: 280px;
-  transition: all 0.3s;
-}
-
-.pool-pill-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-
-.pool-tag {
-  font-size: 9.5px;
+.tier-status {
+  font-size: 10px;
   font-weight: 700;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.1);
   padding: 1px 6px;
   border-radius: 3px;
-  background: rgba(14, 165, 233, 0.15);
-  color: #0ea5e9;
 }
 
-.pool-desc {
-  font-size: 9.5px;
-  color: var(--color-ink-muted);
+.tier-slot {
+  position: relative;
+  height: 44px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  overflow: visible;
 }
 
-.coop-pool-task-a { animation: animTaskAInPool 8s infinite ease-in-out; }
+.slot-pool {
+  background: rgba(14, 165, 233, 0.04);
+  border: 1.5px dashed rgba(14, 165, 233, 0.35);
+  justify-content: center;
+}
 
-.coop-trajectory-row {
+.slot-idle-text {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+  user-select: none;
+}
+
+.slot-thread {
+  background: rgba(16, 185, 129, 0.04);
+  border: 1.5px dashed rgba(16, 185, 129, 0.35);
+}
+
+.thread-idle-cue {
+  position: absolute;
+  left: 12px;
+  font-size: 11px;
+  color: var(--color-ink-faint);
+  user-select: none;
+}
+
+/* Vertical Transfer Connector */
+.coop-transfer-connector {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 2px 20px;
   font-size: 10.5px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-ink-faint);
+  padding: 2px 0;
+  user-select: none;
 }
 
-.traj-arrow {
-  display: flex;
+.transfer-guide {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-.traj-up { animation: animTrajUp 8s infinite ease-in-out; }
-.traj-down { animation: animTrajDown 8s infinite ease-in-out; }
+.guide-up { animation: animGuideUp 8s infinite ease-in-out; }
+.guide-down { animation: animGuideDown 8s infinite ease-in-out; }
 
-.coop-worker-lane {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  background: rgba(16, 185, 129, 0.06);
-  border: 1.5px dashed rgba(16, 185, 129, 0.35);
-  position: relative;
-  min-height: 56px;
-}
-
-.coop-lane-slot {
-  position: relative;
-  flex: 1;
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-}
-
-.coop-task-pill {
+/* Dynamic Physical Task Pills */
+.flight-task-a {
   position: absolute;
-  left: 0;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  font-size: 11.5px;
-  transition: all 0.3s;
-}
-
-.pill-title-row {
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  height: 36px;
   display: flex;
   align-items: center;
-  gap: 8px;
   justify-content: space-between;
+  padding: 0 12px;
+  border-radius: 5px;
+  background: var(--color-surface);
+  border: 1px solid #10b981;
+  box-shadow: var(--shadow-xs);
+  z-index: 2;
+  animation: animFlightTaskA 8s infinite ease-in-out;
 }
 
-.task-title {
+.takeover-task-b {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  border-radius: 5px;
+  background: var(--color-surface);
+  border: 1px solid #10b981;
+  box-shadow: var(--shadow-xs);
+  z-index: 1;
+  animation: animTakeoverTaskB 8s infinite ease-in-out;
+}
+
+.pill-name {
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-ink);
-  font-size: 12px;
 }
 
-.pill-state-tag {
-  font-size: 9.5px;
+.pill-state {
+  position: absolute;
+  right: 12px;
+  font-size: 11px;
   font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 3px;
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
-.state-run {
+.state-a-run {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  animation: animTagARun 8s infinite ease-in-out;
+}
+
+.state-a-pool {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0ea5e9;
+  animation: animTagAPool 8s infinite ease-in-out;
+}
+
+.state-a-done {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  animation: animTagADone 8s infinite ease-in-out;
+}
+
+.state-b-run {
   background: rgba(16, 185, 129, 0.15);
   color: #10b981;
 }
 
-.state-full {
-  background: rgba(16, 185, 129, 0.2);
-  color: #047857;
+/* Keyframe Animations for Physical Flight */
+@keyframes animFlightTaskA {
+  0%, 20% {
+    transform: translateY(0);
+    border-color: #10b981;
+    background: var(--color-surface);
+  }
+  26% {
+    transform: translateY(-90px);
+    border-color: #0ea5e9;
+    background: rgba(14, 165, 233, 0.08);
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);
+  }
+  70% {
+    transform: translateY(-90px);
+    border-color: #0ea5e9;
+    background: rgba(14, 165, 233, 0.08);
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.2);
+  }
+  76% {
+    transform: translateY(0);
+    border-color: #10b981;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-xs);
+  }
+  98% {
+    transform: translateY(0);
+    border-color: #10b981;
+    background: var(--color-surface);
+  }
+  100% {
+    transform: translateY(0);
+    border-color: #10b981;
+  }
 }
 
-.state-resume {
-  background: rgba(14, 165, 233, 0.2);
-  color: #0369a1;
+@keyframes animTagARun {
+  0%, 22% { opacity: 1; }
+  24%, 100% { opacity: 0; }
 }
 
-.pill-detail {
-  font-size: 10.5px;
-  color: var(--color-ink-muted);
+@keyframes animTagAPool {
+  0%, 24% { opacity: 0; }
+  26%, 72% { opacity: 1; }
+  74%, 100% { opacity: 0; }
 }
 
-.coop-p1-task-a { animation: animTaskARunning 8s infinite ease-in-out; }
-.coop-p3-task-b { animation: animTaskBRunning 8s infinite ease-in-out; }
-.coop-p4-task-a { animation: animTaskAResumed 8s infinite ease-in-out; }
-
-.footer-insight {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
-  color: var(--color-ink-muted);
+@keyframes animTagADone {
+  0%, 74% { opacity: 0; }
+  76%, 98% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
-.insight-badge {
-  font-size: 10px;
-  font-weight: 800;
-  background: var(--color-surface);
-  padding: 2px 7px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border);
-  color: var(--color-ink);
-  flex-shrink: 0;
+@keyframes animTakeoverTaskB {
+  0%, 24% {
+    opacity: 0;
+    transform: translateX(60px);
+    pointer-events: none;
+  }
+  28% {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+  68% {
+    opacity: 1;
+    transform: translateX(0);
+    pointer-events: auto;
+  }
+  73% {
+    opacity: 0;
+    transform: translateX(-60px);
+    pointer-events: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(60px);
+    pointer-events: none;
+  }
 }
 
-/* --- Keyframe Animations for Dual Tracks --- */
-@keyframes animLockPulse {
-  0%, 100% { transform: scale(1); opacity: 0.85; }
-  50% { transform: scale(1.03); opacity: 1; filter: drop-shadow(0 0 5px rgba(239, 68, 68, 0.4)); }
-}
-
-@keyframes animTradP1 {
-  0%, 23% { opacity: 1; transform: translateY(0); pointer-events: auto; }
-  25%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-}
-
-@keyframes animTradP2 {
-  0%, 23% { opacity: 0; transform: translateY(8px); pointer-events: none; }
-  25%, 73% { opacity: 1; transform: translateY(0); pointer-events: auto; }
-  75%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-}
-
-@keyframes animTradP4 {
-  0%, 73% { opacity: 0; transform: translateY(8px); pointer-events: none; }
-  75%, 98% { opacity: 1; transform: translateY(0); pointer-events: auto; }
-  99%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-}
-
-@keyframes animQStandby {
-  0%, 48% { opacity: 1; transform: translateY(0); pointer-events: auto; }
-  50%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-}
-
-@keyframes animQBlocked {
-  0%, 48% { opacity: 0; transform: translateY(8px); pointer-events: none; }
-  50%, 73% { opacity: 1; transform: translateY(0); pointer-events: auto; animation-name: animBlockedShake; }
-  75%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-}
-
-@keyframes animQLate {
-  0%, 73% { opacity: 0; transform: translateY(8px); pointer-events: none; }
-  75%, 98% { opacity: 1; transform: translateY(0); pointer-events: auto; }
-  99%, 100% { opacity: 0; transform: translateY(-8px); pointer-events: none; }
-}
-
-@keyframes animBlockedShake {
-  0%, 100% { transform: translateX(0); }
-  15%, 45% { transform: translateX(-2px); }
-  30%, 60% { transform: translateX(2px); }
-}
-
-@keyframes animTaskARunning {
-  0%, 23% { opacity: 1; transform: translateY(-50%); pointer-events: auto; border-color: #10b981; }
-  25%, 100% { opacity: 0; transform: translateY(-90%); pointer-events: none; }
-}
-
-@keyframes animTaskAInPool {
-  0%, 23% { opacity: 0; transform: translateY(16px); pointer-events: none; }
-  25%, 73% { opacity: 1; transform: translateY(0); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
-  75%, 100% { opacity: 0; transform: translateY(16px); pointer-events: none; }
-}
-
-@keyframes animTaskBRunning {
-  0%, 48% { opacity: 0; transform: translateY(-50%) translateX(25px); pointer-events: none; }
-  50%, 73% { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; border-color: #10b981; background: rgba(16, 185, 129, 0.12); box-shadow: 0 0 12px rgba(16, 185, 129, 0.25); }
-  75%, 100% { opacity: 0; transform: translateY(-50%) translateX(-25px); pointer-events: none; }
-}
-
-@keyframes animTaskAResumed {
-  0%, 73% { opacity: 0; transform: translateY(-50%) scale(0.9); pointer-events: none; }
-  75%, 98% { opacity: 1; transform: translateY(-50%) scale(1); pointer-events: auto; border-color: #0ea5e9; background: rgba(14, 165, 233, 0.12); box-shadow: 0 0 10px rgba(14, 165, 233, 0.25); }
-  99%, 100% { opacity: 0; transform: translateY(-50%) scale(0.95); pointer-events: none; }
-}
-
-@keyframes animTrajUp {
-  0%, 23% { opacity: 0.25; color: var(--color-ink-faint); }
-  25%, 48% { opacity: 1; color: #0ea5e9; transform: translateY(-2px); }
+@keyframes animGuideUp {
+  0%, 20% { opacity: 0.25; color: var(--color-ink-faint); }
+  24%, 48% { opacity: 1; color: #0ea5e9; }
   50%, 100% { opacity: 0.25; color: var(--color-ink-faint); }
 }
 
-@keyframes animTrajDown {
-  0%, 73% { opacity: 0.25; color: var(--color-ink-faint); }
-  75%, 98% { opacity: 1; color: #10b981; transform: translateY(2px); }
-  99%, 100% { opacity: 0.25; color: var(--color-ink-faint); }
+@keyframes animGuideDown {
+  0%, 72% { opacity: 0.25; color: var(--color-ink-faint); }
+  75%, 98% { opacity: 1; color: #10b981; }
+  100% { opacity: 0.25; color: var(--color-ink-faint); }
 }
 
 /* --- Stage 02: CPS Continuation Baton --- */
