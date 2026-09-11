@@ -112,59 +112,87 @@ function renderTaskDecoupleAnimation(): string {
             </div>
           </div>
 
-          <!-- Left / Right Grid -->
-          <div class="coop-lr-grid">
-            <!-- Left Region: Physical Worker Thread -->
-            <div class="coop-col col-thread">
-              <div class="col-header">
-                <div class="col-label">
-                  <span class="col-dot dot-thread"></span>
-                  <span class="col-title">Worker Thread #1</span>
+          <!-- Spatial Grid: Thread Region (Left) vs Heap Memory Region (Right: Queue + Pool) -->
+          <div class="coop-arch-grid">
+            <!-- Left Big Container: Physical Thread Region -->
+            <div class="arch-region region-thread">
+              <div class="region-header">
+                <div class="region-title-wrap">
+                  <span class="region-dot dot-thread"></span>
+                  <span class="region-title">物理线程区</span>
+                  <span class="region-mono">OS Worker Thread</span>
                 </div>
-                <span class="col-status status-thread">CPU 工位</span>
+                <span class="region-tag tag-thread">CPU 物理工位</span>
               </div>
-              <div class="col-slot slot-thread">
-                <!-- Background cue when thread is free -->
-                <div class="thread-idle-cue">工人空闲中</div>
 
-                <!-- Physical Task A: Originates in worker thread, glides to right pool on I/O, glides back on resume -->
-                <div class="flight-task-a">
-                  <span class="pill-name">Task A</span>
-                  <span class="pill-state state-a-run">计算中</span>
-                  <span class="pill-state state-a-pool">挂起中</span>
-                  <span class="pill-state state-a-done">已完成</span>
-                </div>
+              <div class="thread-slot-container">
+                <div class="slot-bg-hint">工人待命中 (等待分派)</div>
 
-                <!-- Physical Task B: Takes over empty worker slot during Phase 4, finishes and exits -->
-                <div class="takeover-task-b">
-                  <span class="pill-name">Task B</span>
-                  <span class="pill-state state-b-run">接力执行</span>
-                </div>
+                <!-- Active Task Slot (Occupied dynamically by Task A or Task B) -->
+                <!-- Task A and Task B maintain constant identity and physical position during flight -->
               </div>
-              <div class="col-subbar subbar-queue">
-                <span class="subbar-dot dot-standby"></span>
-                <span class="subbar-text text-q-arrival">就绪队列: Task A + Task B 到达</span>
-                <span class="subbar-text text-q-standby">就绪队列: Task B (待命候场)</span>
-                <span class="subbar-text text-q-active">就绪队列: 空 (已进入工位)</span>
+
+              <div class="region-footer-hint">
+                <span class="footer-dot dot-thread-active"></span>
+                <span>单工位排他执行 · 同一瞬间仅承载 1 个活跃任务栈</span>
               </div>
             </div>
 
-            <!-- Right Region: Suspended Waiting Area (Pool) -->
-            <div class="coop-col col-pool">
-              <div class="col-header">
-                <div class="col-label">
-                  <span class="col-dot dot-pool"></span>
-                  <span class="col-title">挂起等待区</span>
+            <!-- Right Big Container: Heap Memory Region -->
+            <div class="arch-region region-heap">
+              <div class="region-header">
+                <div class="region-title-wrap">
+                  <span class="region-dot dot-heap"></span>
+                  <span class="region-title">堆内存区</span>
+                  <span class="region-mono">Heap Memory Pool</span>
                 </div>
-                <span class="col-status status-pool">堆内存 (0 线程)</span>
+                <span class="region-tag tag-heap">托管对象空间 (0 物理线程)</span>
               </div>
-              <div class="col-slot slot-pool">
-                <span class="slot-idle-text">挂起池空闲</span>
+
+              <!-- Inside Heap: 2 Dedicated Sub-Containers (Queue + Suspended Pool) -->
+              <div class="heap-sub-grid">
+                <!-- Sub-Container 1: Ready Queue -->
+                <div class="heap-sub-cell cell-queue">
+                  <div class="sub-cell-header">
+                    <span class="sub-cell-dot dot-queue"></span>
+                    <span class="sub-cell-title">任务就绪队列 (Ready Queue)</span>
+                  </div>
+                  <div class="sub-cell-slot slot-queue">
+                    <!-- Task A and Task B initial standby home -->
+                    <div class="task-entity task-a" id="coopTaskA">
+                      <div class="task-badge badge-task-a">Task A</div>
+                      <span class="task-action action-a-init">就绪</span>
+                      <span class="task-action action-a-calc">计算中</span>
+                      <span class="task-action action-a-suspend">挂起中</span>
+                      <span class="task-action action-a-resume">唤醒收尾</span>
+                      <span class="task-action action-a-done">已完成</span>
+                    </div>
+
+                    <div class="task-entity task-b" id="coopTaskB">
+                      <div class="task-badge badge-task-b">Task B</div>
+                      <span class="task-action action-b-init">就绪排队</span>
+                      <span class="task-action action-b-calc">接力计算</span>
+                      <span class="task-action action-b-done">已完成</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Sub-Container 2: Suspended Pool -->
+                <div class="heap-sub-cell cell-pool">
+                  <div class="sub-cell-header">
+                    <span class="sub-cell-dot dot-pool"></span>
+                    <span class="sub-cell-title">挂起池 (Suspended Pool)</span>
+                  </div>
+                  <div class="sub-cell-slot slot-pool">
+                    <span class="slot-idle-hint">挂起池空闲</span>
+                    <!-- Task A parks here during Phase 3 & 4 -->
+                  </div>
+                </div>
               </div>
-              <div class="col-subbar subbar-pool">
-                <span class="subbar-dot dot-pool-status"></span>
-                <span class="subbar-text text-pool-idle">暂存: 空</span>
-                <span class="subbar-text text-pool-active">暂存: Task A (0 物理线程消耗)</span>
+
+              <div class="region-footer-hint">
+                <span class="footer-dot dot-heap-active"></span>
+                <span>所有协程均为普通堆对象 (Continuation) · 遇挂起保存现场退回堆</span>
               </div>
             </div>
           </div>

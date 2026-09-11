@@ -5618,12 +5618,12 @@ input:focus-visible,
   border-color: var(--color-accent);
 }
 
-/* Synchronized hover-to-pause: pauses both stepper and task animations in lockstep */
+/* Synchronized hover-to-pause: pauses stepper, spatial entities and tags in lockstep */
 .decouple-panel:hover .stepper-item,
-.decouple-panel:hover .flight-task-a,
-.decouple-panel:hover .takeover-task-b,
-.decouple-panel:hover .pill-state,
-.decouple-panel:hover .subbar-text,
+.decouple-panel:hover .task-entity,
+.decouple-panel:hover .task-action,
+.decouple-panel:hover .task-a,
+.decouple-panel:hover .task-b,
 .decouple-panel:hover .guide-to-pool,
 .decouple-panel:hover .guide-to-thread,
 .decouple-panel:hover .trad-task-pill,
@@ -6292,388 +6292,443 @@ input:focus-visible,
 .guide-to-pool { animation: animGuideToPool 12s infinite ease-in-out; }
 .guide-to-thread { animation: animGuideToThread 12s infinite ease-in-out; }
 
-/* Left / Right 2-Column Grid */
-.coop-lr-grid {
-  --coop-gap: 16px;
+/* ==========================================================================
+   Coroutine Cooperative Decoupling: Thread Region vs Heap Memory Region
+   - Left: 物理线程区 (OS Worker Thread - CPU 工位)
+   - Right: 堆内存区 (Heap Memory)
+     ↳ 任务就绪队列 (Ready Queue)
+     ↳ 挂起池 (Suspended Pool)
+   - Task A: 琥珀金/暖橙色 (#d97706 / #f59e0b) 全程恒定身份
+   - Task B: 冰晶蓝/亮青色 (#0284c7 / #06b6d4) 全程恒定身份
+   ========================================================================== */
+.coop-arch-grid {
+  --arch-gap: 16px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--coop-gap);
+  grid-template-columns: 1fr 1.6fr;
+  gap: var(--arch-gap);
   align-items: stretch;
-  min-width: 460px;
+  min-width: 580px;
   position: relative;
 }
 
-.coop-col {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+@media (max-width: 768px) {
+  .coop-arch-grid {
+    min-width: 100%;
+    grid-template-columns: 1fr;
+  }
 }
 
-.col-header {
+/* Big Regional Containers */
+.arch-region {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+}
+
+.region-thread {
+  background: rgba(15, 23, 42, 0.03);
+  border: 1.5px solid rgba(16, 185, 129, 0.4);
+}
+
+.region-heap {
+  background: rgba(99, 102, 241, 0.03);
+  border: 1.5px solid rgba(99, 102, 241, 0.3);
+}
+
+.region-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 0 2px;
+  padding-bottom: 2px;
 }
 
-.col-label {
+.region-title-wrap {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--color-ink);
 }
 
-.col-dot {
-  width: 6px;
-  height: 6px;
+.region-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .dot-thread {
   background: #10b981;
-  box-shadow: 0 0 5px #10b981;
+  box-shadow: 0 0 6px #10b981;
 }
 
-.dot-pool {
-  background: #0ea5e9;
-  box-shadow: 0 0 5px #0ea5e9;
+.dot-heap {
+  background: #6366f1;
+  box-shadow: 0 0 6px #6366f1;
 }
 
-.col-title {
-  font-size: 11.5px;
+.region-title {
+  font-size: 12px;
   font-weight: 700;
+  color: var(--color-ink);
 }
 
-.col-status {
+.region-mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-ink-muted);
+}
+
+.region-tag {
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: 4px;
   white-space: nowrap;
 }
 
-.status-thread {
-  color: #10b981;
-  background: rgba(16, 185, 129, 0.1);
+.tag-thread {
+  color: #059669;
+  background: rgba(16, 185, 129, 0.12);
 }
 
-.status-pool {
-  color: #0ea5e9;
-  background: rgba(14, 165, 233, 0.1);
+.tag-heap {
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.12);
 }
 
-.col-slot {
+/* Worker Thread Slot */
+.thread-slot-container {
   position: relative;
-  height: 48px;
+  height: 52px;
   border-radius: 6px;
+  background: var(--color-surface);
+  border: 1.5px dashed rgba(16, 185, 129, 0.35);
   display: flex;
   align-items: center;
   padding: 0 10px;
   box-sizing: border-box;
 }
 
-.slot-thread {
-  background: rgba(16, 185, 129, 0.04);
-  border: 1.5px dashed rgba(16, 185, 129, 0.35);
-}
-
-.slot-pool {
-  background: rgba(14, 165, 233, 0.04);
-  border: 1.5px dashed rgba(14, 165, 233, 0.35);
-  justify-content: center;
-}
-
-.thread-idle-cue {
+.slot-bg-hint {
   position: absolute;
   left: 0;
   right: 0;
   text-align: center;
   font-size: 11px;
   color: var(--color-ink-faint);
-  user-select: none;
   pointer-events: none;
+  user-select: none;
 }
 
-.slot-idle-text {
-  font-size: 11px;
-  color: var(--color-ink-faint);
-  user-select: none;
-  pointer-events: none;
+/* Heap Sub-Grid (Ready Queue + Suspended Pool) */
+.heap-sub-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 10px;
 }
 
-/* Telemetry Subbar under columns */
-.col-subbar {
+.heap-sub-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sub-cell-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 10px;
-  color: var(--color-ink-faint);
-  background: var(--color-surface-sunken);
-  border: 1px dashed var(--color-border);
-  border-radius: 4px;
-  padding: 3px 8px;
-  position: relative;
-  height: 22px;
-  box-sizing: border-box;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--color-ink-muted);
 }
 
-.subbar-dot {
+.sub-cell-dot {
   width: 5px;
   height: 5px;
+  border-radius: 50%;
+}
+
+.dot-queue {
+  background: #0ea5e9;
+}
+
+.dot-pool {
+  background: #8b5cf6;
+}
+
+.sub-cell-slot {
+  position: relative;
+  height: 52px;
+  border-radius: 6px;
+  background: var(--color-surface);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+}
+
+.slot-queue {
+  border: 1px dashed rgba(14, 165, 233, 0.35);
+  gap: 8px;
+}
+
+.slot-pool {
+  border: 1px dashed rgba(139, 92, 246, 0.35);
+  justify-content: center;
+}
+
+.slot-idle-hint {
+  font-size: 11px;
+  color: var(--color-ink-faint);
+  pointer-events: none;
+  user-select: none;
+}
+
+.region-footer-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  color: var(--color-ink-faint);
+  padding: 0 2px;
+  margin-top: 2px;
+}
+
+.footer-dot {
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.dot-standby {
-  background: #0ea5e9;
-  box-shadow: 0 0 4px #0ea5e9;
-}
+.dot-thread-active { background: #10b981; }
+.dot-heap-active { background: #6366f1; }
 
-.dot-pool-status {
-  background: var(--color-ink-faint);
-}
-
-.subbar-text {
+/* ==========================================================================
+   Constant-Identity Task Entities
+   - Task A: Amber/Warm Orange (Identity Color NEVER Changes)
+   - Task B: Ice Blue/Cyan (Identity Color NEVER Changes)
+   - Both start in Ready Queue, physically travel across Thread & Heap!
+   ========================================================================== */
+.task-entity {
   position: absolute;
-  left: 20px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.text-q-arrival { animation: animSubbarQArrival 12s infinite ease-in-out; }
-.text-q-standby { animation: animSubbarQStandby 12s infinite ease-in-out; }
-.text-q-active { animation: animSubbarQActive 12s infinite ease-in-out; }
-
-.text-pool-idle { animation: animSubbarPoolIdle 12s infinite ease-in-out; }
-.text-pool-active { animation: animSubbarPoolActive 12s infinite ease-in-out; }
-
-/* Dynamic Physical Task Pills in Coroutine Grid */
-.flight-task-a {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 12px;
-  border-radius: 6px;
-  background: var(--color-surface);
-  border: 1px solid #10b981;
-  box-shadow: var(--shadow-xs);
+  padding: 0 8px;
+  border-radius: 5px;
   box-sizing: border-box;
-  z-index: 2;
-  animation: animFlightTaskA 12s infinite ease-in-out;
-  will-change: transform, border-color, background, box-shadow;
-}
-
-.takeover-task-b {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 12px;
-  border-radius: 6px;
-  background: var(--color-surface);
-  border: 1px solid #10b981;
-  box-shadow: var(--shadow-xs);
-  box-sizing: border-box;
-  z-index: 1;
-  animation: animTakeoverTaskB 12s infinite ease-in-out;
-  will-change: transform, opacity;
-}
-
-.pill-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--color-ink);
-}
-
-.pill-state {
-  position: absolute;
-  right: 12px;
   font-size: 11px;
+  transition: box-shadow 0.2s;
+  will-change: transform, opacity;
+  z-index: 2;
+}
+
+.task-badge {
+  font-weight: 800;
+  font-size: 11.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.2px;
+}
+
+.task-action {
+  font-size: 10px;
   font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 4px;
-  transition: opacity 0.2s;
+  position: absolute;
+  right: 8px;
 }
 
-.state-a-run {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  animation: animTagARun 12s infinite ease-in-out;
+/* Task A: Constant Amber/Orange Identity */
+.task-a {
+  left: 6px;
+  width: 124px;
+  border: 1.5px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #b45309;
+  box-shadow: 0 1px 4px rgba(245, 158, 11, 0.2);
+  animation: animTravelTaskA 12s infinite ease-in-out;
 }
 
-.state-a-pool {
-  background: rgba(14, 165, 233, 0.15);
-  color: #0ea5e9;
-  animation: animTagAPool 12s infinite ease-in-out;
+.badge-task-a {
+  background: #f59e0b;
+  color: #ffffff;
 }
 
-.state-a-done {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-  animation: animTagADone 12s infinite ease-in-out;
+.action-a-init    { animation: animActionAInit 12s infinite ease-in-out; }
+.action-a-calc    { animation: animActionACalc 12s infinite ease-in-out; }
+.action-a-suspend { animation: animActionASuspend 12s infinite ease-in-out; }
+.action-a-resume  { animation: animActionAResume 12s infinite ease-in-out; }
+.action-a-done    { animation: animActionADone 12s infinite ease-in-out; }
+
+/* Task B: Constant Cyan/Blue Identity */
+.task-b {
+  left: 136px;
+  width: 120px;
+  border: 1.5px solid #06b6d4;
+  background: rgba(6, 182, 212, 0.12);
+  color: #0e7490;
+  box-shadow: 0 1px 4px rgba(6, 182, 212, 0.2);
+  animation: animTravelTaskB 12s infinite ease-in-out;
 }
 
-.state-b-run {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
+.badge-task-b {
+  background: #06b6d4;
+  color: #ffffff;
 }
 
-/* Keyframe Animations for Left-to-Right Physical Flight (12s 6-phase cycle) */
-@keyframes animFlightTaskA {
-  /* Phase 1 (0% - 16.2%): In queue, worker is empty */
+.action-b-init { animation: animActionBInit 12s infinite ease-in-out; }
+.action-b-calc { animation: animActionBCalc 12s infinite ease-in-out; }
+.action-b-done { animation: animActionBDone 12s infinite ease-in-out; }
+
+/* ==========================================================================
+   Physical Travel Coordinates across Containers:
+   Reference Origin: Inside .slot-queue!
+   - Destination 1: Left into Thread Slot:
+     Distance = -(Queue Left + Grid Gap + Padding + Margin) ≈ calc(-100% - var(--arch-gap) - 40px)
+     We use fixed dynamic CSS calc for precise viewport-stable flight!
+   - Destination 2: Right into Suspended Pool:
+     Distance = calc(100% + 24px)
+   ========================================================================== */
+
+/* Task A 12s Travel Cycle */
+@keyframes animTravelTaskA {
+  /* Step 1 [0% - 16.2%]: In Ready Queue (Rest position: X=0) */
   0%, 16.2% {
-    opacity: 0;
     transform: translate3d(0, 0, 0);
-    border-color: #10b981;
-    background: var(--color-surface);
-    box-shadow: var(--shadow-xs);
-  }
-  /* Phase 2 (16.6% - 32.8%): On Left worker slot, executing calculation */
-  16.6%, 32.8% {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
-    border-color: #10b981;
-    background: var(--color-surface);
-    box-shadow: var(--shadow-xs);
   }
-  /* Phase 3 (33.3% - 49.5%): Glides horizontally from Left to Right pool */
-  36.5%, 49.5% {
+  /* Flight from Queue to Thread Slot */
+  16.6% {
+    transform: translate3d(calc(-100% - var(--arch-gap, 16px) - 24px), 0, 0);
     opacity: 1;
-    transform: translate3d(calc(100% + var(--coop-gap, 16px)), 0, 0);
-    border-color: #0ea5e9;
-    background: rgba(14, 165, 233, 0.08);
-    box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
   }
-  /* Phase 4 (50.0% - 66.1%): Rests in Right suspended pool while Task B executes */
-  50.0%, 66.1% {
+  /* Step 2 [16.6% - 32.8%]: In Thread Slot computing */
+  20.0%, 32.8% {
+    transform: translate3d(calc(-100% - var(--arch-gap, 16px) - 24px), 0, 0);
     opacity: 1;
-    transform: translate3d(calc(100% + var(--coop-gap, 16px)), 0, 0);
-    border-color: #0ea5e9;
-    background: rgba(14, 165, 233, 0.08);
-    box-shadow: 0 0 10px rgba(14, 165, 233, 0.25);
   }
-  /* Phase 5 (66.6% - 82.8%): Glides horizontally back from Right to Left worker */
-  69.5%, 82.8% {
+  /* Flight from Thread Slot directly to Suspended Pool */
+  36.5% {
+    transform: translate3d(calc(100% + var(--arch-gap, 16px) + 20px), 0, 0);
     opacity: 1;
-    transform: translate3d(0, 0, 0);
-    border-color: #10b981;
-    background: var(--color-surface);
-    box-shadow: var(--shadow-xs);
   }
-  /* Phase 6 (83.3% - 99.5%): Finishes execution on worker */
-  83.3%, 99.5% {
+  /* Step 3 & Step 4 [36.5% - 66.1%]: Resting in Suspended Pool (0 physical thread cost) */
+  37.0%, 66.1% {
+    transform: translate3d(calc(100% + var(--arch-gap, 16px) + 20px), 0, 0);
     opacity: 1;
-    transform: translate3d(0, 0, 0);
-    border-color: #10b981;
-    background: var(--color-surface);
-    box-shadow: var(--shadow-xs);
+  }
+  /* Flight from Suspended Pool back to Thread Slot upon resume */
+  69.5% {
+    transform: translate3d(calc(-100% - var(--arch-gap, 16px) - 24px), 0, 0);
+    opacity: 1;
+  }
+  /* Step 5 & Step 6 [69.5% - 99.5%]: In Thread Slot completing */
+  70.0%, 99.5% {
+    transform: translate3d(calc(-100% - var(--arch-gap, 16px) - 24px), 0, 0);
+    opacity: 1;
   }
   100% {
-    opacity: 0;
     transform: translate3d(0, 0, 0);
-    border-color: #10b981;
-    background: var(--color-surface);
+    opacity: 1;
   }
 }
 
-@keyframes animTagARun {
+/* Task B 12s Travel Cycle */
+@keyframes animTravelTaskB {
+  /* Step 1, Step 2, Step 3 [0% - 49.5%]: In Ready Queue (Rest position: X=0) */
+  0%, 49.5% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+  /* Flight from Queue to Thread Slot to take over vacated worker */
+  51.0% {
+    transform: translate3d(calc(-200% - var(--arch-gap, 16px) - 16px), 0, 0);
+    opacity: 1;
+  }
+  /* Step 4 [51.0% - 66.1%]: In Thread Slot computing */
+  51.5%, 65.5% {
+    transform: translate3d(calc(-200% - var(--arch-gap, 16px) - 16px), 0, 0);
+    opacity: 1;
+  }
+  /* Step 5 [66.6%]: Task B completes and exits gracefully */
+  66.6% {
+    transform: translate3d(calc(-200% - var(--arch-gap, 16px) - 16px), -12px, 0);
+    opacity: 0;
+  }
+  99.5% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+/* Task A Action Text Animations */
+@keyframes animActionAInit {
+  0%, 16.2% { opacity: 1; }
+  16.6%, 100% { opacity: 0; }
+}
+
+@keyframes animActionACalc {
   0%, 16.5% { opacity: 0; }
   16.6%, 32.8% { opacity: 1; }
   33.3%, 100% { opacity: 0; }
 }
 
-@keyframes animTagAPool {
+@keyframes animActionASuspend {
   0%, 33.2% { opacity: 0; }
   33.3%, 66.1% { opacity: 1; }
   66.6%, 100% { opacity: 0; }
 }
 
-@keyframes animTagADone {
+@keyframes animActionAResume {
   0%, 66.5% { opacity: 0; }
-  66.6%, 99.5% { opacity: 1; }
+  66.6%, 82.8% { opacity: 1; }
+  83.3%, 100% { opacity: 0; }
+}
+
+@keyframes animActionADone {
+  0%, 83.2% { opacity: 0; }
+  83.3%, 99.5% { opacity: 1; }
   100% { opacity: 0; }
 }
 
-/* Phase 4 Exclusive: Task B executes on the vacated Worker Thread */
-@keyframes animTakeoverTaskB {
-  0%, 49.9% {
-    opacity: 0;
-    transform: translateY(8px) scale(0.96);
-    pointer-events: none;
-  }
-  51.5% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-  }
-  63.5% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    pointer-events: auto;
-  }
-  66.1% {
-    opacity: 0;
-    transform: translateY(-8px) scale(0.96);
-    pointer-events: none;
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(8px) scale(0.96);
-    pointer-events: none;
-  }
+/* Task B Action Text Animations */
+@keyframes animActionBInit {
+  0%, 49.5% { opacity: 1; }
+  50.0%, 100% { opacity: 0; }
 }
 
+@keyframes animActionBCalc {
+  0%, 49.9% { opacity: 0; }
+  50.0%, 65.5% { opacity: 1; }
+  66.0%, 100% { opacity: 0; }
+}
+
+@keyframes animActionBDone {
+  0%, 65.9% { opacity: 0; }
+  66.0%, 66.5% { opacity: 1; }
+  66.6%, 100% { opacity: 0; }
+}
+
+/* Guide Arrows synced with flight */
 @keyframes animGuideToPool {
   0%, 33.2% { opacity: 0.3; color: var(--color-ink-faint); }
-  33.3%, 49.5% { opacity: 1; color: #0ea5e9; }
+  33.3%, 49.5% { opacity: 1; color: #8b5cf6; font-weight: 700; }
   50.0%, 100% { opacity: 0.3; color: var(--color-ink-faint); }
 }
 
 @keyframes animGuideToThread {
   0%, 66.5% { opacity: 0.3; color: var(--color-ink-faint); }
-  66.6%, 82.8% { opacity: 1; color: #10b981; }
+  66.6%, 82.8% { opacity: 1; color: #10b981; font-weight: 700; }
   83.3%, 100% { opacity: 0.3; color: var(--color-ink-faint); }
-}
-
-@keyframes animSubbarQArrival {
-  0%, 16.2% { opacity: 1; color: #0ea5e9; font-weight: 600; }
-  16.6%, 100% { opacity: 0; }
-}
-
-@keyframes animSubbarQStandby {
-  0%, 16.5% { opacity: 0; }
-  16.6%, 49.5% { opacity: 1; color: #0ea5e9; font-weight: 600; }
-  50.0%, 100% { opacity: 0; }
-}
-
-@keyframes animSubbarQActive {
-  0%, 49.9% { opacity: 0; }
-  50.0%, 99.5% { opacity: 1; color: var(--color-ink-muted); font-weight: 500; }
-  100% { opacity: 0; }
-}
-
-@keyframes animSubbarPoolIdle {
-  0%, 32.8% { opacity: 1; }
-  33.3%, 66.1% { opacity: 0; }
-  66.6%, 100% { opacity: 1; }
-}
-
-@keyframes animSubbarPoolActive {
-  0%, 33.2% { opacity: 0; }
-  33.3%, 66.1% { opacity: 1; color: #0ea5e9; font-weight: 600; }
-  66.6%, 100% { opacity: 0; }
 }
 
 /* --- Stage 02: CPS Continuation Baton --- */
