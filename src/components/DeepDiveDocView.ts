@@ -781,6 +781,47 @@ function renderTimelineExplanation(
 
     container.appendChild(item);
 
+    // Helpers for Decouple Animation auto-play & step control
+    const updatePanelStep = (panel: HTMLElement, step: string | number) => {
+      const stepStr = String(step);
+      panel.querySelectorAll('.stepper-item').forEach((item) => {
+        item.classList.toggle('active', item.getAttribute('data-step') === stepStr);
+      });
+      const coopStack = panel.querySelector<HTMLElement>('.coop-vertical-stack');
+      if (coopStack) {
+        coopStack.setAttribute('data-active-step', stepStr);
+      }
+      const tradStack = panel.querySelector<HTMLElement>('.trad-vertical-stack') || panel.querySelector<HTMLElement>('.trad-stage-canvas');
+      if (tradStack) {
+        tradStack.setAttribute('data-active-step', stepStr);
+      }
+    };
+
+    const stopPanelAutoPlay = (panel: HTMLElement) => {
+      const timer = (panel as any)._autoPlayTimer;
+      if (timer) {
+        clearInterval(timer);
+        (panel as any)._autoPlayTimer = null;
+      }
+    };
+
+    const playPanelOnce = (panel: HTMLElement) => {
+      stopPanelAutoPlay(panel);
+      let currentStep = 1;
+      updatePanelStep(panel, currentStep);
+
+      const timer = window.setInterval(() => {
+        currentStep++;
+        if (currentStep > 6) {
+          stopPanelAutoPlay(panel);
+          return;
+        }
+        updatePanelStep(panel, currentStep);
+      }, 1500);
+
+      (panel as any)._autoPlayTimer = timer;
+    };
+
     // Wire up Segmented Control tab switching for Decouple Animation
     item.querySelectorAll<HTMLButtonElement>('.decouple-tab-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -798,36 +839,60 @@ function renderTimelineExplanation(
           const match = panel.classList.contains(`decouple-panel-${target}`);
           panel.classList.toggle('active', match);
           panel.style.display = match ? 'block' : 'none';
+          if (match) {
+            playPanelOnce(panel);
+          } else {
+            stopPanelAutoPlay(panel);
+          }
         });
       });
     });
 
-    // Wire up Manual Stepper Click for Decouple Animation (Zero auto-loop, user controlled)
+    // Wire up Manual Stepper Click for Decouple Animation (manual click stops autoplay)
     item.querySelectorAll<HTMLElement>('.decouple-stepper-bar .stepper-item').forEach((stepItem) => {
       stepItem.addEventListener('click', (e) => {
         e.stopPropagation();
         const step = stepItem.dataset.step;
         if (!step) return;
-        const panel = stepItem.closest('.decouple-panel');
+        const panel = stepItem.closest<HTMLElement>('.decouple-panel');
         if (!panel) return;
 
-        // Update active step in stepper bar
-        panel.querySelectorAll('.stepper-item').forEach((item) => {
-          item.classList.toggle('active', item === stepItem);
-        });
+        stopPanelAutoPlay(panel);
+        updatePanelStep(panel, step);
+      });
+    });
 
-        // If in coop panel, update data-active-step on coop-vertical-stack
-        const coopStack = panel.querySelector<HTMLElement>('.coop-vertical-stack');
-        if (coopStack) {
-          coopStack.setAttribute('data-active-step', step);
-        }
-
-        // If in trad panel, update data-active-step on trad-vertical-stack or trad-stage-canvas
-        const tradStack = panel.querySelector<HTMLElement>('.trad-vertical-stack') || panel.querySelector<HTMLElement>('.trad-stage-canvas');
-        if (tradStack) {
-          tradStack.setAttribute('data-active-step', step);
+    // Wire up Replay Button ("自动推演一次")
+    item.querySelectorAll<HTMLButtonElement>('.decouple-replay-btn').forEach((replayBtn) => {
+      replayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const card = replayBtn.closest('.decouple-card');
+        if (!card) return;
+        const activePanel = card.querySelector<HTMLElement>('.decouple-panel.active');
+        if (activePanel) {
+          playPanelOnce(activePanel);
         }
       });
+    });
+
+    // Auto-execute once when decouple-card enters view
+    item.querySelectorAll<HTMLElement>('.decouple-card').forEach((card) => {
+      const activePanel = card.querySelector<HTMLElement>('.decouple-panel.active');
+      if (!activePanel) return;
+
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              observer.disconnect();
+              playPanelOnce(activePanel);
+            }
+          });
+        }, { threshold: 0.25 });
+        observer.observe(card);
+      } else {
+        setTimeout(() => playPanelOnce(activePanel), 600);
+      }
     });
   });
 

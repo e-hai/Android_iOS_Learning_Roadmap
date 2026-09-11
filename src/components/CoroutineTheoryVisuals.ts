@@ -43,6 +43,9 @@ function renderTaskDecoupleAnimation(): string {
             <span class="tab-badge badge-trad">对照组 · 死锁缺陷</span>
           </button>
         </div>
+        <button type="button" class="decouple-replay-btn" title="从头自动演示一次">
+          <span class="replay-label">自动推演一次</span>
+        </button>
       </div>
 
       <!-- Panel 1: Coroutine Cooperative Decoupling (Default Active) -->
