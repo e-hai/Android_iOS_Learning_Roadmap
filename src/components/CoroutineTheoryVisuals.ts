@@ -52,9 +52,9 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p1">
             <div class="step-head">
               <span class="step-circle">1</span>
-              <span class="step-title">初始计算</span>
+              <span class="step-title">初始调度</span>
             </div>
-            <span class="step-sub">Task A 占用工人正常执行</span>
+            <span class="step-sub">Task A 上工 · Task B 待命</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p2">
@@ -62,7 +62,7 @@ function renderTaskDecoupleAnimation(): string {
               <span class="step-circle">2</span>
               <span class="step-title">遇 I/O 挂起</span>
             </div>
-            <span class="step-sub">脱钩让权，移入右侧挂起池</span>
+            <span class="step-sub">Task A 入池 · 工位释放</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p3">
@@ -70,15 +70,15 @@ function renderTaskDecoupleAnimation(): string {
               <span class="step-circle">3</span>
               <span class="step-title">Task B 接力</span>
             </div>
-            <span class="step-sub">左侧工人无缝接手，100% 运转</span>
+            <span class="step-sub">工人接管 · 满载运转</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle">4</span>
-              <span class="step-title">数据就绪唤醒</span>
+              <span class="step-title">唤醒完成</span>
             </div>
-            <span class="step-sub">Task A 回落左侧收尾，双任务完成</span>
+            <span class="step-sub">Task A 回落 · 双任务结算</span>
           </div>
         </div>
 
@@ -88,10 +88,10 @@ function renderTaskDecoupleAnimation(): string {
           <div class="coop-lr-transfer-bar">
             <div class="lr-guide guide-to-pool">
               <span class="guide-arrow">→</span>
-              <span>遇 I/O 让出工位，移入右侧挂起池</span>
+              <span>挂起出让</span>
             </div>
             <div class="lr-guide guide-to-thread">
-              <span>I/O 就绪唤醒，恢复左侧执行工位</span>
+              <span>唤醒恢复</span>
               <span class="guide-arrow">←</span>
             </div>
           </div>
@@ -103,27 +103,32 @@ function renderTaskDecoupleAnimation(): string {
               <div class="col-header">
                 <div class="col-label">
                   <span class="col-dot dot-thread"></span>
-                  <span class="col-title">Worker Thread #1 (物理工人)</span>
+                  <span class="col-title">Worker Thread #1</span>
                 </div>
-                <span class="col-status status-thread">CPU 执行工位</span>
+                <span class="col-status status-thread">CPU 工位</span>
               </div>
               <div class="col-slot slot-thread">
                 <!-- Background cue when thread is free -->
-                <div class="thread-idle-cue">工位已释放 · 物理工人空闲中</div>
+                <div class="thread-idle-cue">工人空闲中</div>
 
                 <!-- Physical Task A: Originates in worker thread, glides to right pool on I/O, glides back on resume -->
                 <div class="flight-task-a">
-                  <span class="pill-name">Task A (网络请求)</span>
-                  <span class="pill-state state-a-run">正在执行</span>
-                  <span class="pill-state state-a-pool">挂起等待 I/O (让出工位)</span>
-                  <span class="pill-state state-a-done">数据就绪 · 恢复收尾</span>
+                  <span class="pill-name">Task A</span>
+                  <span class="pill-state state-a-run">计算中</span>
+                  <span class="pill-state state-a-pool">挂起中</span>
+                  <span class="pill-state state-a-done">已完成</span>
                 </div>
 
                 <!-- Physical Task B: Takes over empty worker slot during Phase 3, finishes and exits -->
                 <div class="takeover-task-b">
-                  <span class="pill-name">Task B (界面渲染)</span>
-                  <span class="pill-state state-b-run">接力执行中 (100% 线程复用)</span>
+                  <span class="pill-name">Task B</span>
+                  <span class="pill-state state-b-run">接力执行</span>
                 </div>
+              </div>
+              <div class="col-subbar subbar-queue">
+                <span class="subbar-dot dot-standby"></span>
+                <span class="subbar-text text-q-standby">就绪队列: Task B (待命候场)</span>
+                <span class="subbar-text text-q-active">就绪队列: 空 (已进入工位)</span>
               </div>
             </div>
 
@@ -132,19 +137,24 @@ function renderTaskDecoupleAnimation(): string {
               <div class="col-header">
                 <div class="col-label">
                   <span class="col-dot dot-pool"></span>
-                  <span class="col-title">挂起等待区 (待续挂起池)</span>
+                  <span class="col-title">挂起等待区</span>
                 </div>
-                <span class="col-status status-pool">堆内存 · 0 物理线程消耗</span>
+                <span class="col-status status-pool">堆内存 (0 线程)</span>
               </div>
               <div class="col-slot slot-pool">
-                <span class="slot-idle-text">Task A 挂起暂存位</span>
+                <span class="slot-idle-text">挂起池空闲</span>
+              </div>
+              <div class="col-subbar subbar-pool">
+                <span class="subbar-dot dot-pool-status"></span>
+                <span class="subbar-text text-pool-idle">暂存: 空</span>
+                <span class="subbar-text text-pool-active">暂存: Task A (0 物理线程消耗)</span>
               </div>
             </div>
           </div>
         </div>
 
         <div class="model-verdict verdict-success">
-          <strong>协程破局</strong>：任务遇到 I/O 主动脱钩让出工人，工人立即接力处理 Task B，两项任务重叠高效完成，吞吐量翻倍！
+          <strong>结果</strong>：单工人交替复用，I/O 等待零阻塞，吞吐量翻倍。
         </div>
       </div>
 
@@ -155,33 +165,33 @@ function renderTaskDecoupleAnimation(): string {
           <div class="stepper-item step-p1">
             <div class="step-head">
               <span class="step-circle circle-danger">1</span>
-              <span class="step-title">初始计算</span>
+              <span class="step-title">初始调度</span>
             </div>
-            <span class="step-sub">Task A 占用线程执行</span>
+            <span class="step-sub">Task A 上工 · Task B 排队</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p2">
             <div class="step-head">
               <span class="step-circle circle-danger">2</span>
-              <span class="step-title">遇 I/O 等待</span>
+              <span class="step-title">遇 I/O 阻塞</span>
             </div>
-            <span class="step-sub">Thread.sleep 死锁阻塞</span>
+            <span class="step-sub">Thread.sleep · 物理线程死锁</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p3">
             <div class="step-head">
               <span class="step-circle circle-danger">3</span>
-              <span class="step-title">Task B 到来</span>
+              <span class="step-title">Task B 饥饿</span>
             </div>
-            <span class="step-sub">进不去！排队严重饥饿</span>
+            <span class="step-sub">排队进不去 · 工人被占</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p4">
             <div class="step-head">
               <span class="step-circle circle-danger">4</span>
-              <span class="step-title">数据就绪唤醒</span>
+              <span class="step-title">唤醒滞后</span>
             </div>
-            <span class="step-sub">Task A 延误释放，Task B 滞后</span>
+            <span class="step-sub">Task A 延误 · 总体耗时翻倍</span>
           </div>
         </div>
 
@@ -192,33 +202,33 @@ function renderTaskDecoupleAnimation(): string {
             <div class="trad-lane">
               <div class="worker-tag tag-danger">
                 <span class="worker-dot"></span>
-                <span>OS Thread #1 (物理工人)</span>
+                <span>OS Thread #1</span>
               </div>
               <div class="trad-lane-slot">
                 <!-- P1: Task A running normally -->
                 <div class="trad-task-pill trad-p1-run">
-                  <span class="t-title">Task A 正在执行</span>
-                  <span class="t-state">CPU 正常运转中...</span>
+                  <span class="t-title">Task A</span>
+                  <span class="t-state">计算中...</span>
                 </div>
                 <!-- P2 & P3: Task A blocked -->
                 <div class="trad-task-pill trad-p2-blocked">
                   <div class="t-row">
-                    <span class="t-title text-danger">Task A 发起网络 I/O</span>
-                    <span class="badge-lock">Thread.sleep 死锁阻塞</span>
+                    <span class="t-title text-danger">Task A</span>
+                    <span class="badge-lock">死锁阻塞 (Thread.sleep)</span>
                   </div>
-                  <span class="t-state text-danger">物理工人被迫停工，1MB 内存被死锁，CPU 空耗</span>
+                  <span class="t-state text-danger">物理工人停工，1MB 栈内存死锁</span>
                 </div>
                 <!-- P4: Task A unblocks late -->
                 <div class="trad-task-pill trad-p4-finish">
-                  <span class="t-title text-amber">Task A 终于唤醒</span>
-                  <span class="t-state text-danger">耗时翻倍！Task B 此时才刚准备排队进入...</span>
+                  <span class="t-title text-amber">Task A</span>
+                  <span class="t-state text-amber">迟钝唤醒 · 释放工人</span>
                 </div>
               </div>
             </div>
 
             <!-- Outside Waiting Queue -->
             <div class="trad-queue-cell">
-              <div class="queue-header">就绪队列 (排队情况)</div>
+              <div class="queue-header">就绪队列</div>
               <div class="trad-queue-slot">
                 <!-- P1 & P2: Task B standby -->
                 <div class="queue-task-pill q-standby">
@@ -228,12 +238,12 @@ function renderTaskDecoupleAnimation(): string {
                 <!-- P3: Task B locked out -->
                 <div class="queue-task-pill q-blocked">
                   <span class="b-name text-danger">Task B</span>
-                  <span class="b-state text-danger">排队进不去，工人被占用</span>
+                  <span class="b-state text-danger">排队受阻，工人被占</span>
                 </div>
                 <!-- P4: Task B finally entering late -->
                 <div class="queue-task-pill q-late">
                   <span class="b-name text-amber">Task B</span>
-                  <span class="b-state text-amber">排队延误，刚轮到它</span>
+                  <span class="b-state text-amber">严重延误，刚轮到它</span>
                 </div>
               </div>
             </div>
@@ -241,7 +251,7 @@ function renderTaskDecoupleAnimation(): string {
         </div>
 
         <div class="model-verdict verdict-danger">
-          <strong>传统弊端</strong>：I/O 等待期间物理线程死锁，后续任务全部被堵在门外无法执行，吞吐量暴跌！
+          <strong>代价</strong>：I/O 死等霸占物理工人，后续任务严重饥饿，总体耗时翻倍。
         </div>
       </div>
     </div>
