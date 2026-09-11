@@ -801,6 +801,34 @@ function renderTimelineExplanation(
         });
       });
     });
+
+    // Wire up Manual Stepper Click for Decouple Animation (Zero auto-loop, user controlled)
+    item.querySelectorAll<HTMLElement>('.decouple-stepper-bar .stepper-item').forEach((stepItem) => {
+      stepItem.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const step = stepItem.dataset.step;
+        if (!step) return;
+        const panel = stepItem.closest('.decouple-panel');
+        if (!panel) return;
+
+        // Update active step in stepper bar
+        panel.querySelectorAll('.stepper-item').forEach((item) => {
+          item.classList.toggle('active', item === stepItem);
+        });
+
+        // If in coop panel, update data-active-step on coop-vertical-stack
+        const coopStack = panel.querySelector<HTMLElement>('.coop-vertical-stack');
+        if (coopStack) {
+          coopStack.setAttribute('data-active-step', step);
+        }
+
+        // If in trad panel, update data-active-step on trad-stage-canvas
+        const tradCanvas = panel.querySelector<HTMLElement>('.trad-stage-canvas');
+        if (tradCanvas) {
+          tradCanvas.setAttribute('data-active-step', step);
+        }
+      });
+    });
   });
 
   return container;

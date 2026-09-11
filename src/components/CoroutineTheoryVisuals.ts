@@ -47,9 +47,9 @@ function renderTaskDecoupleAnimation(): string {
 
       <!-- Panel 1: Coroutine Cooperative Decoupling (Default Active) -->
       <div class="decouple-panel decouple-panel-coop active" role="tabpanel">
-        <!-- Coroutine 6-Phase Stepper Tracker -->
+        <!-- Coroutine 6-Phase Stepper Tracker (Clickable Manual Steps) -->
         <div class="decouple-stepper-bar coop-stepper-bar">
-          <div class="stepper-item step-p1">
+          <div class="stepper-item step-p1 active" data-step="1">
             <div class="step-head">
               <span class="step-circle">1</span>
               <span class="step-title">初始待命</span>
@@ -57,7 +57,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">双任务到达 · 工人就绪</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p2">
+          <div class="stepper-item step-p2" data-step="2">
             <div class="step-head">
               <span class="step-circle">2</span>
               <span class="step-title">A 启动计算</span>
@@ -65,7 +65,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">Task A 上工 · Task B 待命</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p3">
+          <div class="stepper-item step-p3" data-step="3">
             <div class="step-head">
               <span class="step-circle">3</span>
               <span class="step-title">A 挂起出让</span>
@@ -73,7 +73,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">A 移入挂起池 · 工位腾空</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p4">
+          <div class="stepper-item step-p4" data-step="4">
             <div class="step-head">
               <span class="step-circle">4</span>
               <span class="step-title">B 接力执行</span>
@@ -81,7 +81,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">工人接管 B · 满载运转</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p5">
+          <div class="stepper-item step-p5" data-step="5">
             <div class="step-head">
               <span class="step-circle">5</span>
               <span class="step-title">B 完成唤醒</span>
@@ -89,7 +89,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">B 退出 · A 回落工位</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p6">
+          <div class="stepper-item step-p6" data-step="6">
             <div class="step-head">
               <span class="step-circle">6</span>
               <span class="step-title">双任务达成</span>
@@ -98,23 +98,9 @@ function renderTaskDecoupleAnimation(): string {
           </div>
         </div>
 
-        <!-- Spatial Side-by-Side Coroutine Stage (Worker on Left, Pool on Right) -->
-        <div class="coop-stage-canvas single-stage">
-          <!-- Horizontal Transfer Direction Guides -->
-          <div class="coop-lr-transfer-bar">
-            <div class="lr-guide guide-to-pool">
-              <span class="guide-arrow">→</span>
-              <span>挂起出让</span>
-            </div>
-            <div class="lr-guide guide-to-thread">
-              <span>唤醒恢复</span>
-              <span class="guide-arrow">←</span>
-            </div>
-          </div>
-
-          <!-- Spatial Grid: Thread Region (Left) vs Heap Memory Region (Right: Queue + Pool) -->
-          <div class="coop-arch-grid">
-            <!-- Left Big Container: Physical Thread Region -->
+          <!-- Vertical Stack: Thread Region (Top) vs Heap Memory Region (Bottom) -->
+          <div class="coop-vertical-stack" data-active-step="1">
+            <!-- Top Container: Physical Thread Region -->
             <div class="arch-region region-thread">
               <div class="region-header">
                 <div class="region-title-wrap">
@@ -125,11 +111,18 @@ function renderTaskDecoupleAnimation(): string {
                 <span class="region-tag tag-thread">CPU 物理工位</span>
               </div>
 
-              <div class="thread-slot-container">
-                <div class="slot-bg-hint">工人待命中 (等待分派)</div>
-
-                <!-- Active Task Slot (Occupied dynamically by Task A or Task B) -->
-                <!-- Task A and Task B maintain constant identity and physical position during flight -->
+              <div class="thread-slot-container slot-thread">
+                <div class="slot-bg-hint thread-idle-hint">工人待命中 (等待分派)</div>
+                <!-- Task A in Thread during Step 2, 5, 6 -->
+                <div class="task-entity task-a task-in-thread">
+                  <div class="task-badge badge-task-a">Task A</div>
+                  <span class="task-action action-thread-a">计算中</span>
+                </div>
+                <!-- Task B in Thread during Step 4 -->
+                <div class="task-entity task-b task-in-thread">
+                  <div class="task-badge badge-task-b">Task B</div>
+                  <span class="task-action action-thread-b">接力计算</span>
+                </div>
               </div>
 
               <div class="region-footer-hint">
@@ -138,7 +131,7 @@ function renderTaskDecoupleAnimation(): string {
               </div>
             </div>
 
-            <!-- Right Big Container: Heap Memory Region -->
+            <!-- Bottom Container: Heap Memory Region (Queue + Suspended Pool) -->
             <div class="arch-region region-heap">
               <div class="region-header">
                 <div class="region-title-wrap">
@@ -149,7 +142,7 @@ function renderTaskDecoupleAnimation(): string {
                 <span class="region-tag tag-heap">托管对象空间 (0 物理线程)</span>
               </div>
 
-              <!-- Inside Heap: 2 Dedicated Sub-Containers (Queue + Suspended Pool) -->
+              <!-- Inside Heap: 2 Dedicated Horizontal Sub-Cells (Ready Queue + Suspended Pool) -->
               <div class="heap-sub-grid">
                 <!-- Sub-Container 1: Ready Queue -->
                 <div class="heap-sub-cell cell-queue">
@@ -158,21 +151,16 @@ function renderTaskDecoupleAnimation(): string {
                     <span class="sub-cell-title">任务就绪队列 (Ready Queue)</span>
                   </div>
                   <div class="sub-cell-slot slot-queue">
-                    <!-- Task A and Task B initial standby home -->
-                    <div class="task-entity task-a" id="coopTaskA">
+                    <div class="slot-bg-hint queue-empty-hint">队列已清空</div>
+                    <!-- Task A in queue during Step 1 -->
+                    <div class="task-entity task-a task-in-queue-a">
                       <div class="task-badge badge-task-a">Task A</div>
-                      <span class="task-action action-a-init">就绪</span>
-                      <span class="task-action action-a-calc">计算中</span>
-                      <span class="task-action action-a-suspend">挂起中</span>
-                      <span class="task-action action-a-resume">唤醒收尾</span>
-                      <span class="task-action action-a-done">已完成</span>
+                      <span class="task-action">就绪待命</span>
                     </div>
-
-                    <div class="task-entity task-b" id="coopTaskB">
+                    <!-- Task B in queue during Step 1, 2, 3 -->
+                    <div class="task-entity task-b task-in-queue-b">
                       <div class="task-badge badge-task-b">Task B</div>
-                      <span class="task-action action-b-init">就绪排队</span>
-                      <span class="task-action action-b-calc">接力计算</span>
-                      <span class="task-action action-b-done">已完成</span>
+                      <span class="task-action">就绪排队</span>
                     </div>
                   </div>
                 </div>
@@ -184,8 +172,12 @@ function renderTaskDecoupleAnimation(): string {
                     <span class="sub-cell-title">挂起池 (Suspended Pool)</span>
                   </div>
                   <div class="sub-cell-slot slot-pool">
-                    <span class="slot-idle-hint">挂起池空闲</span>
-                    <!-- Task A parks here during Phase 3 & 4 -->
+                    <div class="slot-bg-hint pool-empty-hint">挂起池空闲</div>
+                    <!-- Task A in pool during Step 3, 4 -->
+                    <div class="task-entity task-a task-in-pool">
+                      <div class="task-badge badge-task-a">Task A</div>
+                      <span class="task-action">挂起中 (0 线程)</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -197,17 +189,13 @@ function renderTaskDecoupleAnimation(): string {
             </div>
           </div>
         </div>
-
-        <div class="model-verdict verdict-success">
-          <strong>结果</strong>：单工人交替复用，I/O 等待零阻塞，吞吐量翻倍。
-        </div>
       </div>
 
       <!-- Panel 2: Traditional Blocking Model (Comparison Pane) -->
       <div class="decouple-panel decouple-panel-trad" role="tabpanel" style="display: none;">
-        <!-- Traditional 6-Phase Stepper Tracker -->
+        <!-- Traditional 6-Phase Stepper Tracker (Clickable Manual Steps) -->
         <div class="decouple-stepper-bar trad-stepper-bar">
-          <div class="stepper-item step-p1">
+          <div class="stepper-item step-p1 active" data-step="1">
             <div class="step-head">
               <span class="step-circle circle-danger">1</span>
               <span class="step-title">初始待命</span>
@@ -215,7 +203,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">双任务到达 · 工人就绪</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p2">
+          <div class="stepper-item step-p2" data-step="2">
             <div class="step-head">
               <span class="step-circle circle-danger">2</span>
               <span class="step-title">A 启动计算</span>
@@ -223,7 +211,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">Task A 上工 · Task B 排队</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p3">
+          <div class="stepper-item step-p3" data-step="3">
             <div class="step-head">
               <span class="step-circle circle-danger">3</span>
               <span class="step-title">A 死锁阻塞</span>
@@ -231,7 +219,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">Thread.sleep · 物理线程死锁</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p4">
+          <div class="stepper-item step-p4" data-step="4">
             <div class="step-head">
               <span class="step-circle circle-danger">4</span>
               <span class="step-title">B 饥饿受阻</span>
@@ -239,7 +227,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">工人被占 · Task B 进不去</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p5">
+          <div class="stepper-item step-p5" data-step="5">
             <div class="step-head">
               <span class="step-circle circle-danger">5</span>
               <span class="step-title">A 迟钝释放</span>
@@ -247,7 +235,7 @@ function renderTaskDecoupleAnimation(): string {
             <span class="step-sub">A 终于唤醒 · B 刚轮到</span>
           </div>
           <div class="stepper-arrow">→</div>
-          <div class="stepper-item step-p6">
+          <div class="stepper-item step-p6" data-step="6">
             <div class="step-head">
               <span class="step-circle circle-danger">6</span>
               <span class="step-title">延误滞后</span>
@@ -256,8 +244,8 @@ function renderTaskDecoupleAnimation(): string {
           </div>
         </div>
 
-        <!-- Traditional Single-Stage Canvas -->
-        <div class="trad-stage-canvas single-stage">
+        <!-- Traditional Single-Stage Canvas (Interactive Step Controlled) -->
+        <div class="trad-stage-canvas single-stage" data-active-step="1">
           <div class="model-content-row">
             <!-- Worker Lane -->
             <div class="trad-lane">
@@ -329,10 +317,6 @@ function renderTaskDecoupleAnimation(): string {
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="model-verdict verdict-danger">
-          <strong>代价</strong>：I/O 死等霸占物理工人，后续任务严重饥饿，总体耗时翻倍。
         </div>
       </div>
     </div>
