@@ -54,7 +54,7 @@ function renderTaskDecoupleAnimation(): string {
               <span class="step-circle">1</span>
               <span class="step-title">初始计算</span>
             </div>
-            <span class="step-sub">Task A 占用线程执行</span>
+            <span class="step-sub">Task A 占用工人正常执行</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p2">
@@ -62,7 +62,7 @@ function renderTaskDecoupleAnimation(): string {
               <span class="step-circle">2</span>
               <span class="step-title">遇 I/O 挂起</span>
             </div>
-            <span class="step-sub">脱钩让权，腾出工位</span>
+            <span class="step-sub">脱钩让权，移入右侧挂起池</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p3">
@@ -70,7 +70,7 @@ function renderTaskDecoupleAnimation(): string {
               <span class="step-circle">3</span>
               <span class="step-title">Task B 接力</span>
             </div>
-            <span class="step-sub">工人无缝接手，100% 运转</span>
+            <span class="step-sub">左侧工人无缝接手，100% 运转</span>
           </div>
           <div class="stepper-arrow">→</div>
           <div class="stepper-item step-p4">
@@ -78,57 +78,66 @@ function renderTaskDecoupleAnimation(): string {
               <span class="step-circle">4</span>
               <span class="step-title">数据就绪唤醒</span>
             </div>
-            <span class="step-sub">Task A 回落收尾，双任务完成</span>
+            <span class="step-sub">Task A 回落左侧收尾，双任务完成</span>
           </div>
         </div>
 
-        <!-- Continuous Spatial Two-Tier Coroutine Stage -->
+        <!-- Spatial Side-by-Side Coroutine Stage (Worker on Left, Pool on Right) -->
         <div class="coop-stage-canvas single-stage">
-          <!-- Tier 1: Suspended Waiting Area (Pool) -->
-          <div class="coop-tier tier-pool">
-            <div class="tier-header">
-              <div class="tier-label">
-                <span class="tier-dot dot-pool"></span>
-                <span>挂起等待区 (堆内存 · 0 物理线程消耗)</span>
-              </div>
-              <span class="tier-hint">任务遇 I/O 主动让位，在此挂起等待</span>
+          <!-- Horizontal Transfer Direction Guides -->
+          <div class="coop-lr-transfer-bar">
+            <div class="lr-guide guide-to-pool">
+              <span class="guide-arrow">→</span>
+              <span>遇 I/O 让出工位，移入右侧挂起池</span>
             </div>
-            <div class="tier-slot slot-pool">
-              <span class="slot-idle-text">Task A 挂起就绪位</span>
+            <div class="lr-guide guide-to-thread">
+              <span>I/O 就绪唤醒，恢复左侧执行工位</span>
+              <span class="guide-arrow">←</span>
             </div>
           </div>
 
-          <!-- Subtle Connector Track -->
-          <div class="coop-transfer-connector">
-            <span class="transfer-guide guide-up">让出执行权 ↑</span>
-            <span class="transfer-guide guide-down">↓ 唤醒回落</span>
-          </div>
-
-          <!-- Tier 2: Physical Worker Thread -->
-          <div class="coop-tier tier-thread">
-            <div class="tier-header">
-              <div class="tier-label">
-                <span class="tier-dot dot-thread"></span>
-                <span>Worker Thread #1 (物理工人)</span>
+          <!-- Left / Right Grid -->
+          <div class="coop-lr-grid">
+            <!-- Left Region: Physical Worker Thread -->
+            <div class="coop-col col-thread">
+              <div class="col-header">
+                <div class="col-label">
+                  <span class="col-dot dot-thread"></span>
+                  <span class="col-title">Worker Thread #1 (物理工人)</span>
+                </div>
+                <span class="col-status status-thread">CPU 执行工位</span>
               </div>
-              <span class="tier-status">CPU 执行工位</span>
+              <div class="col-slot slot-thread">
+                <!-- Background cue when thread is free -->
+                <div class="thread-idle-cue">工位已释放 · 物理工人空闲中</div>
+
+                <!-- Physical Task A: Originates in worker thread, glides to right pool on I/O, glides back on resume -->
+                <div class="flight-task-a">
+                  <span class="pill-name">Task A (网络请求)</span>
+                  <span class="pill-state state-a-run">正在执行</span>
+                  <span class="pill-state state-a-pool">挂起等待 I/O (让出工位)</span>
+                  <span class="pill-state state-a-done">数据就绪 · 恢复收尾</span>
+                </div>
+
+                <!-- Physical Task B: Takes over empty worker slot during Phase 3, finishes and exits -->
+                <div class="takeover-task-b">
+                  <span class="pill-name">Task B (界面渲染)</span>
+                  <span class="pill-state state-b-run">接力执行中 (100% 线程复用)</span>
+                </div>
+              </div>
             </div>
-            <div class="tier-slot slot-thread">
-              <!-- Background cue when thread is free -->
-              <div class="thread-idle-cue">工位已释放 · 物理工人空闲中</div>
 
-              <!-- Physical Task A: Ascends to pool on I/O, descends back on resume -->
-              <div class="flight-task-a">
-                <span class="pill-name">Task A (网络请求)</span>
-                <span class="pill-state state-a-run">正在执行</span>
-                <span class="pill-state state-a-pool">挂起等待 I/O (让出工位)</span>
-                <span class="pill-state state-a-done">数据就绪 · 恢复收尾</span>
+            <!-- Right Region: Suspended Waiting Area (Pool) -->
+            <div class="coop-col col-pool">
+              <div class="col-header">
+                <div class="col-label">
+                  <span class="col-dot dot-pool"></span>
+                  <span class="col-title">挂起等待区 (待续挂起池)</span>
+                </div>
+                <span class="col-status status-pool">堆内存 · 0 物理线程消耗</span>
               </div>
-
-              <!-- Physical Task B: Slides in when slot is empty, completes and exits -->
-              <div class="takeover-task-b">
-                <span class="pill-name">Task B (界面渲染)</span>
-                <span class="pill-state state-b-run">接力执行中 (100% 线程复用)</span>
+              <div class="col-slot slot-pool">
+                <span class="slot-idle-text">Task A 挂起暂存位</span>
               </div>
             </div>
           </div>
