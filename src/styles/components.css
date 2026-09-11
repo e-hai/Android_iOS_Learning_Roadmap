@@ -5618,8 +5618,12 @@ input:focus-visible,
   border-color: var(--color-accent);
 }
 
-.coroutine-anim-card:hover * {
-  animation-play-state: paused !important;
+/* Only pause task motion when explicitly hovering over the stage canvas */
+.single-stage:hover .trad-lane-slot *,
+.single-stage:hover .trad-queue-slot *,
+.single-stage:hover .coop-lane-slot *,
+.single-stage:hover .coop-pool-zone * {
+  animation-play-state: paused;
 }
 
 .coroutine-anim-header {
@@ -5788,7 +5792,6 @@ input:focus-visible,
 
 .decouple-panel {
   display: none;
-  animation: fadeInPanel 0.25s ease;
 }
 
 .decouple-panel.active {
@@ -5799,11 +5802,6 @@ input:focus-visible,
 .decouple-card[data-active-mode="coop"] .decouple-panel-trad { display: none; }
 .decouple-card[data-active-mode="trad"] .decouple-panel-coop { display: none; }
 .decouple-card[data-active-mode="trad"] .decouple-panel-trad { display: block; }
-
-@keyframes fadeInPanel {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
-}
 
 .single-stage {
   border-radius: 8px;

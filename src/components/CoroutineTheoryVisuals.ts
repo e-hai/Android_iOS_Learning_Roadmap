@@ -253,13 +253,6 @@ function renderTaskDecoupleAnimation(): string {
           <strong>传统弊端</strong>：I/O 等待期间物理线程死锁，后续任务全部被堵在门外无法执行，吞吐量暴跌！
         </div>
       </div>
-
-      <div class="coroutine-anim-footer">
-        <div class="footer-insight">
-          <span class="insight-badge">第一性原理</span>
-          <span>协程并不是“更轻的物理线程”，而是一套<strong>任务与工人的动态协作调度协议</strong>：遇等待即出让，工人永不闲置。</span>
-        </div>
-      </div>
     </div>
   `;
 }
