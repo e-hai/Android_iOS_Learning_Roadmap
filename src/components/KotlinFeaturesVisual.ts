@@ -80,18 +80,26 @@ export function renderKotlinFeaturesVisual(): string {
             <div class="kt-sc-box box-pain">
               <div class="kt-box-label label-pain">本质与历史痛点</div>
               <p class="kt-box-text">
-                <strong>本质定义</strong>：泛型本质是<strong>参数化类型（Parameterized Types）</strong>，将数据类型本身作为参数传递。<br/>
-                <strong>最初痛点</strong>：在泛型诞生前，所有集合容器全存 <code>Object</code>，取值全靠手工强转，线上极易突发致命的 <code>ClassCastException</code> 崩溃；若为求类型安全，就必须为每种类型复制一套 <code>IntArrayList</code>、<code>StringArrayList</code> 等冗余模板。泛型最初的使命就是<strong>将类型崩溃提前到编译期静态拦截，并用一套模板消除重复样板</strong>。<br/>
-                <strong>型变墙演进</strong>：引入泛型后，面向对象继承体系引出了“型变隔阂”——现实中“一筐苹果”可以当成“一筐水果”，但类型系统里 <code>List&lt;Apple&gt;</code> 却不能赋给 <code>List&lt;Fruit&gt;</code>。Java 迫使调用方在每个方法签名中痛苦地手写 <code>? extends</code> / <code>? super</code> 通配符，心智负担极高。
+                <strong>1. 本质定义</strong>：泛型本质是<strong>参数化类型（Parameterized Types）</strong>，将数据类型本身作为参数传递，写一套通用模板适配万物。
+              </p>
+              <p class="kt-box-text">
+                <strong>2. 最初痛点</strong>：在泛型诞生前，所有集合容器全存 <code>Object</code>，取值全靠手工强转，线上极易突发致命的 <code>ClassCastException</code> 崩溃；若为求类型安全，就必须为每种类型复制一套 <code>IntArrayList</code>、<code>StringArrayList</code> 等冗余模板。泛型最初的根本使命就是<strong>将类型崩溃提前到编译期静态拦截，并用一套模板消除重复样板</strong>。
+              </p>
+              <p class="kt-box-text">
+                <strong>3. 型变墙演进</strong>：引入泛型后，面向对象继承体系引出了“型变隔阂”——现实中“一筐苹果”可以当成“一筐水果”，但类型系统里 <code>List&lt;Apple&gt;</code> 却不能赋给 <code>List&lt;Fruit&gt;</code>。Java 迫使调用方在每个方法签名中痛苦地手写 <code>? extends</code> / <code>? super</code> 通配符，心智负担极高。
               </p>
             </div>
 
             <div class="kt-sc-box box-idea">
               <div class="kt-box-label label-idea">现代设计思路</div>
               <p class="kt-box-text">
-                “泛型不仅要实现<strong>编译期类型安全与一套模板通用</strong>，更要根治通配符的重复折磨：<br/>
-                1. <strong>边界约束</strong>：通过 <code>T : Comparable&lt;T&gt;</code> 上界与 <code>where</code> 复合子句精准限定类型能力。<br/>
-                2. <strong>声明处型变（PECS 规则原生化）</strong>：直接在<strong>类或接口定义处</strong>一次性声明生产/消费契约——只产出不消费标 <code>out</code>（协变，子类容器自然赋值给父类容器），只消费不产出标 <code>in</code>（逆变），全工程调用方自然安全流转，调用端零额外心智负担！”
+                泛型不仅要实现<strong>编译期类型安全与一套模板通用</strong>，更要根治通配符的重复折磨：
+              </p>
+              <p class="kt-box-text">
+                <strong>1. 边界约束</strong>：通过 <code>T : Comparable&lt;T&gt;</code> 上界与 <code>where</code> 复合子句精准限定类型能力。
+              </p>
+              <p class="kt-box-text">
+                <strong>2. 声明处型变（PECS 规则原生化）</strong>：直接在<strong>类或接口定义处</strong>一次性声明生产/消费契约——只产出不消费标 <code>out</code>（协变，子类容器自然赋值给父类容器），只消费不产出标 <code>in</code>（逆变），全工程调用方自然安全流转，调用端零额外心智负担！
               </p>
             </div>
           </div>
