@@ -69,11 +69,6 @@ export function renderKotlinFeaturesVisual(): string {
                 <span class="kt-sc-metaphor">“参数化类型：写一套模板适配万物，把类型错误彻底拦截在编译期”</span>
               </div>
             </div>
-            <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-purple">参数化类型</span>
-              <span class="kt-pill pill-purple">编译期类型安全</span>
-              <span class="kt-pill pill-gray">out 协变 / in 逆变</span>
-            </div>
           </div>
 
           <div class="kt-sc-body-grid">
@@ -141,11 +136,6 @@ export function renderKotlinFeaturesVisual(): string {
                 <span class="kt-sc-metaphor">“专业的事交给专门的代理人跑腿，主类只挂名”</span>
               </div>
             </div>
-            <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-green">组合优于继承</span>
-              <span class="kt-pill pill-green">约定胜于配置</span>
-              <span class="kt-pill pill-gray">by lazy / by viewModels</span>
-            </div>
           </div>
 
           <div class="kt-sc-body-grid">
@@ -198,11 +188,6 @@ export function renderKotlinFeaturesVisual(): string {
                 <h4 class="kt-sc-title">扩展 (fun / val)</h4>
                 <span class="kt-sc-metaphor">“不破坏人家的封装，也能随手在人家口袋里塞个好用的小工具”</span>
               </div>
-            </div>
-            <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-blue">终结 Utils 堆砌</span>
-              <span class="kt-pill pill-blue">主谓自然流畅</span>
-              <span class="kt-pill pill-gray">IDE 联想友好</span>
             </div>
           </div>
 
@@ -258,11 +243,6 @@ context.<span class="kt-c-f">toast</span>(<span class="kt-c-s">"屏幕宽度: \$
                 <h4 class="kt-sc-title">带接收者 Lambda (T.() -> R)</h4>
                 <span class="kt-sc-metaphor">“闭门造车——直接把屋子借给你，进门后你就是当前的屋主”</span>
               </div>
-            </div>
-            <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-amber">上下文借调</span>
-              <span class="kt-pill pill-amber">隐式 this</span>
-              <span class="kt-pill pill-gray">声明式 DSL 基石</span>
             </div>
           </div>
 
@@ -320,11 +300,6 @@ context.<span class="kt-c-f">toast</span>(<span class="kt-c-s">"屏幕宽度: \$
                 <span class="kt-sc-metaphor">“替身代打与就地拆包装——高级抽象不给运行时交‘中介费’”</span>
               </div>
             </div>
-            <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-rose">零成本抽象</span>
-              <span class="kt-pill pill-rose">消除 GC 抖动</span>
-              <span class="kt-pill pill-gray">noinline / crossinline</span>
-            </div>
           </div>
 
           <div class="kt-sc-body-grid">
@@ -376,11 +351,6 @@ context.<span class="kt-c-f">toast</span>(<span class="kt-c-s">"屏幕宽度: \$
                 <h4 class="kt-sc-title">泛型具现化 (reified)</h4>
                 <span class="kt-sc-metaphor">“借东风——让内联展开把调用现场的真实类型直接‘焊死’在代码里”</span>
               </div>
-            </div>
-            <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-cyan">突破类型擦除</span>
-              <span class="kt-pill pill-cyan">直接 is T / T::class</span>
-              <span class="kt-pill pill-gray">必须配合 inline</span>
             </div>
           </div>
 
