@@ -48,24 +48,12 @@ export function renderKotlinFeaturesVisual(): string {
   return `
     <div class="kt-visual-container" id="kt-features-card">
       
-      <!-- Top Overview Header -->
-      <div class="kt-visual-header">
-        <div class="kt-visual-header-left">
-          <div class="kt-badge-row">
-            <span class="kt-badge kt-badge-accent">语言设计哲学</span>
-            <span class="kt-badge kt-badge-subtle">问题驱动 · 拒绝学术八股</span>
-            <span class="kt-badge kt-badge-outline">从踩坑痛点到工程权衡</span>
-          </div>
-          <h3 class="kt-visual-title">Kotlin 现代语法糖与工程提效全景图</h3>
-          <p class="kt-visual-subtitle">
-            语法特性绝不是单纯的炫技，而是设计师为了解决前人写代码时的痛点做出的优雅抽象与工程折中。
-          </p>
-        </div>
-        <div class="kt-visual-header-actions">
-          <button class="box-copy-btn btn-ghost" id="btn-copy-kt-features" title="复制全景思辨 Markdown 笔记">
-            <span>复制设计笔记</span>
-          </button>
-        </div>
+      <!-- Top Action Toolbar -->
+      <div class="kt-visual-toolbar">
+        <button class="box-copy-btn btn-ghost" id="btn-copy-kt-features" title="复制全景设计笔记">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span>复制设计笔记</span>
+        </button>
       </div>
 
       <!-- Philosophy Story Cards Flow -->

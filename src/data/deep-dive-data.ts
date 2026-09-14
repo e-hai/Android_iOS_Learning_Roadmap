@@ -9,7 +9,6 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
         sectionTitles: {
           explanation: '核心原理解析与设计哲学',
           diagram: '六大特性的设计哲学与工程破局卡片',
-          diagramCaption: 'Kotlin 现代语法糖与工程提效全景图',
           caseStudy: '三、详细的使用例子',
         },
         explanation: `### 1. 语法糖背后的工程本质：少写样板与零开销抽象

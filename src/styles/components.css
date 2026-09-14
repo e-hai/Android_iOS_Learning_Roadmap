@@ -5271,80 +5271,11 @@ input:focus-visible,
   font-family: var(--font-sans);
 }
 
-.kt-visual-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 18px 22px;
-  box-shadow: var(--shadow-xs);
-  flex-wrap: wrap;
-}
-
-@media (max-width: 640px) {
-  .kt-visual-header {
-    padding: 14px;
-    gap: 14px;
-  }
-}
-
-.kt-visual-header-left {
-  flex: 1;
-  min-width: 280px;
-}
-
-.kt-badge-row {
+.kt-visual-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-
-.kt-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 2.5px 8px;
-  border-radius: var(--radius-full);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.kt-badge-accent {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
-  border: 1px solid var(--color-accent-ring);
-}
-
-.kt-badge-subtle {
-  background: var(--color-android-soft);
-  color: var(--color-android);
-  border: 1px solid var(--color-android-border);
-}
-
-.kt-badge-outline {
-  background: var(--color-surface-sunken);
-  color: var(--color-ink-muted);
-  border: 1px solid var(--color-border);
-}
-
-.kt-visual-title {
-  font-size: 16px;
-  font-weight: 800;
-  color: var(--color-ink);
-  margin: 0 0 4px 0;
-  letter-spacing: -0.01em;
-}
-
-.kt-visual-subtitle {
-  font-size: 12.5px;
-  color: var(--color-ink-muted);
-  margin: 0;
-  line-height: 1.5;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }
 
 /* Story Cards Flow */
