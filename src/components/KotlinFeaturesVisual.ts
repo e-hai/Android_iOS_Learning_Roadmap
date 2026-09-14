@@ -15,7 +15,7 @@ export const KOTLIN_FEATURES_MARKDOWN = `### Kotlin 六大现代特性的语言�
      - 调料台·调料罐（可放可舀，两头通 \<T\>）：死守标签绝不串用（不变 Invariant），防止白糖混进盐罐引起崩溃；
      - 饮料岛·自动饮料机（单向取饮料，只出不进 \<out T\>）：贴可乐直接当通用饮料喝（协变 Covariant），放行子类赋给父类；
      - 回收处·餐盘垃圾桶（吃完只能往里扔，只进不出 \<in T\>）：通用大垃圾桶通吃具体小垃圾（逆变 Contravariant），放行父类赋给子类。
-   - 典型场景：泛型上界约束、只读集合 List<out E>、异步流 Flow<out T>、消费者 Comparable<in T>。
+   - 核心语法矩阵：<T>（读写不变）、<out T>（只读协变）、<in T>（只写逆变）、<*>（星号无差别安全只读）、where（多重上界复合约束）。
 
 2. **委托机制 (by)**
    - 核心隐喻：专业的事交给专门的代理人跑腿，主类只挂名。
@@ -103,28 +103,33 @@ export function renderKotlinFeaturesVisual(): string {
 
           <div class="kt-sc-code-box">
             <div class="kt-code-header">
-              <span class="kt-code-tab">代码实现</span>
+              <span class="kt-code-tab">代码实现（五大核心用法）</span>
             </div>
-            <pre class="kt-code-pre"><code><span class="kt-c-m">// 1. 泛型约束：限定 T 具备可比较性</span>
-<span class="kt-c-k">fun</span> &lt;<span class="kt-c-t">T</span> : <span class="kt-c-t">Comparable</span>&lt;<span class="kt-c-t">T</span>&gt;&gt; <span class="kt-c-f">maxOf</span>(a: <span class="kt-c-t">T</span>, b: <span class="kt-c-t">T</span>): <span class="kt-c-t">T</span> = <span class="kt-c-k">if</span> (a &gt; b) a <span class="kt-c-k">else</span> b
+            <pre class="kt-code-pre"><code><span class="kt-c-m">// 1. &lt;T&gt; 不变（调料罐：能放能取，类型锁死不能串用）</span>
+<span class="kt-c-k">class</span> <span class="kt-c-t">Jar</span>&lt;<span class="kt-c-t">T</span>&gt;(<span class="kt-c-k">var</span> item: <span class="kt-c-t">T</span>)
+<span class="kt-c-k">val</span> saltJar: <span class="kt-c-t">Jar</span>&lt;<span class="kt-c-t">Salt</span>&gt; = <span class="kt-c-t">Jar</span>(<span class="kt-c-t">Salt</span>())
+<span class="kt-c-m">// val seasonJar: Jar&lt;Seasoning&gt; = saltJar // ❌ 编译报错！禁止赋值，防止被混入白糖</span>
 
-<span class="kt-c-m">// 2. 声明处协变 out（生产者只出不进）：自然赋值，全工程免写 ? extends</span>
-<span class="kt-c-k">interface</span> <span class="kt-c-t">Source</span>&lt;<span class="kt-c-k">out</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">produce</span>(): <span class="kt-c-t">T</span> }
-<span class="kt-c-k">val</span> fruitSource: <span class="kt-c-t">Source</span>&lt;<span class="kt-c-t">Fruit</span>&gt; = appleSource <span class="kt-c-m">// 合法安全向上转换</span>
+<span class="kt-c-m">// 2. &lt;out T&gt; 协变（饮料机：只能接取只出不进，子类自然赋给父类）</span>
+<span class="kt-c-k">interface</span> <span class="kt-c-t">DrinkMachine</span>&lt;<span class="kt-c-k">out</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">getDrink</span>(): <span class="kt-c-t">T</span> }
+<span class="kt-c-k">val</span> colaMachine: <span class="kt-c-t">DrinkMachine</span>&lt;<span class="kt-c-t">Cola</span>&gt; = ...
+<span class="kt-c-k">val</span> drinkMachine: <span class="kt-c-t">DrinkMachine</span>&lt;<span class="kt-c-t">Beverage</span>&gt; = colaMachine <span class="kt-c-m">// ✅ 安全协变！贴可乐直接当饮料喝</span>
 
-<span class="kt-c-m">// 3. 声明处逆变 in（消费者只进不出）：父类消费者自然适配子类</span>
-<span class="kt-c-k">interface</span> <span class="kt-c-t">Sink</span>&lt;<span class="kt-c-k">in</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">consume</span>(item: <span class="kt-c-t">T</span>) }</code></pre>
-          </div>
+<span class="kt-c-m">// 3. &lt;in T&gt; 逆变（垃圾桶：只能扔进只进不出，父类消费者通吃子类）</span>
+<span class="kt-c-k">interface</span> <span class="kt-c-t">TrashBin</span>&lt;<span class="kt-c-k">in</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">throwIn</span>(item: <span class="kt-c-t">T</span>) }
+<span class="kt-c-k">val</span> universalBin: <span class="kt-c-t">TrashBin</span>&lt;<span class="kt-c-t">Trash</span>&gt; = ...
+<span class="kt-c-k">val</span> colaCupBin: <span class="kt-c-t">TrashBin</span>&lt;<span class="kt-c-t">ColaCup</span>&gt; = universalBin <span class="kt-c-m">// ✅ 安全逆变！大垃圾桶通吃可乐杯</span>
 
-          <div class="kt-sc-footer-grid">
-            <div class="kt-sc-foot-item">
-              <span class="kt-foot-badge">底层实现</span>
-              <span>纯编译器前端类型推导与类型安全校验；在 JVM 字节码层面执行类型擦除并自动合成桥接通配符，<strong>零运行时包装损耗</strong>。</span>
-            </div>
-            <div class="kt-sc-foot-item">
-              <span class="kt-foot-badge">典型场景</span>
-              <span>编译期安全集合、泛型约束工具、只读集合 <code>List&lt;out E&gt;</code>、异步数据流 <code>Flow&lt;out T&gt;</code>、比较器 <code>Comparable&lt;in T&gt;</code>。</span>
-            </div>
+<span class="kt-c-m">// 4. &lt;*&gt; 星号投影（只关心容器通用属性，安全只读 Any?，严禁写入）</span>
+<span class="kt-c-k">fun</span> <span class="kt-c-f">printListInfo</span>(list: <span class="kt-c-t">List</span>&lt;*&gt;) {
+  <span class="kt-c-f">println</span>(list.size)                   <span class="kt-c-m">// ✅ 安全读取元素个数</span>
+  <span class="kt-c-k">val</span> first: <span class="kt-c-t">Any</span>? = list.firstOrNull() <span class="kt-c-m">// ✅ 只能作为 Any? 安全读取，类型完全抹平</span>
+}
+
+<span class="kt-c-m">// 5. where 多重上界约束（T 必须同时满足多个接口/类条件）</span>
+<span class="kt-c-k">fun</span> &lt;<span class="kt-c-t">T</span>&gt; <span class="kt-c-f">closeAndSort</span>(item: <span class="kt-c-t">T</span>) <span class="kt-c-k">where</span> <span class="kt-c-t">T</span> : <span class="kt-c-t">AutoCloseable</span>, <span class="kt-c-t">T</span> : <span class="kt-c-t">Comparable</span>&lt;<span class="kt-c-t">T</span>&gt; {
+  item.<span class="kt-c-f">close</span>()                         <span class="kt-c-m">// ✅ T 既拥有可关闭能力，又拥有可比较能力</span>
+}</code></pre>
           </div>
         </article>
 
