@@ -5447,6 +5447,29 @@ input:focus-visible,
   color: var(--color-ink);
 }
 
+.kt-ascii-diagram {
+  margin: 4px 0 0 0;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-ink);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.kt-ascii-diagram code {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
 /* Code Syntax Presentation */
 .kt-sc-code-box {
   background: var(--color-surface-sunken);

@@ -89,19 +89,15 @@ export function renderKotlinFeaturesVisual(): string {
             </div>
 
             <div class="kt-sc-box box-idea">
-              <div class="kt-box-label label-idea">现代设计思路：自助餐厅顾客视角</div>
-              <p class="kt-box-text">
-                为了在保证绝对安全的前提下消除 Java 通配符（<code>? extends</code> / <code>? super</code>）在调用点的反复折磨，Kotlin 依据<strong>读写权限</strong>提供清晰的三重声明：
-              </p>
-              <p class="kt-box-text">
-                <strong>1. 调料台·调料罐 ➔ 不变性 <code>&lt;T&gt;</code>（能放能取，两头通）</strong>：顾客拿勺子舀、后厨开盖添料。<strong>必须贴死标签、专罐专用</strong>，绝不能当通用调料罐混借，防止误将白糖当盐毁了一锅菜。
-              </p>
-              <p class="kt-box-text">
-                <strong>2. 饮料岛·自动饮料机 ➔ 协变 <code>&lt;out T&gt;</code>（只能按键接取，只出不进）</strong>：出水嘴单向出流，中途没人能投毒。<strong>机器贴“可乐”，口渴的顾客完全能把它当“饮料机”直接接</strong>！单向只读放行子类容器赋给父类容器（<code>List&lt;out E&gt;</code>、<code>Flow&lt;out T&gt;</code>）。
-              </p>
-              <p class="kt-box-text">
-                <strong>3. 回收处·餐盘垃圾桶 ➔ 逆变 <code>&lt;in T&gt;</code>（吃完只能往里扔，只进不出）</strong>：单向投入，绝不往外掏。<strong>大垃圾桶能吞一切，拿来扔具体的可乐纸杯轻轻松松</strong>！单向只写放行父类消费者直接服务于子类（<code>Comparable&lt;in T&gt;</code>）。
-              </p>
+              <div class="kt-box-label label-idea">现代设计思路：自助餐厅就餐全景</div>
+              <pre class="kt-ascii-diagram"><code>                【自助餐厅就餐全景】
+                         │
+        ┌────────────────┼────────────────┐
+        ▼                ▼                ▼
+     调料台·调料罐       饮料岛·自动饮料机     回收台·餐盘垃圾桶
+      (能放又能取)         (只能按键接饮料)       (吃完只能往里扔)
+      必须贴死标签         贴可乐直接当饮料用     大垃圾桶吃一切小垃圾
+     【不变性 &lt;T&gt;】       【协变 &lt;out T&gt;】     【逆变 &lt;in T&gt;】</code></pre>
             </div>
           </div>
 
