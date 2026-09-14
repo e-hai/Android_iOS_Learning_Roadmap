@@ -10,8 +10,11 @@ export const KOTLIN_FEATURES_MARKDOWN = `### Kotlin 六大现代特性的语言�
 
 1. **泛型 (Generics)**
    - 本质定义：参数化类型（Parameterized Types），将数据类型本身作为参数传递，写一套通用模板适配万物。
-   - 根源动机：在泛型诞生前，容器只能存 Object，取值全靠手工强转，运行时极易爆发 ClassCastException 崩溃；若要保持类型安全就必须手写 IntArrayList、StringArrayList 等大量冗余容器。泛型最初的使命就是将类型错误提前到编译期静态拦截，并用一套模板消除重复样板。
-   - 现代突破：引入泛型后遭遇面向对象继承的“型变墙”（List<Apple> 无法直接赋给 List<Fruit>）。Java 迫使调用方在每个方法签名手写 ? extends / ? super 使用处通配符；Kotlin 提出“声明处型变”（out 协变 / in 逆变），在类定义时一次性声明生产/消费契约，全工程调用端自然安全赋值。
+   - 根源动机：在泛型诞生前，容器全存 Object，取值全靠手工强转，运行时极易突发 ClassCastException 崩溃；若求类型安全就必须为每种类型复制一套 IntArrayList 等冗余模板。泛型最初的使命就是将类型崩溃提前到编译期静态拦截，并用一套模板消除重复样板。
+   - 现代突破（自助餐厅顾客视角看型变）：
+     - 调料台·调料罐（可放可舀，两头通 \<T\>）：死守标签绝不串用（不变 Invariant），防止白糖混进盐罐引起崩溃；
+     - 饮料岛·自动饮料机（单向取饮料，只出不进 \<out T\>）：贴可乐直接当通用饮料喝（协变 Covariant），放行子类赋给父类；
+     - 回收处·餐盘垃圾桶（吃完只能往里扔，只进不出 \<in T\>）：通用大垃圾桶通吃具体小垃圾（逆变 Contravariant），放行父类赋给子类。
    - 典型场景：泛型上界约束、只读集合 List<out E>、异步流 Flow<out T>、消费者 Comparable<in T>。
 
 2. **委托机制 (by)**
@@ -66,7 +69,7 @@ export function renderKotlinFeaturesVisual(): string {
               <span class="kt-sc-badge num-purple">01</span>
               <div class="kt-sc-headings">
                 <h4 class="kt-sc-title">泛型 (Generics)</h4>
-                <span class="kt-sc-metaphor">“参数化类型：写一套模板适配万物，把类型错误彻底拦截在编译期”</span>
+                <span class="kt-sc-metaphor">“参数化类型：一套模板适配万物；自助餐厅顾客视角看懂型变”</span>
               </div>
             </div>
           </div>
@@ -75,26 +78,29 @@ export function renderKotlinFeaturesVisual(): string {
             <div class="kt-sc-box box-pain">
               <div class="kt-box-label label-pain">本质与历史痛点</div>
               <p class="kt-box-text">
-                <strong>1. 本质定义</strong>：泛型本质是<strong>参数化类型（Parameterized Types）</strong>，将数据类型本身作为参数传递，写一套通用模板适配万物。
+                <strong>1. 本质定义</strong>：泛型本质是<strong>参数化类型（Parameterized Types）</strong>，将数据类型本身作为参数传递，实现“写一套通用模板适配万物”。
               </p>
               <p class="kt-box-text">
                 <strong>2. 最初痛点</strong>：在泛型诞生前，所有集合容器全存 <code>Object</code>，取值全靠手工强转，线上极易突发致命的 <code>ClassCastException</code> 崩溃；若为求类型安全，就必须为每种类型复制一套 <code>IntArrayList</code>、<code>StringArrayList</code> 等冗余模板。泛型最初的根本使命就是<strong>将类型崩溃提前到编译期静态拦截，并用一套模板消除重复样板</strong>。
               </p>
               <p class="kt-box-text">
-                <strong>3. 型变墙演进</strong>：引入泛型后，面向对象继承体系引出了“型变隔阂”——现实中“一筐苹果”可以当成“一筐水果”，但类型系统里 <code>List&lt;Apple&gt;</code> 却不能赋给 <code>List&lt;Fruit&gt;</code>。Java 迫使调用方在每个方法签名中痛苦地手写 <code>? extends</code> / <code>? super</code> 通配符，心智负担极高。
+                <strong>3. 型变矛盾（为什么不能随意赋值？）</strong>：引入泛型后，现实中“可乐是一种饮料”，但为什么类型系统里 <code>MutableList&lt;Cola&gt;</code> 绝不能赋给 <code>MutableList&lt;Beverage&gt;</code>？因为一旦放行，别人就能往你的可乐列表里塞进热咖啡，导致你取回时爆发类型污染崩溃！
               </p>
             </div>
 
             <div class="kt-sc-box box-idea">
-              <div class="kt-box-label label-idea">现代设计思路</div>
+              <div class="kt-box-label label-idea">现代设计思路：自助餐厅顾客视角</div>
               <p class="kt-box-text">
-                泛型不仅要实现<strong>编译期类型安全与一套模板通用</strong>，更要根治通配符的重复折磨：
+                为了在保证绝对安全的前提下消除 Java 通配符（<code>? extends</code> / <code>? super</code>）在调用点的反复折磨，Kotlin 依据<strong>读写权限</strong>提供清晰的三重声明：
               </p>
               <p class="kt-box-text">
-                <strong>1. 边界约束</strong>：通过 <code>T : Comparable&lt;T&gt;</code> 上界与 <code>where</code> 复合子句精准限定类型能力。
+                <strong>1. 调料台·调料罐 ➔ 不变性 <code>&lt;T&gt;</code>（能放能取，两头通）</strong>：顾客拿勺子舀、后厨开盖添料。<strong>必须贴死标签、专罐专用</strong>，绝不能当通用调料罐混借，防止误将白糖当盐毁了一锅菜。
               </p>
               <p class="kt-box-text">
-                <strong>2. 声明处型变（PECS 规则原生化）</strong>：直接在<strong>类或接口定义处</strong>一次性声明生产/消费契约——只产出不消费标 <code>out</code>（协变，子类容器自然赋值给父类容器），只消费不产出标 <code>in</code>（逆变），全工程调用方自然安全流转，调用端零额外心智负担！
+                <strong>2. 饮料岛·自动饮料机 ➔ 协变 <code>&lt;out T&gt;</code>（只能按键接取，只出不进）</strong>：出水嘴单向出流，中途没人能投毒。<strong>机器贴“可乐”，口渴的顾客完全能把它当“饮料机”直接接</strong>！单向只读放行子类容器赋给父类容器（<code>List&lt;out E&gt;</code>、<code>Flow&lt;out T&gt;</code>）。
+              </p>
+              <p class="kt-box-text">
+                <strong>3. 回收处·餐盘垃圾桶 ➔ 逆变 <code>&lt;in T&gt;</code>（吃完只能往里扔，只进不出）</strong>：单向投入，绝不往外掏。<strong>大垃圾桶能吞一切，拿来扔具体的可乐纸杯轻轻松松</strong>！单向只写放行父类消费者直接服务于子类（<code>Comparable&lt;in T&gt;</code>）。
               </p>
             </div>
           </div>
