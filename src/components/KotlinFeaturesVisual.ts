@@ -9,10 +9,10 @@
 export const KOTLIN_FEATURES_MARKDOWN = `### Kotlin 六大现代特性的语言设计哲学全景图
 
 1. **泛型 (Generics)**
-   - 核心隐喻：写一套模板适配万物，一筐苹果能不能当成一筐水果？
-   - 历史问题：传统泛型要么缺乏多重上界约束，要么遭遇不可赋值的“型变墙”（Java 中 List<Dog> 无法赋给 List<Animal>），迫使调用方在每个方法参数中痛苦地手写 ? extends / ? super。
-   - 设计思路：在编译期提供绝对的类型安全与极致的代码复用。通过上界约束限制范围；通过声明处型变（out 协变 / in 逆变）在类定义时一次性声明生产/消费协议，全工程调用处自然转换。
-   - 典型场景：泛型约束、List<out E> 只读集合、Flow<out T> 数据流、Comparable<in T> 消费者。
+   - 本质定义：参数化类型（Parameterized Types），将数据类型本身作为参数传递，写一套通用模板适配万物。
+   - 根源动机：在泛型诞生前，容器只能存 Object，取值全靠手工强转，运行时极易爆发 ClassCastException 崩溃；若要保持类型安全就必须手写 IntArrayList、StringArrayList 等大量冗余容器。泛型最初的使命就是将类型错误提前到编译期静态拦截，并用一套模板消除重复样板。
+   - 现代突破：引入泛型后遭遇面向对象继承的“型变墙”（List<Apple> 无法直接赋给 List<Fruit>）。Java 迫使调用方在每个方法签名手写 ? extends / ? super 使用处通配符；Kotlin 提出“声明处型变”（out 协变 / in 逆变），在类定义时一次性声明生产/消费契约，全工程调用端自然安全赋值。
+   - 典型场景：泛型上界约束、只读集合 List<out E>、异步流 Flow<out T>、消费者 Comparable<in T>。
 
 2. **委托机制 (by)**
    - 核心隐喻：专业的事交给专门的代理人跑腿，主类只挂名。
@@ -66,28 +66,32 @@ export function renderKotlinFeaturesVisual(): string {
               <span class="kt-sc-badge num-purple">01</span>
               <div class="kt-sc-headings">
                 <h4 class="kt-sc-title">泛型 (Generics)</h4>
-                <span class="kt-sc-metaphor">“写一套模板适配万物，一筐苹果能不能当成一筐水果？”</span>
+                <span class="kt-sc-metaphor">“参数化类型：写一套模板适配万物，把类型错误彻底拦截在编译期”</span>
               </div>
             </div>
             <div class="kt-sc-tag-group">
-              <span class="kt-pill pill-purple">上界与多重约束</span>
-              <span class="kt-pill pill-purple">out 协变 / in 逆变</span>
-              <span class="kt-pill pill-gray">声明处一次生效</span>
+              <span class="kt-pill pill-purple">参数化类型</span>
+              <span class="kt-pill pill-purple">编译期类型安全</span>
+              <span class="kt-pill pill-gray">out 协变 / in 逆变</span>
             </div>
           </div>
 
           <div class="kt-sc-body-grid">
             <div class="kt-sc-box box-pain">
-              <div class="kt-box-label label-pain">历史问题</div>
+              <div class="kt-box-label label-pain">本质与历史痛点</div>
               <p class="kt-box-text">
-                泛型开发中面临两大阻碍：一是类型范围不明确时难以进行多接口复合约束；二是严重的“赋值隔阂”——现实中“一筐苹果”显然能当成“一筐水果”送人，但在 Java 泛型里 <code>List&lt;Apple&gt;</code> 绝不能赋给 <code>List&lt;Fruit&gt;</code>，导致调用方不得不天天手写晦涩的 <code>? extends Fruit</code> 和 <code>? super Apple</code> 通配符，极易出错。
+                <strong>本质定义</strong>：泛型本质是<strong>参数化类型（Parameterized Types）</strong>，将数据类型本身作为参数传递。<br/>
+                <strong>最初痛点</strong>：在泛型诞生前，所有集合容器全存 <code>Object</code>，取值全靠手工强转，线上极易突发致命的 <code>ClassCastException</code> 崩溃；若为求类型安全，就必须为每种类型复制一套 <code>IntArrayList</code>、<code>StringArrayList</code> 等冗余模板。泛型最初的使命就是<strong>将类型崩溃提前到编译期静态拦截，并用一套模板消除重复样板</strong>。<br/>
+                <strong>型变墙演进</strong>：引入泛型后，面向对象继承体系引出了“型变隔阂”——现实中“一筐苹果”可以当成“一筐水果”，但类型系统里 <code>List&lt;Apple&gt;</code> 却不能赋给 <code>List&lt;Fruit&gt;</code>。Java 迫使调用方在每个方法签名中痛苦地手写 <code>? extends</code> / <code>? super</code> 通配符，心智负担极高。
               </p>
             </div>
 
             <div class="kt-sc-box box-idea">
-              <div class="kt-box-label label-idea">设计思路</div>
+              <div class="kt-box-label label-idea">现代设计思路</div>
               <p class="kt-box-text">
-                “泛型要做到<strong>编译期强类型安全与最大化代码复用</strong>。对于能力边界，提供清晰的 <code>T : Comparable&lt;T&gt;</code> 上界与 <code>where</code> 多重约束；对于容器转换，直接在<strong>定义类时声明读写契约</strong>：承诺只读不写标 <code>out</code>、只写不读标 <code>in</code>，编译器完全放行安全转型，调用端零额外心智负担！”
+                “泛型不仅要实现<strong>编译期类型安全与一套模板通用</strong>，更要根治通配符的重复折磨：<br/>
+                1. <strong>边界约束</strong>：通过 <code>T : Comparable&lt;T&gt;</code> 上界与 <code>where</code> 复合子句精准限定类型能力。<br/>
+                2. <strong>声明处型变（PECS 规则原生化）</strong>：直接在<strong>类或接口定义处</strong>一次性声明生产/消费契约——只产出不消费标 <code>out</code>（协变，子类容器自然赋值给父类容器），只消费不产出标 <code>in</code>（逆变），全工程调用方自然安全流转，调用端零额外心智负担！”
               </p>
             </div>
           </div>
@@ -110,11 +114,11 @@ export function renderKotlinFeaturesVisual(): string {
           <div class="kt-sc-footer-grid">
             <div class="kt-sc-foot-item">
               <span class="kt-foot-badge">底层实现</span>
-              <span>纯编译器前端类型推导与语法校验；JVM 字节码底层做类型擦除并自动桥接通配符，<strong>零包装类、零运行时性能罚款</strong>。</span>
+              <span>纯编译器前端类型推导与类型安全校验；在 JVM 字节码层面执行类型擦除并自动合成桥接通配符，<strong>零运行时包装损耗</strong>。</span>
             </div>
             <div class="kt-sc-foot-item">
               <span class="kt-foot-badge">典型场景</span>
-              <span>泛型约束工具、只读集合 <code>List&lt;out E&gt;</code>、异步数据流 <code>Flow&lt;out T&gt;</code>、比较器 <code>Comparable&lt;in T&gt;</code>。</span>
+              <span>编译期安全集合、泛型约束工具、只读集合 <code>List&lt;out E&gt;</code>、异步数据流 <code>Flow&lt;out T&gt;</code>、比较器 <code>Comparable&lt;in T&gt;</code>。</span>
             </div>
           </div>
         </article>
