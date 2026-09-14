@@ -98,6 +98,9 @@ export function renderKotlinFeaturesVisual(): string {
       (能放又能取)         (只能按键接饮料)       (吃完只能往里扔)
       必须贴死标签         贴可乐直接当饮料用     大垃圾桶吃一切小垃圾
      【不变性 &lt;T&gt;】       【协变 &lt;out T&gt;】     【逆变 &lt;in T&gt;】</code></pre>
+              <p class="kt-box-text" style="margin-top: 6px;">
+                <strong>核心思考（既然“只出不进”，数据从哪来？）</strong>：数据在<strong>构造时一次性灌装（如 <code>listOf</code>）</strong>，或由容器<strong>在内部自行生产（如网络数据流 <code>Flow</code>）</strong>。“只出不进”是指<strong>对外封闭写接口（无 <code>add</code>/<code>set</code>）</strong>，彻底杜绝外部调用方中途塞入异物破坏类型安全。
+              </p>
             </div>
           </div>
 
@@ -110,9 +113,11 @@ export function renderKotlinFeaturesVisual(): string {
 <span class="kt-c-k">val</span> saltJar: <span class="kt-c-t">Jar</span>&lt;<span class="kt-c-t">Salt</span>&gt; = <span class="kt-c-t">Jar</span>(<span class="kt-c-t">Salt</span>())
 <span class="kt-c-m">// val seasonJar: Jar&lt;Seasoning&gt; = saltJar // ❌ 编译报错！禁止赋值，防止被混入白糖</span>
 
-<span class="kt-c-m">// 2. &lt;out T&gt; 协变（饮料机：只能接取只出不进，子类自然赋给父类）</span>
-<span class="kt-c-k">interface</span> <span class="kt-c-t">DrinkMachine</span>&lt;<span class="kt-c-k">out</span> <span class="kt-c-t">T</span>&gt; { <span class="kt-c-k">fun</span> <span class="kt-c-f">getDrink</span>(): <span class="kt-c-t">T</span> }
-<span class="kt-c-k">val</span> colaMachine: <span class="kt-c-t">DrinkMachine</span>&lt;<span class="kt-c-t">Cola</span>&gt; = ...
+<span class="kt-c-m">// 2. &lt;out T&gt; 协变（饮料机：构造时一次性灌装，对外只出不进，子类自然赋给父类）</span>
+<span class="kt-c-k">class</span> <span class="kt-c-t">DrinkMachine</span>&lt;<span class="kt-c-k">out</span> <span class="kt-c-t">T</span>&gt;(<span class="kt-c-k">private val</span> drink: <span class="kt-c-t">T</span>) { <span class="kt-c-m">// ✅ 数据在出厂/构造时灌装</span>
+  <span class="kt-c-k">fun</span> <span class="kt-c-f">getDrink</span>(): <span class="kt-c-t">T</span> = drink                        <span class="kt-c-m">// ✅ 对外只读，绝无 put/set 入口</span>
+}
+<span class="kt-c-k">val</span> colaMachine = <span class="kt-c-t">DrinkMachine</span>(<span class="kt-c-t">Cola</span>())
 <span class="kt-c-k">val</span> drinkMachine: <span class="kt-c-t">DrinkMachine</span>&lt;<span class="kt-c-t">Beverage</span>&gt; = colaMachine <span class="kt-c-m">// ✅ 安全协变！贴可乐直接当饮料喝</span>
 
 <span class="kt-c-m">// 3. &lt;in T&gt; 逆变（垃圾桶：只能扔进只进不出，父类消费者通吃子类）</span>
