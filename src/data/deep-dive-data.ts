@@ -450,21 +450,7 @@ class LoadDashboardStateMachine extends ContinuationImpl {
 }
 \`\`\`
 
-### 二、常见写法透视：scope.launch、withContext 与自定义 suspend 函数
-
-开发者日常写的最频繁的 3 种协程代码，在编译器眼里的变形各不相同：
-
-| 常见写法 | 谁变成了 Continuation？ | 谁变成了状态机？ | 状态机步骤如何切割？ | 线程调度表现 |
-| :--- | :--- | :--- | :--- | :--- |
-| **\`scope.launch { ... }\`** | 花括号内的 Lambda 闭包 | 该 Lambda 生成的 \`SuspendLambda\` 匿名类（**根状态机**） | 闭包内的每个挂起点切一个 \`case\` | 依赖 scope 绑定的上下文初始派发 |
-| **\`suspend fun foo()\`** | 编译期强行注入的隐式实参 \`\$completion\` | 该方法生成的 \`ContinuationImpl\` 匿名类（**子状态机**） | 方法体内的每个挂起点切一个 \`case\` | 沿用调用方的当前执行线程 |
-| **\`withContext(IO) { ... }\`** | 既接收外层 Continuation，自身也是挂起点 | 外层状态机被其切分；内层闭包也生成一个包装类 | 作为外层的一个 \`case\`；内层执行完触发外层恢复 | 挂起当前线程，在 IO 线程池执行完再 post 切回原线程 |
-
-- **\`scope.launch\`**：\`launch\` 本身是普通函数（无 CPS），它创建 \`StandaloneCoroutine\`，将花括号生成的 \`SuspendLambda\` 根状态机提交给调度器开启第一步。
-- **自定义 \`suspend fun\`**：属于层级调用的子状态机，内部持有一份父级 \`completion\` 引用。最深层的叶子函数执行完毕后，顺着 \`completion\` 链表自底向上反向逐级唤醒（**用堆内存链表复刻了硬件调用栈**）。
-- **\`withContext\`**：具有双重身份。在外层是挂起点切断代码；在内层将闭包打包为 \`Runnable\` 投递至指定线程池，完成后通过 \`resumeWith\` 切回原调度器。
-
-### 三、挂起点判定机制：编译器如何知道这里该切分状态机？
+### 二、挂起点判定机制：编译器如何知道这里该切分状态机？
 
 #### 1. 核心误区辨析：挂起点是“编译器认为会长时间执行的代码”吗？
 - **绝对不是！编译器在编译期没有预测运行时间的“读心术”**：
@@ -489,7 +475,7 @@ class LoadDashboardStateMachine extends ContinuationImpl {
 - **\`suspendCancellableCoroutine\`** / **\`suspendCoroutineUninterceptedOrReturn\`**
 正是这些原语内部捕获了当前状态机的 \`Continuation\` 引用（交由系统定时器或操作系统 epoll/kqueue 事件监听），并向外返回了 \`COROUTINE_SUSPENDED\` 单例，完成了物理线程的真正出让。
 
-### 四、阻塞 I/O 的致命陷阱：为什么未声明 suspend 的 I/O 会击穿协程？
+### 三、阻塞 I/O 的致命陷阱：为什么未声明 suspend 的 I/O 会击穿协程？
 
 这是工程排错中最隐蔽的**“假协程、真阻塞”**陷阱：
 
@@ -500,7 +486,7 @@ class LoadDashboardStateMachine extends ContinuationImpl {
   2. 若在 \`Dispatchers.Default\` 上调用：由于其最大线程数严格等于 CPU 核心数（通常仅 4~8 个），几个阻塞调用就会耗尽所有计算线程，**导致全局其他原本流畅的计算型协程全线饿死（Thread Starvation）**！
 - **救赎之道**：必须使用 \`withContext(Dispatchers.IO)\` 将其隔离转移至 64 容限的弹性阻塞线程池替死，或用 \`suspendCancellableCoroutine\` 将底层异步回调封装为真正的挂起函数。
 
-### 五、真假非阻塞与架构终局：withContext(IO) 替死 vs 操作系统多路复用（epoll）
+### 四、真假非阻塞与架构终局：withContext(IO) 替死 vs 操作系统多路复用（epoll）
 
 Kotlin 协程处理 I/O 存在两个截然不同的底层阵营：
 
@@ -514,7 +500,21 @@ Kotlin 协程处理 I/O 存在两个截然不同的底层阵营：
 3. **Java 的演进与宿命**：
    - Java 早在 2002 年（JDK 1.4）就通过 Java NIO 封装了 \`epoll\`，但纯事件驱动破坏了语言控制流，陷入了回调地狱；
    - **Kotlin 的突破在于编译器前端的 CPS 翻译**：让开发者写同步代码，编译器自动桥接底层的非阻塞 epoll 回调；
-   - **Java 的终极反击（JDK 21 虚拟线程 Project Loom）**：直接在 JVM 底层重写 \`read()\` 和 \`sleep()\`，在虚拟机内核层面自动挂接 epoll，实现了无需语法着色的真协程。`,
+   - **Java 的终极反击（JDK 21 虚拟线程 Project Loom）**：直接在 JVM 底层重写 \`read()\` 和 \`sleep()\`，在虚拟机内核层面自动挂接 epoll，实现了无需语法着色的真协程。
+
+### 五、常见写法透视：scope.launch、withContext 与自定义 suspend 函数
+
+开发者日常写的最频繁的 3 种协程代码，在编译器眼里的变形各不相同：
+
+| 常见写法 | 谁变成了 Continuation？ | 谁变成了状态机？ | 状态机步骤如何切割？ | 线程调度表现 |
+| :--- | :--- | :--- | :--- | :--- |
+| **\`scope.launch { ... }\`** | 花括号内的 Lambda 闭包 | 该 Lambda 生成的 \`SuspendLambda\` 匿名类（**根状态机**） | 闭包内的每个挂起点切一个 \`case\` | 依赖 scope 绑定的上下文初始派发 |
+| **\`suspend fun foo()\`** | 编译期强行注入的隐式实参 \`\$completion\` | 该方法生成的 \`ContinuationImpl\` 匿名类（**子状态机**） | 方法体内的每个挂起点切一个 \`case\` | 沿用调用方的当前执行线程 |
+| **\`withContext(IO) { ... }\`** | 既接收外层 Continuation，自身也是挂起点 | 外层状态机被其切分；内层闭包也生成一个包装类 | 作为外层的一个 \`case\`；内层执行完触发外层恢复 | 挂起当前线程，在 IO 线程池执行完再 post 切回原线程 |
+
+- **\`scope.launch\`**：\`launch\` 本身是普通函数（无 CPS），它创建 \`StandaloneCoroutine\`，将花括号生成的 \`SuspendLambda\` 根状态机提交给调度器开启第一步。
+- **自定义 \`suspend fun\`**：属于层级调用的子状态机，内部持有一份父级 \`completion\` 引用。最深层的叶子函数执行完毕后，顺着 \`completion\` 链表自底向上反向逐级唤醒（**用堆内存链表复刻了硬件调用栈**）。
+- **\`withContext\`**：具有双重身份。在外层是挂起点切断代码；在内层将闭包打包为 \`Runnable\` 投递至指定线程池，完成后通过 \`resumeWith\` 切回原调度器。`,
         caseStudy: `### 一、viewModelScope 场景下 Job 与 SupervisorJob 的行为差异
 
 \`viewModelScope\` 内部实际的 Context 是 \`SupervisorJob() + Dispatchers.Main.immediate\`。为了搞清楚这个选择背后的原因，用 \`Job()\` 和 \`SupervisorJob()\` 各写一组对照代码，分两轮实验：先看不装异常处理器时的差异，再看装了 \`CoroutineExceptionHandler\` 之后差异是否还成立。
