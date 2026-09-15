@@ -7,7 +7,6 @@ import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
 import { renderSuspensionVisual } from './SuspensionVisual';
-import { renderCoroutineStageAnimation } from './CoroutineTheoryVisuals';
 
 export function renderDeepDiveDocView(
   currentStageId: string,
@@ -762,7 +761,7 @@ function renderTimelineExplanation(
   platform: 'android' | 'ios',
   pipeline?: PipelineStep[],
   customPipelineTitle?: string,
-  moduleTitle?: string
+  _moduleTitle?: string
 ): HTMLElement {
   const container = document.createElement('div');
   container.className = `timeline-stream ${platform === 'ios' ? 'timeline-ios' : ''}`;
@@ -810,11 +809,6 @@ function renderTimelineExplanation(
     const badgeNumber = String(idx + 1).padStart(2, '0');
     const tagText = isTheory ? '设计思路' : '工程落地';
 
-    let animHtml = '';
-    if (moduleTitle === 'Kotlin 协程' || (!moduleTitle && platform === 'android' && sec.includes('CPS 续体传递风格'))) {
-      animHtml = renderCoroutineStageAnimation(idx);
-    }
-
     const item = document.createElement('div');
     item.className = 'timeline-item';
 
@@ -830,126 +824,11 @@ function renderTimelineExplanation(
         </div>
         <div class="timeline-card-content">
           ${formatCaseStudyBody(bodyText)}
-          ${animHtml}
         </div>
       </div>
     `;
 
     container.appendChild(item);
-
-    // Helpers for Decouple Animation auto-play & step control
-    const updatePanelStep = (panel: HTMLElement, step: string | number) => {
-      const stepStr = String(step);
-      panel.querySelectorAll('.stepper-item').forEach((item) => {
-        item.classList.toggle('active', item.getAttribute('data-step') === stepStr);
-      });
-      const coopStack = panel.querySelector<HTMLElement>('.coop-vertical-stack');
-      if (coopStack) {
-        coopStack.setAttribute('data-active-step', stepStr);
-      }
-      const tradStack = panel.querySelector<HTMLElement>('.trad-vertical-stack') || panel.querySelector<HTMLElement>('.trad-stage-canvas');
-      if (tradStack) {
-        tradStack.setAttribute('data-active-step', stepStr);
-      }
-    };
-
-    const stopPanelAutoPlay = (panel: HTMLElement) => {
-      const timer = (panel as any)._autoPlayTimer;
-      if (timer) {
-        clearInterval(timer);
-        (panel as any)._autoPlayTimer = null;
-      }
-    };
-
-    const playPanelOnce = (panel: HTMLElement) => {
-      stopPanelAutoPlay(panel);
-      let currentStep = 1;
-      updatePanelStep(panel, currentStep);
-
-      const timer = window.setInterval(() => {
-        currentStep++;
-        if (currentStep > 6) {
-          stopPanelAutoPlay(panel);
-          return;
-        }
-        updatePanelStep(panel, currentStep);
-      }, 1500);
-
-      (panel as any)._autoPlayTimer = timer;
-    };
-
-    // Wire up Segmented Control tab switching for Decouple Animation
-    item.querySelectorAll<HTMLButtonElement>('.decouple-tab-btn').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const card = btn.closest('.decouple-card');
-        if (!card) return;
-        const target = btn.dataset.target || 'coop';
-        card.setAttribute('data-active-mode', target);
-        card.querySelectorAll('.decouple-tab-btn').forEach((b) => {
-          const isActive = b === btn;
-          b.classList.toggle('active', isActive);
-          b.setAttribute('aria-selected', String(isActive));
-        });
-        card.querySelectorAll<HTMLElement>('.decouple-panel').forEach((panel) => {
-          const match = panel.classList.contains(`decouple-panel-${target}`);
-          panel.classList.toggle('active', match);
-          panel.style.display = match ? 'block' : 'none';
-          if (match) {
-            playPanelOnce(panel);
-          } else {
-            stopPanelAutoPlay(panel);
-          }
-        });
-      });
-    });
-
-    // Wire up Manual Stepper Click for Decouple Animation (manual click stops autoplay)
-    item.querySelectorAll<HTMLElement>('.decouple-stepper-bar .stepper-item').forEach((stepItem) => {
-      stepItem.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const step = stepItem.dataset.step;
-        if (!step) return;
-        const panel = stepItem.closest<HTMLElement>('.decouple-panel');
-        if (!panel) return;
-
-        stopPanelAutoPlay(panel);
-        updatePanelStep(panel, step);
-      });
-    });
-
-    // Wire up Replay Button ("自动推演一次")
-    item.querySelectorAll<HTMLButtonElement>('.decouple-replay-btn').forEach((replayBtn) => {
-      replayBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const card = replayBtn.closest('.decouple-card');
-        if (!card) return;
-        const activePanel = card.querySelector<HTMLElement>('.decouple-panel.active');
-        if (activePanel) {
-          playPanelOnce(activePanel);
-        }
-      });
-    });
-
-    // Auto-execute once when decouple-card enters view
-    item.querySelectorAll<HTMLElement>('.decouple-card').forEach((card) => {
-      const activePanel = card.querySelector<HTMLElement>('.decouple-panel.active');
-      if (!activePanel) return;
-
-      if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              observer.disconnect();
-              playPanelOnce(activePanel);
-            }
-          });
-        }, { threshold: 0.25 });
-        observer.observe(card);
-      } else {
-        setTimeout(() => playPanelOnce(activePanel), 600);
-      }
-    });
   });
 
   return container;

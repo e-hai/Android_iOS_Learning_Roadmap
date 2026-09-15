@@ -216,36 +216,126 @@ measureTime("LOAD_USER") {
         tag: '并发底层',
         title: 'Kotlin 协程',
         pipeline: [
-          { title: '任务与线程解绑', subtitle: '等网络时不占工位 · 遇到挂起主动让出线程，不干等耗资源', category: 'theory' },
-          { title: '后续代码当参数传', subtitle: '用回调接力棒（Continuation） · 把暂停点后的活打包成交接参数', category: 'theory' },
-          { title: '现场变量搬到堆中', subtitle: '真退出但数据不丢 · 函数直接 return 弹栈，局部变量存入堆对象', category: 'theory' },
-          { title: '状态机切片精准接力', subtitle: '按挂起点切成多段 · 唤醒后根据 label 序号精准跳到下一步', category: 'engineering' },
-          { title: '堆上链表模拟调用栈', subtitle: '层层调用自底向上唤醒 · 子函数完成后顺着引用通知外层继续', category: 'engineering' },
-          { title: '树状任务自动管理', subtitle: '父协程统一收拢生命周期 · 页面退出自动广播取消，杜绝后台漏跑', category: 'engineering' },
+          { title: 'CPS 变换', subtitle: '隐式返回转回调参数 · suspend 函数编译期重写注入 Continuation 与哨兵值', category: 'theory' },
+          { title: '状态机切片', subtitle: '挂起点切断顺序代码 · 生成 ContinuationImpl 状态机依 label 分支跳转', category: 'theory' },
+          { title: '挂起非阻塞', subtitle: '提前 return 释放物理线程 · 异步就绪后沿回调链调用 resumeWith 恢复', category: 'theory' },
+          { title: '上下文与调度', subtitle: '拦截器分派目标线程 · 调度器拦截 resumeWith 包装 Runnable 抛入队列', category: 'engineering' },
+          { title: '结构化并发', subtitle: '树状 Job 管理生命周期 · 级联向下取消、自动等待子任务与异常熔断', category: 'engineering' },
         ],
-        explanation: `### 1. 任务与线程解绑：等网络时不占工位
-- **本质认知**：传统并发模式将“任务逻辑”与“操作系统物理线程”强行绑定，遇到 I/O 等待时线程死等（阻塞），产生 1MB+ 内存常驻与内核态切换浪费，甚至引发主线程 ANR 崩溃；
-- **破局模型**：协程将“待办任务”与“执行工人（线程）”彻底解耦。当任务遇到挂起点（I/O 等待）时，主动出让物理线程，允许调度器复用该线程去处理其他就绪工作；等待就绪后，再由调度器指派任一空闲线程继续接力执行。
+        explanation: `Kotlin 协程的核心不是“轻量级线程”这么简单一句话能概括的，它本质上是**编译器把你写的顺序代码，转换成了一个基于回调的状态机**。理解这一点，其他细节（挂起、恢复、调度）就都顺理成章了。
 
-### 2. 后续代码当参数传：用回调接力棒（Continuation）交接
-- **本质认知**：传统函数依赖硬件 CPU 寄存器隐式保存返回地址，无法在代码执行中途离开并随后返回；
-- **破局模型**：编译器在编译阶段抹去函数的隐式返回值，转而向函数尾部注入一个显式参数——**续体（Continuation，CPS 续体传递风格）**。这个参数把“当前挂起点之后要执行的所有剩余代码”打包成了一个可传递的引用对象，使异步代码能以完全线性的顺序风格书写。
+### 1. suspend 函数的真面目：CPS 变换
+\`suspend\` 关键字本身不是运行时特性，而是编译期标记。编译器会给每个 \`suspend\` 函数偷偷加一个参数：
 
-### 3. 现场变量搬到堆中：真退出但数据不丢
-- **本质认知**：JVM 虚拟机出于安全性，严禁应用层直接读写和修改底层 CPU 栈指针，无法实现底层的独立有栈切换；
-- **破局模型**：**真退出，伪等待**。函数执行到挂起点时，不是物理停在原地，而是带着状态直接执行 \`return\` 弹栈退出，彻底释放物理线程栈。为了在退出后不丢失局部变量，编译器在编译期将原本属于栈帧内的局部变量，全部“搬移（Spill）”到堆内存对象的成员变量中保存。
+\`\`\`kotlin
+suspend fun fetchUser(id: Int): User
+// 编译后大致等价于（CPS：Continuation-Passing Style）
+fun fetchUser(id: Int, continuation: Continuation<User>): Any?
+\`\`\`
 
-### 4. 状态机切片精准接力：按挂起点切片分步跳转
-- **本质认知**：挂起函数被重新唤醒调用时，必须能够精准跳过前半段已经跑完的代码，不能从头重新执行；
-- **破局模型**：编译器以每个挂起点（\`suspend\`）为分界线，将函数内部连续代码切分成包含多个 \`case 0, case 1, case 2\` 的状态机分支。挂起前将内部的 \`label\` 计数器修改为下一个阶段；当外部调用 \`resumeWith()\` 唤醒时，直接依据 \`label\` 跳转到目标分支恢复执行。
+\`Continuation\` 就是一个回调接口：
 
-### 5. 堆上链表模拟调用栈：层层调用自底向上唤醒
-- **本质认知**：当挂起函数 A 调用 B、B 调用 C 时，最底层的 C 完成后，需要把结果一路返回给 B，再由 B 返回给 A；
-- **破局模型**：每个子状态机在初始化时，均持有外层调用者的 \`Continuation\` 引用（即 \`completion\` 字段），在堆上自底向上构建了一条单向引用链表。最内层的 C 计算完成时，沿着 \`completion\` 链条逐级向上触发 \`resumeWith()\`，用纯堆内存完美复刻了硬件函数调用栈的压栈与弹栈。
+\`\`\`kotlin
+interface Continuation<in T> {
+    val context: CoroutineContext
+    fun resumeWith(result: Result<T>)
+}
+\`\`\`
 
-### 6. 树状任务自动管理：父协程统一收拢生命周期
-- **本质认知**：传统多线程并发如同无序的 \`goto\`，任务一旦派发便失去生命周期约束，宿主页面销毁后后台线程沦为孤儿任务，导致内存泄漏与空指针异常；
-- **破局模型**：通过 CoroutineScope 建立严格的父子拓扑树契约：父协程必须等待全部子协程执行完毕后方可收尾退出；父级作用域被取消时，取消信号瞬间沿树状拓扑向下广播级联取消所有子任务；兄弟任务异常时根据 Job 类型决定隔离保护或全树熔断。`,
+返回值类型变成 \`Any?\`，是因为函数要么正常返回结果，要么返回一个特殊的哨兵值 \`COROUTINE_SUSPENDED\`——这个值就是“挂起”这件事在代码层面的物理表示。
+
+### 2. 状态机：代码怎么被切成片的
+编译器会把一个 \`suspend\` 函数内部的代码，以每个挂起点为界，切分成若干个状态。
+
+伪代码大致长这样：
+
+\`\`\`kotlin
+// 你写的代码
+suspend fun loadData() {
+    val token = fetchToken()   // 挂起点 1
+    val user = fetchUser(token) // 挂起点 2
+    show(user)
+}
+
+// 编译器生成的伪代码
+class LoadDataSM : ContinuationImpl {
+    var label = 0
+    var token: String? = null
+
+    fun resumeWith(result: Result<Any?>) {
+        when (label) {
+            0 -> {
+                label = 1
+                fetchToken(this) // 把自己作为回调传进去
+            }
+            1 -> {
+                token = result.getOrThrow() as String
+                label = 2
+                fetchUser(token, this)
+            }
+            2 -> {
+                val user = result.getOrThrow() as User
+                show(user)
+            }
+        }
+    }
+}
+\`\`\`
+
+每遇到一个挂起点，\`label\` 加 1，把自己（\`this\`，也就是当前的 \`Continuation\`）传给下一个挂起函数，然后函数直接退出（return \`COROUTINE_SUSPENDED\`）。
+
+### 3. 挂起与恢复：为什么说“挂起不阻塞线程”
+这是最容易让人困惑的地方，但有了状态机的视角就非常好理解：
+
+- **挂起**：就是函数执行到一半，记录好当前状态（\`label\`），然后直接从当前线程 **return** 了。物理线程没有停，它回去继续干别的事了（比如 Android 主线程继续刷帧、响应点击）。
+- **恢复**：底层异步操作（比如网络请求）完成后，拿到底层回调，调用之前保存的 \`Continuation.resumeWith(...)\`。\`resumeWith\` 再次触发状态机的 \`when (label)\`，根据记录的 \`label\` 跳到下一个 \`case\` 继续往下走。
+
+所谓“非阻塞”，本质就是**提前 return**，把线程还给别人；所谓的“恢复”，本质就是**一个回调通知**。
+
+### 4. 调度器与 CoroutineContext：代码在哪个线程恢复
+\`Continuation\` 接口里有个属性叫 \`val context: CoroutineContext\`。它是一个以 \`Key\` 为索引的数据结构（类似不可变 Map），里面存了协程需要的所有元数据，其中最重要的就是 \`CoroutineDispatcher\`。
+
+调度器本质上是一个拦截器（\`ContinuationInterceptor\`）。当底层调用 \`resumeWith\` 时，它会拦截这个调用：
+
+\`\`\`kotlin
+// Dispatcher 的核心工作
+fun interceptContinuation(continuation: Continuation): Continuation {
+    return DispatchedContinuation(dispatcher, continuation)
+}
+\`\`\`
+
+\`DispatchedContinuation\` 在收到 \`resumeWith\` 时，不做真正的恢复，而是把任务包装成一个 \`Runnable\`，扔给目标线程的队列：
+
+\`\`\`kotlin
+// DispatchedContinuation 内部大致逻辑
+override fun resumeWith(result: Result<T>) {
+    dispatcher.dispatch(context, Runnable {
+        continuation.resumeWith(result) // 在目标线程上真正恢复状态机
+    })
+}
+\`\`\`
+
+这就是为什么你在 \`withContext(Dispatchers.IO)\` 里挂起，回来之后能在主线程恢复——不是什么魔法把线程切换了，而是回调被包装后 post 到了不同的线程队列里。
+
+### 5. 结构化并发：协程树与生命周期
+\`CoroutineScope\` 管理一棵 \`Job\` 树：
+
+\`\`\`diagram
+GlobalScope (反模式：脱离树的孤儿协程)
+      │
+CoroutineScope (如 viewModelScope，绑定生命周期)
+      │
+  Root Job
+   ├── Child Job 1 ── Grandchild Job 1.1
+   └── Child Job 2
+\`\`\`
+
+- **取消传递**：父协程取消，会递归取消所有子协程；
+- **等待子协程**：父协程必须等所有子协程完成才算完成（这也是为什么叫“结构化”）；
+- **异常传播**：子协程未捕获的异常会向上抛给父协程，导致整个树被取消（除非使用 \`SupervisorJob\` 阻断传播）。
+
+> **一句话总结**：
+> **Kotlin 协程 = 编译器生成的状态机 + Continuation 回调链 + 一棵管理取消/调度的 Job 树**，没有魔法，全部是编译期代码生成加一套精心设计的运行时库（\`kotlinx.coroutines\`）。`,
         extendedDeepDive: `### 第一层：编译器层（不可见，自动生成）
 \`\`\`diagram
 suspend 函数

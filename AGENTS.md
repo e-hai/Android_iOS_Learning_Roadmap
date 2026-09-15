@@ -41,6 +41,14 @@
      - **调料罐（可舀可放，两头通 `<T>`）** ➔ **死守标签不串用（不变性 Invariant）**，防止白糖混进盐罐导致业务崩溃；
      - **自动饮料机（只能按键接取，只出不进 `<out T>`）** ➔ **贴可乐直接当饮料喝（协变 Covariant）**，单向只读放行子类赋给父类；必须向读者阐明数据来源心智（数据在出厂构造时一次性灌装或内部生产，对外封闭写接口以杜绝中途篡改）；
      - **餐盘垃圾桶（吃完只能往里扔，只进不出 `<in T>`）** ➔ **大垃圾桶通吃具体小垃圾（逆变 Contravariant）**，单向只写放行父类赋给子类。
+   - **Kotlin 协程（Coroutines）编排准则**：
+     - **破除神话**：严禁开篇以“轻量级线程”一笔带过。第一性原理定义：**Kotlin 协程 = 编译器生成的状态机 + Continuation 回调链 + 一棵管理取消/调度的 Job 树**。没有魔法，全部是编译期代码生成（CPS 转换与状态机拆分）加一套精心设计的运行时库（`kotlinx.coroutines`）。
+     - **五大核心支柱与递进逻辑**：
+       1. **CPS 变换（Continuation-Passing Style）**：`suspend` 是编译期标记而非运行时魔法。编译器给函数末尾注入 `continuation: Continuation<T>` 参数，返回值变为 `Any?`，以返回 `COROUTINE_SUSPENDED` 哨兵值表示挂起。
+       2. **状态机切片（State Machine）**：编译器以每个挂起点为界将顺序代码切分成包含 `when (label)` 的 `ContinuationImpl` 状态机。遇到挂起点时 `label++`，传 `this` 给下一个挂起函数，直接退出（return `COROUTINE_SUSPENDED`）。
+       3. **挂起与恢复（Non-blocking Suspension）**：“挂起不阻塞线程”的本质是**提前 return 释放物理线程**；“恢复”的本质是**底层异步就绪后回调通知 `Continuation.resumeWith(...)`**，驱动状态机依 `label` 跳转到下一个分支。
+       4. **上下文与调度（CoroutineContext & Dispatchers）**：调度器本质是 `ContinuationInterceptor` 拦截器。拦截 `resumeWith` 并包装成 `Runnable` 投递至目标线程队列（如 Android `Handler`/线程池），消除线程切换的神秘感。
+       5. **结构化并发（Structured Concurrency）**：基于 `CoroutineScope` 的树状生命周期（父子 Job 树），规范级联向下取消、自动等待子任务完成与异常向上熔断传播。
 
 ## 导航与资源生命周期
 
