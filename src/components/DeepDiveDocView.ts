@@ -659,7 +659,7 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
   }).join('');
 
   const hasTheory = !customTitle && pipeline.some((step) => step.category === 'theory');
-  const flowTitle = customTitle ?? (hasTheory ? '理论 ➔ 工程演进全景链路' : '工程演进全景链路');
+  const flowTitle = customTitle ?? (hasTheory ? '从设计思路到工程落地' : '核心工程演进链路');
   const badgeText = customTitle ? 'Workflow' : 'Roadmap';
 
   let legendHtml = '';
@@ -690,11 +690,11 @@ function renderPipelineFlowCard(pipeline: PipelineStep[], platform: 'android' | 
       ${hasTheory ? `
         <div class="legend-item">
           <span class="legend-dot theory-dot"></span>
-          <span>理论与策略层</span>
+          <span>设计思路</span>
         </div>` : ''}
       <div class="legend-item">
         <span class="legend-dot eng-dot"></span>
-        <span>工程与运行时层</span>
+        <span>工程落地</span>
       </div>
     `;
   }
@@ -728,7 +728,7 @@ function renderTimelineExplanation(
   container.className = `timeline-stream ${platform === 'ios' ? 'timeline-ios' : ''}`;
   const bridge = document.createElement('div');
   bridge.className = 'timeline-stream-bridge';
-  const bridgeTag = customPipelineTitle ? '各环节底层原理与关键策略分步详述' : '各阶段底层原理与代码演进分步详述';
+  const bridgeTag = customPipelineTitle ? '各环节设计思路与落地细节分步详述' : '各阶段设计思路与落地细节分步详述';
   bridge.innerHTML = `
     <div class="timeline-bridge-line"></div>
     <span class="timeline-bridge-tag">${bridgeTag}</span>
@@ -768,7 +768,7 @@ function renderTimelineExplanation(
 
     const isTheory = pipeline?.[idx]?.category === 'theory' || (!pipeline && idx < 3);
     const badgeNumber = String(idx + 1).padStart(2, '0');
-    const tagText = isTheory ? '理论与策略' : '工程与运行时';
+    const tagText = isTheory ? '设计思路' : '工程落地';
 
     let animHtml = '';
     if (moduleTitle === 'Kotlin 协程' || (!moduleTitle && platform === 'android' && sec.includes('CPS 续体传递风格'))) {
