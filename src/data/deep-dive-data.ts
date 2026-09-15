@@ -376,12 +376,28 @@ class LoadDashboardStateMachine extends ContinuationImpl {
 
 ### 三、挂起点判定机制：编译器如何知道这里该切分状态机？
 
+#### 1. 核心误区辨析：挂起点是“编译器认为会长时间执行的代码”吗？
+- **绝对不是！编译器在编译期没有预测运行时间的“读心术”**：
+  - 编译器在静态编译期只做 AST 语法树解析、符号表绑定与 IR 降级变换，它无法预知网络究竟是 10 毫秒还是 5 秒返回，也无法预知一段代码会不会耗时；
+  - 哪怕你在函数里写了一个密集的纯 CPU 死循环 \`while(true) {}\` 跑 100 年，只要签名没有 \`suspend\`，编译器就会将其当成普通字节码编译，**物理线程直接被卡死 100 年，绝不会发生状态机切分或挂起让权**！
+
+#### 2. 挂起点在编译期的真实定义：严格且仅认「suspend 签名契约」
 - **符号元数据（Symbol Metadata）**：编译器在语义分析阶段解析被调用函数的声明，检查是否有 \`suspend\` 修饰符（底层对应 \`isSuspend == true\`）或类型是否为 \`suspend () -> T\`。
 - **控制流图切割（CFG Splitting）**：在后端 IR Lowering 阶段（\`SuspendLambdaLowering\`），编译器将所有打上 \`isSuspendCall\` 标记的调用节点视为**切割刀刃**。在此处断开当前 BasicBlock，自增 \`label\`，将当前状态机自身作为最后一个参数注入，并紧跟一段挂起安全检查：
   \`\`\`java
   if (result == Intrinsics.COROUTINE_SUSPENDED) return COROUTINE_SUSPENDED;
   \`\`\`
-- **独立编译原则**：编译器在编译调用方时**只认接口签名契约**。即使被调函数内部全是纯同步代码，只要签名带 \`suspend\`，调用方就必须生成状态机分支；这也是 IDE 会警告 **\`Redundant 'suspend' modifier\`** 的底层原因（避免无意义的状态机拆分与栈帧开销）。
+- **独立编译原则（Separate Compilation）**：编译器在编译调用方时**只认接口签名契约**。哪怕被调函数内部全是纯同步代码（如 \`suspend fun getCache() = "data"\`），只要签名带 \`suspend\`，调用方就必须保守地生成状态机分支；这也是 IDE 会警告 **\`Redundant 'suspend' modifier\`** 的底层原因（避免无意义的状态机拆分与栈帧开销）。
+
+#### 3. 挂起点在运行期的真实表现：真挂起 vs 同步快道（Fast Path）
+**调用了挂起函数，运行期就一定会释放物理线程吗？不一定！**
+- **同步快道（无需挂起）**：如果挂起函数内部发现内存缓存命中，它直接返回真实数据对象；调用方状态机拿到结果后发现不是 \`COROUTINE_SUSPENDED\`，**根本不让出物理线程，直接无缝进入下一个 case 继续执行**！
+- **异步让权（真正挂起）**：只有当底层异步操作尚未就绪，函数返回了特殊单例标识 \`COROUTINE_SUSPENDED\`，当前物理线程才会执行 \`return\` 弹栈退出，将物理工位还给调度器。
+
+#### 4. 追本溯源：到底是谁在底层真正出让了线程？
+所有的上层 \`delay()\`、\`withContext()\`、网络请求库，底层追查到底，最终都收敛到标准库的几大底层原语：
+- **\`suspendCancellableCoroutine\`** / **\`suspendCoroutineUninterceptedOrReturn\`**
+正是这些原语内部捕获了当前状态机的 \`Continuation\` 引用（交由系统定时器或操作系统 epoll/kqueue 事件监听），并向外返回了 \`COROUTINE_SUSPENDED\` 单例，完成了物理线程的真正出让。
 
 ### 四、阻塞 I/O 的致命陷阱：为什么未声明 suspend 的 I/O 会击穿协程？
 
