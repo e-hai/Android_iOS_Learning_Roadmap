@@ -372,6 +372,45 @@ function renderSingleChapterView(
   }
 
   container.appendChild(navFooter);
+  setTimeout(() => hydrateMermaid(container), 0);
+}
+
+/**
+ * Dynamically loads Mermaid.js on-demand and hydrates all .mermaid-container elements.
+ * Adheres to AGENTS.md zero heavy UI upfront requirement via code splitting.
+ */
+async function hydrateMermaid(root: HTMLElement) {
+  const nodes = root.querySelectorAll<HTMLElement>('.mermaid-container:not([data-rendered])');
+  if (nodes.length === 0) return;
+
+  try {
+    const mermaidModule = await import('mermaid');
+    const mermaid = mermaidModule.default;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: isDark ? 'dark' : 'neutral',
+      securityLevel: 'loose',
+      fontFamily: 'inherit',
+    });
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i];
+      const code = node.getAttribute('data-mermaid');
+      if (!code) continue;
+      const id = `mermaid-render-${Date.now()}-${i}`;
+      try {
+        const { svg } = await mermaid.render(id, code);
+        node.innerHTML = svg;
+        node.setAttribute('data-rendered', 'true');
+      } catch (err) {
+        console.error('Mermaid render error:', err);
+        node.innerHTML = `<pre class="layer-code-box"><code>${escapeHtml(code)}</code></pre>`;
+      }
+    }
+  } catch (err) {
+    console.error('Failed to load mermaid dynamically:', err);
+  }
 }
 
 /**
@@ -953,7 +992,9 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
       const lang = (codeMatch[1] || '').toLowerCase();
       const code = codeMatch[2].trim();
 
-      if (lang === 'okhttp-pipeline' || code.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
+      if (lang === 'mermaid') {
+        contentHtml += `<div class="mermaid-container" data-mermaid="${escapeHtml(code)}"><div class="mermaid-skeleton">正在渲染矢量拓扑图...</div></div>`;
+      } else if (lang === 'okhttp-pipeline' || code.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
         contentHtml += renderOkHttpPipelineVisual(code);
       } else if (lang === 'viewmodel-diagram' || code.includes('NonConfigurationInstances 零拷贝复用')) {
         contentHtml += renderViewModelVisual(code);
@@ -1095,7 +1136,9 @@ function formatCaseStudyBody(rawText: string): string {
     if (trimmed.startsWith('```')) {
       if (inCodeBlock) {
         const codeTrimmed = codeContent.trim();
-        if (currentCodeLang === 'okhttp-pipeline' || codeTrimmed.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
+        if (currentCodeLang === 'mermaid') {
+          html += `<div class="mermaid-container" data-mermaid="${escapeHtml(codeTrimmed)}"><div class="mermaid-skeleton">正在渲染矢量拓扑图...</div></div>`;
+        } else if (currentCodeLang === 'okhttp-pipeline' || codeTrimmed.includes('OkHttp 同步 / 异步双轨与责任链管线全景图')) {
           html += renderOkHttpPipelineVisual(codeTrimmed);
         } else if (currentCodeLang === 'viewmodel-diagram' || codeTrimmed.includes('NonConfigurationInstances 零拷贝复用')) {
           html += renderViewModelVisual(codeTrimmed);

@@ -400,66 +400,44 @@ class LoadDashboardStateMachine extends ContinuationImpl {
 正是这些原语内部捕获了当前状态机的 \`Continuation\` 引用（交由系统定时器或操作系统 epoll/kqueue 事件监听），并向外返回了 \`COROUTINE_SUSPENDED\` 单例，完成了物理线程的真正出让。
 
 #### 5. 挂起点全景本质与执行分流图解
-\`\`\`diagram
-================================================================================================
-                         【挂起点 (Suspension Point) 全景本质认知图解】                         
-================================================================================================
 
- ❌ 常见误区：以为挂起点是“耗时很长的代码”或“编译器读心猜测耗时”
- ✔️ 真实本质：编译期认「suspend 签名契约」下刀切割；运行期看「是否返回 COROUTINE_SUSPENDED」让权
+\`\`\`mermaid
+flowchart TD
+    classDef compile fill:#EEF2FF,stroke:#6366F1,stroke-width:2px,color:#1E1B4B;
+    classDef fastpath fill:#ECFDF5,stroke:#10B981,stroke-width:2px,color:#064E3B;
+    classDef suspend fill:#FFF7ED,stroke:#F97316,stroke-width:2px,color:#7C2D12;
+    classDef resume fill:#F0FDF4,stroke:#22C55E,stroke-width:2px,color:#14532D;
+    classDef trigger fill:#F8FAFC,stroke:#94A3B8,stroke-width:1.5px,color:#0F172A;
 
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 【阶段一：编译期 (Compile-time) · 静态契约切割】                                             │
-│                                                                                              │
-│ 代码源码:                                    编译器 AST / IR 降级变换:                       │
-│ suspend fun loadData() {                     loadData$Continuation (状态机)                  │
-│     val a = step1()                          switch (this.label) {                           │
-│ ──▶ val b = fetchRemote() ◀── (挂起点)         case 0:                                       │
-│     val c = step2(b)                             a = step1();                                │
-│ }                                                this.label = 1; // 预备断点序号             │
-│                                                  Object res = fetchRemote(this);             │
-│                                              ┌── if (res == COROUTINE_SUSPENDED) return;     │
-│                                              │ case 1:                                       │
-│                                              │   b = res; // 恢复现场变量                    │
-│                                              │   c = step2(b);                               │
-│                                              │ }                                             │
-└───────────────────────────────────────────────┬──────────────────────────────────────────────┘
-                                                │ (返回 COROUTINE_SUSPENDED 弹栈让权)
-                                                ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 【阶段二：运行期 (Runtime) · 动态执行分流】                                                  │
-│                                                                                              │
-│                           执行被调函数: fetchRemote(continuation)                            │
-│                                              │                                               │
-│                      ┌───────────────────────┴────────────────────────┐                      │
-│         ▼ (分支 A: 数据已在内存中)                        ▼ (分支 B: 真正异步耗时)           │
-│          【同步快道 (Fast Path)】                     【真挂起让权 (True Suspension)】       │
-│                      │                                                │                      │
-│      例如：内存缓存命中，直接返回数据                  底层发起非阻塞网络 I/O 或定时器       │
-│                      │                                                │                      │
-│        返回值: res = User("cached")                将 continuation 注册保存至系统内核/回调   │
-│                      │                                                │                      │
-│         res != COROUTINE_SUSPENDED                    返回值: res = COROUTINE_SUSPENDED      │
-│                      │                                                │                      │
-│       【绝不挂起！物理线程不让工位】                【真弹栈退出！当前物理线程立即释放】     │
-│     直接进入 case 1 继续跑，零调度损耗              物理栈帧清空，线程回归线程池去跑别人     │
-└───────────────────────────────────────────────────────────────────────┬──────────────────────┘
-                                                                        │ (等待异步就绪唤醒)
-                                                                        ▼
-┌──────────────────────────────────────────────────────────────────────────────────────────────┐
-│ 【阶段三：唤醒期 (Resume) · 异步完成断点接力】                                               │
-│                                                                                              │
-│ 1. 外部异步事件就绪 (操作系统 epoll 网卡中断 / 定时器到期 / 回调触发)                        │
-│                          │                                                                   │
-│                          ▼                                                                   │
-│ 2. 触发回调凭证: continuation.resume(data)                                                   │
-│                          │                                                                   │
-│                          ▼                                                                   │
-│ 3. 协程调度器 (Dispatcher) 指派任一空闲 Worker 物理线程                                      │
-│                          │                                                                   │
-│                          ▼                                                                   │
-│ 4. 重新调用 invokeSuspend(data) ➔ 依据 label=1 瞬间跳转至 case 1 恢复现场继续执行            │
-└──────────────────────────────────────────────────────────────────────────────────────────────┘
+    subgraph Phase1 ["阶段一 · 编译期 (Compile-time) · 静态契约切割"]
+        P1_Code["源码: val b = fetchRemote()"] -->|扫描到 suspend 签名| P1_Cut["断开 BasicBlock<br/>插入 label = 1 断点序号"]
+        P1_Cut --> P1_Check["注入自身状态机与安全检查:<br/>if (res == COROUTINE_SUSPENDED) return;"]
+    end
+    class Phase1 compile;
+
+    subgraph Phase2 ["阶段二 · 运行期 (Runtime) · 动态执行分流"]
+        P2_Call["执行挂起函数: fetchRemote(continuation)"]
+        
+        P2_Call -->|分支 A: 内存缓存已命中| P2_Fast["【同步快道 Fast Path】<br/>直接返回数据: res = User(...)<br/>res != COROUTINE_SUSPENDED<br/>⚡ 绝不挂起！物理线程不让工位，原地进入下一行"]
+        
+        P2_Call -->|分支 B: 底层真正耗时 I/O| P2_True["【真挂起让权 True Suspension】<br/>底层向内核/定时器注册 Continuation 回调<br/>返回: res = COROUTINE_SUSPENDED<br/>🚪 真弹栈退出！释放物理线程，回归线程池去跑别人"]
+    end
+    class Phase2 trigger;
+    class P2_Fast fastpath;
+    class P2_True suspend;
+
+    subgraph Phase3 ["阶段三 · 唤醒期 (Resume) · 异步完成断点接力"]
+        P3_1["1. 外部事件就绪 (网络数据包到达 / 定时器到期)"]
+        P3_2["2. 触发回调凭证: continuation.resume(data)"]
+        P3_3["3. 协程调度器指派任一空闲 Worker 物理线程"]
+        P3_4["4. 重新调用 invokeSuspend(data) ➔ 依据 label=1 瞬间直达断点恢复现场"]
+
+        P3_1 --> P3_2 --> P3_3 --> P3_4
+    end
+    class Phase3 resume;
+
+    Phase1 -->|运行时发起调用| Phase2
+    P2_True -->|等待异步回调| Phase3
 \`\`\`
 
 ### 四、阻塞 I/O 的致命陷阱：为什么未声明 suspend 的 I/O 会击穿协程？

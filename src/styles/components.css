@@ -7599,5 +7599,37 @@ input:focus-visible,
   opacity: 0.5;
 }
 
+/* ==========================================================================
+   Mermaid Container Styles (On-Demand Vector Diagrams)
+   ========================================================================== */
+
+.mermaid-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 16px 0 24px 0;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xs);
+  overflow-x: auto;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.mermaid-skeleton {
+  font-size: 13px;
+  color: var(--color-ink-muted);
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
 
 
