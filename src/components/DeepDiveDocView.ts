@@ -6,6 +6,7 @@ import { renderKotlinFeaturesVisual, KOTLIN_FEATURES_MARKDOWN } from './KotlinFe
 import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
+import { renderSuspensionVisual } from './SuspensionVisual';
 import { renderCoroutineStageAnimation } from './CoroutineTheoryVisuals';
 
 export function renderDeepDiveDocView(
@@ -956,6 +957,8 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
         contentHtml += renderOkHttpPipelineVisual(code);
       } else if (lang === 'viewmodel-diagram' || code.includes('NonConfigurationInstances 零拷贝复用')) {
         contentHtml += renderViewModelVisual(code);
+      } else if (lang === 'suspension-diagram' || code.includes('挂起点 (Suspension Point) 全景本质认知')) {
+        contentHtml += renderSuspensionVisual();
       } else if (lang === 'diagram' || lang === 'ascii' || lang === 'text') {
         contentHtml += `<pre class="layer-diagram-box"><code>${escapeHtml(code)}</code></pre>`;
       } else {
@@ -1096,6 +1099,8 @@ function formatCaseStudyBody(rawText: string): string {
           html += renderOkHttpPipelineVisual(codeTrimmed);
         } else if (currentCodeLang === 'viewmodel-diagram' || codeTrimmed.includes('NonConfigurationInstances 零拷贝复用')) {
           html += renderViewModelVisual(codeTrimmed);
+        } else if (currentCodeLang === 'suspension-diagram' || codeTrimmed.includes('挂起点 (Suspension Point) 全景本质认知')) {
+          html += renderSuspensionVisual();
         } else {
           html += `<pre class="layer-code-box case-code-box"><code>${escapeHtml(codeTrimmed)}</code></pre>`;
         }
