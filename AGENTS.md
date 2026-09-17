@@ -49,6 +49,14 @@
        3. **挂起与恢复（Non-blocking Suspension）**：“挂起不阻塞线程”的本质是**提前 return 释放物理线程**；“恢复”的本质是**底层异步就绪后回调通知 `Continuation.resumeWith(...)`**，驱动状态机依 `label` 跳转到下一个分支。
        4. **上下文与调度（CoroutineContext & Dispatchers）**：调度器本质是 `ContinuationInterceptor` 拦截器。拦截 `resumeWith` 并包装成 `Runnable` 投递至目标线程队列（如 Android `Handler`/线程池），消除线程切换的神秘感。
        5. **结构化并发（Structured Concurrency）**：基于 `CoroutineScope` 的树状生命周期（父子 Job 树），规范级联向下取消、自动等待子任务完成与异常向上熔断传播。
+   - **Swift 并发（Swift Concurrency）编排准则**：
+     - **破除神话**：严禁开篇以“系统自动开线程”一笔带过。第一性原理定义：**Swift 并发 = 编译器拆分的切片函数（Partial Functions） + 堆上 Async Frame 续体链 + 一棵管理取消/优先级的 Task 树 + 严格限额的协作线程池 + Actor 编译期隔离**。由 LLVM 编译器在 SIL 阶段重构控制流，与原生 Concurrency ABI 深度协同。
+     - **五大核心支柱与递进逻辑**：
+       1. **函数切片与 AsyncContext 注入（Partial Functions & Async Calling Convention）**：`async` 是编译期与 ABI 标记。编译器重写调用约定注入异步上下文指针 `context: UnsafeMutablePointer<AsyncContext>`，挂起点交接后通过 CPU `ret` 弹栈返回释放工位。
+       2. **函数切片与 Async Frame（Async Stack Frame on Heap）**：区别于 JVM 状态机匿名类，LLVM 将函数物理切割为多个独立函数指针（切片）；跨挂起点局部变量打包存入堆上的 `Async Frame` 单向链表（模拟逻辑调用栈），ARM64 下以 `x21`（Frame）/`x22`（Task）寄存器直接寻址。
+       3. **挂起与恢复（Non-blocking Suspension & Fast Resume）**：“挂起”本质是切片执行到 `await` 后**提前 ret 弹栈释放物理线程**，还给协作池；“恢复”本质是底层就绪后回调 `continuation.resume(...)`，调度器指派 Worker 重新载入寄存器并通过 `br` 指令瞬间跳转到下一个切片函数。
+       4. **协作式线程池与调度（Cooperative Thread Pool & Thread Hopping）**：全局 Worker 数严格等于 CPU 物理核心数，彻底杜绝 GCD 弹性池的线程爆炸；恢复时的 Worker 线程随机指派（线程跳跃）；`@MainActor` 拦截切片投递回 RunLoop 主队列。
+       5. **结构化并发（Structured Concurrency & Task Tree）**：基于 Task 树的有向无环图（DAG）生命周期，规范级联向下广播取消（协作式响应）、自动等待所有子任务排空与异常向上冒泡。
 
 ## 导航与资源生命周期
 
