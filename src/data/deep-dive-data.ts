@@ -6100,54 +6100,170 @@ final class RealtimeCameraFilterPipeline {
         tag: '出海订阅',
         title: 'Google Play Billing v6+ 订阅生命周期与断网掉单补单机制',
         sectionTitles: {
-          pipeline: '支付流程',
+          pipeline: '三种架构选型',
           explanation: '支付流转全生命周期详述',
           caseStudy: '二、实战场景下的疑难问题与破局方案',
         },
         pipeline: [
-          { title: '控制台配置', subtitle: 'Console 登记 Product ID、BasePlan 与全球价格体系', category: 'engineering' },
-          { title: '中台动态下发', subtitle: '中台下发售卖矩阵与商品类型 (SUBS / 消耗 / 非消耗)', category: 'engineering' },
-          { title: '连接与查价', subtitle: 'startConnection ➔ 通过商品 ID 查询真实价格与 OfferToken', category: 'engineering' },
-          { title: '调起支付', subtitle: '抢占原子互斥锁 ➔ launchBillingFlow 唤起收银台', category: 'engineering' },
-          { title: '支付结果', subtitle: 'PurchasesUpdatedListener ➔ PENDING 挂起 / PURCHASED 成功', category: 'engineering' },
-          { title: '验单与记账', subtitle: '服务端 Developer API 验签 ➔ 写入 ConsumableLedger 账本', category: 'engineering' },
-          { title: '发货与终态闭环', subtitle: '业务履约发货 ➔ acknowledge / consume 闭环擦除账本', category: 'engineering' },
+          { title: '无服务器架构', subtitle: '纯客户端单机 · 本地公钥验签与端侧确认', category: 'theory' },
+          { title: '有服务器无用户体系', subtitle: '单据驱动与设备绑定 · 官方API双向验单与RTDN推送', category: 'engineering' },
+          { title: '有服务器与用户体系', subtitle: 'UID强绑定与跨端漫游 · 两阶段分布式事务与风控闭环', category: 'engineering' },
         ],
-        explanation: `### 1. 官方配置源头：Google Play Console 配置商品与价格体系
-- **商品注册与分类**：在 Google Play Console 登记商品 ID，明确划分为订阅（SUBS）、单次消耗型商品（Consumable）以及永久非消耗型商品（Non-Consumable）。
-- **三级定价结构**：订阅体系基于 \`BasePlan\`（月度/年度等计费周期）与 \`Offer\`（新客折扣/免费试用）组织，生成唯一合法且具备生命周期的 \`offerToken\`。
-- **全球价格托管**：Google 托管全球 170+ 国家本地化基准汇率、税费换算与多币种价格矩阵，作为所有端侧与中台价格计算的权威官方源头。
+        explanation: `在接入 Google Play Billing v6+ 时，支付流转与订阅生命周期管理的底层拓扑取决于应用的技术与商业定位。根据**是否引入自有服务器**以及**是否具备自建用户账号体系**，移动端商业化架构严格分流为三种形态：从纯单机本地弱校验，到设备级单据驱动，再到以 UID 为核心的双向鉴权与全生命周期工业级闭环。理解这三种链路的时序差异、验单权责与掉单补偿边界，是出海变现高可用工程的核心基石。
 
-### 2. 商业化中台动态下发：对应配置的商品信息（商品 ID、商品类型）
-- **商品配置矩阵下发**：商业化中台服务端结合当前用户画像、国家地域、AB 实验策略，动态下发当前场景售卖的商品 ID 列表与促销角标标签。
-- **三分法商品类型注入**：中台明确返回每个商品 ID 对应的类型字典（订阅 / 消耗品 / 非消耗品），供客户端 PayKit 在后续确认链路中精准路由执行 \`acknowledge\` 还是 \`consume\`。
-- **离线网络防御机制**：若用户处于无网、弱网或商业化接口报错，PayKit 自动退避降级读取本地预置的 JSON/Assets 兜底配置，确保页面收银台高可用。
+### 1. 无服务器架构（纯客户端单机模式）
 
-### 3. 客户端连接与查价：连接设备 Google Play 并通过商品 ID 获取详细信息（价格体系）
-- **建立底层服务通信**：PayKit 调用 \`startConnection\` 绑定用户设备底层的 Google Play 商店系统级进程（通过 AIDL IPC 通信），连接成功方可发起通信。
-- **动态拉取设备端价格**：调用 \`queryProductDetailsAsync\` 传入中台下发的商品 ID 列表，实时查询用户设备当前绑定的 Google 账号在对应国家地区的真实购买价格。
-- **提取格式化货币与 OfferToken**：解析返回的 \`ProductDetails\` 实体，提取格式化价格字符串（如 \`$4.99\`、\`¥30.00\`）直接用于 UI 展示，并缓存当前生效方案的合法 \`offerToken\`。
+适合离线单机工具、个人独立开发者、买断制软件（如本地记事本、简单计算器、离线壁纸）。
 
-### 4. 发起支付与防重调起：Client PayKit 抢占原子互斥锁 ➔ launchBillingFlow
-- **全局原子购买互斥锁**：调用 \`purchase()\` 前必须先抢占原子互斥锁（\`PURCHASE_IN_PROGRESS\`），严防用户快速双击或狂点按钮导致并发唤起两次官方收银台。
-- **构建调起参数**：从缓存的 \`ProductDetails\` 中装配选中的 \`offerToken\`，并注入基于用户账户生成的防混淆 ID（\`obfuscatedAccountId\`）用于防作弊防刷。
-- **唤起系统半屏收银台**：调用 \`BillingClient.launchBillingFlow\` 拉起系统级半屏支付界面，用户在该界面选卡、输入密码或进行生物识别扣款。
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    actor User as "用户"
+    participant App as "客户端 App"
+    participant GP as "Google Play 商店"
+    participant Local as "本地持久化 (DataStore)"
 
-### 5. 支付结果监听与状态分流：Google Play IPC 回调 ➔ PurchasesUpdatedListener
-- **系统级结果监听**：通过 \`PurchasesUpdatedListener\` 接收 Google Play 进程异步派发回应用的 \`Purchase\` 结果实体。
-- **状态精准三向分流**：
-  - \`PENDING\`（延迟付款）：用户选择了便利店现金支付或触发了家长审批，**铁律守则：绝对禁止提前发货**，进入挂起等待态；
-  - \`PURCHASED\`（扣款成功）：款项已真实扣除，提取订单核心凭证 \`purchaseToken\` 与 \`orderId\` 进入下一阶段验单；
-  - \`USER_CANCELED\` / 支付异常：立即释放全局互斥锁，向用户展示友好提示并安全终止支付状态机。
+    User->>App: 1. 点击购买订阅或内购
+    App->>GP: 2. launchBillingFlow(ProductDetails)
+    GP->>User: 3. 弹出半屏收银台
+    User->>GP: 4. 确认支付并完成密码/生物扣款
+    GP-->>App: 5. 回调 onPurchasesUpdated(PURCHASED)
+    Note over App: 本地弱校验阶段 (安全脆弱点)
+    App->>App: 6. 读取 APK 打包的 Base64 公钥，执行 Security.verifyPurchase
+    App->>Local: 7. 写入本地账本与权益 (isVip = true)
+    Note over App,GP: 72小时内核销闭环
+    App->>GP: 8. billingClient.acknowledgePurchase(token)
+    GP-->>App: 9. 确认成功回调
+    App->>User: 10. 刷新界面呈现会员特权
+    Note over App,GP: 断网掉单自愈 (无服务器兜底)
+    Note over App: 若步骤 8 因断网/杀进程未执行，App 必须在 72 小时内<br/>通过 queryPurchasesAsync 重新补调 acknowledge<br/>超时 Google 将强制全额退款并废除订单！
+\`\`\`
 
-### 6. 服务端安全验签与账本落盘：Client ➔ Developer API 核验真实性 ➔ ConsumableLedger
-- **服务端安全验签**：客户端将 \`purchaseToken\`、\`orderId\` 及用户凭据上传至自建业务后端，后端直接请求 Google Play Developer API 进行官方双向核验，彻底拦截客户端本地作弊与重放伪造。
-- **消耗品入账落盘**：对于消耗型商品，在执行任何发货与充值操作前，**客户端/服务端必须先将订单持久化写入 \`ConsumableLedger\` 履约账本**（标记为“已发货待 Consume”），彻底杜绝两阶段提交中的掉单死结。
+#### 核心链路与执行细节
+1. **客户端直连查价与调起**：调用 \`startConnection\` 绑定系统 Google Play 进程，通过 \`queryProductDetailsAsync\` 获取对应 BasePlan 的合法 \`offerToken\`，直接调起官方半屏收银台；
+2. **本地公钥弱校验**：通过 \`PurchasesUpdatedListener\` 接收 \`Purchase\` 对象，读取打包在 APK 内部的 Google Play Base64 开发者公钥执行 RSA 验签；
+3. **本地入账与端侧确认**：先将状态落盘到本地持久化存储（\`DataStore\` / \`MMKV\`），然后客户端直接调用 \`billingClient.acknowledgePurchase\`（订阅/非消耗品）或 \`consumePurchase\`（消耗品）；
+4. **订阅生命周期管理（被动盲盒）**：
+   - **无法接入 RTDN**：无服务器无法接收 Google Cloud Pub/Sub 的实时 Webhook 推送；
+   - **状态感知严重滞后**：用户在 Google Play 商店后台续费成功、卡内余额不足进入宽限期（Grace Period）、暂停（Paused）或申请退款，应用完全不知情；
+   - **唯一同步手段**：只能在用户每次冷启动或切回前台时，调用 \`queryPurchasesAsync\` 查询当前有效列表，若返回结果中不再包含该订阅，端侧才将本地 VIP 状态翻转为 \`false\`；
+5. **断网掉单与自愈机制**：
+   - 依赖四大自愈切面：应用冷启动首屏、\`ProcessLifecycleOwner\` 切回前台、网络重连广播监听、以及“恢复购买”按钮主动触发；
+   - **致命陷阱**：若用户支付完成后因断网卸载应用、清空数据、或 72 小时内未打开 App，Google 官方将自动执行退款并作废订单；
+   - **黑产风险**：客户端属于不可信环境，本地验签代码极易被 Frida、Xposed、LuckyPatcher 动态 Hook 返回 \`true\`，发生无成本批量白嫖。
 
-### 7. 业务发货与终态确认闭环：Fulfillment 发货 ➔ Acknowledge / Consume 擦除账本
-- **业务履约与权益快照**：业务系统为用户充值虚拟币或发放会员特权，并同步刷新持久化到本地的 \`DeviceCache\`，保障用户在后续离线断网环境下依然享有 0 毫秒 VIP 秒开体验。
-- **订阅与非消耗品确认**：调用 \`acknowledgePurchase\` 标记订单最终完成。Google 规定 3 天内未确认的订单将被官方强制退款并废除。
-- **消耗品核销出库**：调用 \`consumePurchase\` 释放该商品拥有权，使得用户能够立即再次购买；消费成功回调后，立即从 \`ConsumableLedger\` 履约账本中擦除记录，最后释放全局购买互斥锁。`,
+### 2. 有服务器无用户体系（设备指纹与单据驱动模式）
+
+适合不需要强制用户注册登录、但对防作弊、防盗刷与退款监控有刚性要求的工具类出海产品（如 VPN、扫描仪、相机滤镜、系统清理）。
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    actor User as "用户"
+    participant App as "客户端 App"
+    participant GP as "Google Play 商店"
+    participant Server as "自建业务服务器"
+    participant GAPI as "Google Developer API"
+    participant PubSub as "Cloud Pub/Sub (RTDN)"
+
+    User->>App: 1. 点击购买
+    App->>GP: 2. launchBillingFlow(携带匿名 deviceId)
+    GP->>User: 3. 唤起官方收银台完成扣款
+    GP-->>App: 4. 回调 onPurchasesUpdated(PURCHASED)
+    App->>Server: 5. 上报 purchaseToken + deviceId
+    rect rgb(240, 248, 255)
+    Note over Server,GAPI: 官方服务端权威验单
+    Server->>GAPI: 6. purchases.subscriptionsv2.get(token)
+    GAPI-->>Server: 7. 返回官方权威订单状态与真实扣款凭据
+    Server->>Server: 8. 校验订单有效性，绑定 deviceId 入库
+    end
+    alt 服务端直接确认 (推荐)
+        Server->>GAPI: 9a. purchases.subscriptionsv2.acknowledge
+        Server-->>App: 10a. 返回发货成功，下发授权 Token
+    else 客户端确认
+        Server-->>App: 9b. 验单成功，授权端侧确认
+        App->>GP: 10b. billingClient.acknowledgePurchase(token)
+    end
+    App->>User: 11. 激活会员特权
+    Note over PubSub,Server: 周期性订阅自动运维 (无需打开 App)
+    GP->>PubSub: 自动续费成功 / 进入宽限期 / 退款
+    PubSub-->>Server: 实时 Webhook 推送订阅状态变更
+    Server->>Server: 更新数据库中该 deviceId 的订阅到期时间
+\`\`\`
+
+#### 核心链路与执行细节
+1. **匿名设备身份绑定**：客户端生成唯一设备指纹（如 UUID / Android ID 并混淆），发起支付拿到 \`purchaseToken\` 后，将 Token 与 \`deviceId\` 打包上传自建服务器；
+2. **官方权威双向验单（彻底防破解）**：
+   - 废弃客户端本地公钥校验。服务端持有 Google Cloud IAM 服务账号密钥，调用官方 REST API：\`purchases.subscriptionsv2.get\`；
+   - 官方权威核验订单真实扣款状态（\`paymentState\`），彻底粉碎客户端 Frida / 内存 Hook 伪造收据攻击；
+3. **接入 RTDN 掌控订阅全生命周期**：
+   - 服务端接入 Google Cloud Pub/Sub，订阅官方实时开发者通知（RTDN）；
+   - **自动续费**：次月自动扣款成功时，Google 主动将续约事件推送至后端 Webhook，后端自动为该 \`deviceId\` 展期；
+   - **宽限期与冻结**：扣款失败进入 \`SUBSCRIPTION_IN_GRACE_PERIOD\` 或 \`SUBSCRIPTION_ON_HOLD\`，后端即时更新状态并在设备请求时下发“请更新支付方式”提示；
+   - **恶意退款拦截**：用户向 Google 申请退款成功后，后端秒级收到 \`SUBSCRIPTION_REVOKED\`，立即在数据库吊销该设备特权，杜绝白嫖；
+4. **断网掉单双向自愈兜底**：
+   - **正向补偿**：若客户端上报后端瞬间断网，后续通过多切面主动扫单（冷启动/切前台）将滞留 Token 再次补报；
+   - **反向补偿（RTDN 预入账）**：即使客户端掉电或一直无网，Google Pub/Sub 也会先于客户端通知后端。后端根据 Token 预先建立有效账本，待设备下一次连网握手时直接返回 VIP 已激活；
+5. **局限与权衡**：
+   - **换机“恢复购买”冲突**：用户换新手机后，新手机具有新的 \`deviceId\`，必须通过“恢复购买”将旧 Token 重新绑定到新设备；若风控逻辑不严，易被黑产在多台设备间轮流撞单盗刷；
+   - **无法跨平台共享**：无法与 iOS 或 Web 端的账号体系互通。
+
+### 3. 有服务器与完整用户体系（工业级商业闭环模式）
+
+适合流媒体（Netflix/Spotify 模式）、中重度游戏、跨端 SaaS、高价值内容订阅等具备自建用户账号体系的成熟商业平台。
+
+\`\`\`mermaid
+sequenceDiagram
+    autonumber
+    actor User as "用户"
+    participant App as "客户端 App"
+    participant GP as "Google Play 商店"
+    participant Server as "业务中台 (含用户系统)"
+    participant GAPI as "Google Developer API"
+    participant PubSub as "Cloud Pub/Sub (RTDN)"
+
+    User->>App: 1. 点击购买订阅
+    Note over App: 强绑定当前登录账号 (防盗刷核心)
+    App->>GP: 2. launchBillingFlow(注入 setObfuscatedAccountId(UID))
+    GP->>User: 3. 唤起收银台完成扣款
+    GP-->>App: 4. 回调 onPurchasesUpdated (携带 purchaseToken)
+    App->>Server: 5. 上报 purchaseToken + 登录态 UID
+    rect rgb(235, 245, 255)
+    Note over Server,GAPI: 双向归属验签与两阶段事务
+    Server->>GAPI: 6. purchases.subscriptionsv2.get(token)
+    GAPI-->>Server: 7. 返回订单详情 (含 obfuscatedExternalAccountId)
+    Server->>Server: 8. 严格核验: Google返回混淆UID == 登录UID<br/>核验: Token 在全局账本中未被重放使用
+    Server->>Server: 9. 开启 DB 事务: 写入用户资产表 (更新 VIP 到期时间)
+    end
+    Note over Server,GAPI: 10. 服务端单向闭环确认 (彻底摆脱移动端弱网影响)
+    Server->>GAPI: 11. purchases.subscriptionsv2.acknowledge(token)
+    Server-->>App: 12. 响应发货成功
+    App->>User: 13. UI 实时刷新会员特权
+    Note over PubSub,Server: 14. 订阅全生命周期异步驱动
+    GP->>PubSub: 次月自动续费 / 扣款失败进宽限期 / 用户退款
+    PubSub-->>Server: RTDN 纳秒级通知，按 UID 自动展期或风控止损
+    Note over Server,App: 15. 跨端漫游: iOS / Web 登录同一 UID 秒级同步享用特权
+\`\`\`
+
+#### 核心链路与执行细节
+1. **发起支付时强绑定 UID（核心防盗刷基石）**：
+   - 调用 \`launchBillingFlow\` 时，必须通过 \`setObfuscatedAccountId(hashSha256(currentUid))\` 将自建用户账号注入官方订单参数；
+   - Google 将该哈希后的混淆账户 ID 永久持久化在交易底账中；
+2. **防盗刷双向核验与防重放机制**：
+   - 服务端调用 \`purchases.subscriptionsv2.get\` 后，比对返回的 \`obfuscatedExternalAccountId\` 是否与当前请求发货的登录用户一致；
+   - **杜绝跨账号盗充**：即使黑产截获了合法付费用户的真实 \`purchaseToken\`，企图将其上传到自己的黑产账号刷单，服务端校验 UID 不匹配立即拒绝发货并告警；
+   - **全局订单幂等性**：数据库通过唯一索引保证每个 \`purchaseToken\` 只能核销入账一次，杜绝并发重放攻击；
+3. **服务端单向闭环确认（彻底杜绝 72 小时掉单）**：
+   - 确认（\`acknowledge\`）与核销（\`consume\`）**完全由服务端调用官方 REST API 直接完成**，不假手移动端脆弱的网络环境；
+   - 客户端只要成功送达一次请求，后续所有事务均在数据中心高可用内网完成；
+4. **订阅全生命周期与用户资产中台解耦联动**：
+   - 结合 Google Cloud Pub/Sub (RTDN)，订阅状态流转完全自动化：
+     - \`SUBSCRIPTION_RENEWED\` ➔ 服务端直接将对应 UID 的 VIP 截止时间顺延一个周期；
+     - \`SUBSCRIPTION_IN_GRACE_PERIOD\` ➔ 给用户打上“宽限期”标签，App 端内推送催款横幅；
+     - \`SUBSCRIPTION_REVOKED\`（退款） ➔ 数据库立即清空权益，若涉及消耗品刷币则自动扣减钻石并触发冻结风控；
+5. **跨平台多端无缝漫游**：
+   - 用户在 Android 设备购买的会员权益直接入库挂载至全局 UID；
+   - 用户换用 iPhone、iPad 或登录 Web 官网时，权益 100% 同步秒开，真正实现跨端商业化闭环。`,
         caseStudy: `### 实战问题一：用户扣款成功但发货瞬间断网/闪退，导致“掉单投诉”或“重复发货被薅羊毛”
 
 **业务场景痛点**：
