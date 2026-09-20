@@ -6109,7 +6109,55 @@ final class RealtimeCameraFilterPipeline {
           { title: '有服务器无用户体系', subtitle: '单据驱动与设备绑定 · 官方API双向验单与RTDN推送', category: 'engineering' },
           { title: '有服务器与用户体系', subtitle: 'UID强绑定与跨端漫游 · 两阶段分布式事务与风控闭环', category: 'engineering' },
         ],
-        explanation: `在接入 Google Play Billing v6+ 时，支付流转与订阅生命周期管理的底层拓扑取决于应用的技术与商业定位。根据**是否引入自有服务器**以及**是否具备自建用户账号体系**，移动端商业化架构严格分流为三种形态：从纯单机本地弱校验，到设备级单据驱动，再到以 UID 为核心的双向鉴权与全生命周期工业级闭环。理解这三种链路的时序差异、验单权责与掉单补偿边界，是出海变现高可用工程的核心基石。
+        explanation: `在接入 Google Play Billing v6+ 时，从 **Google Play Console 商品配置** 到 **客户端获取商品映射表（Product Mapping Matrix）**，再到最终 **扣款、验单、终态确认（Acknowledge / Consume）**，其全生命周期流转严格取决于系统的服务化形态。
+
+以下通过架构全景图、数据结构图与三大场景完整时序图直观呈现全链路设计。
+
+---
+
+### 前置基石：Console 商品配置体系与客户端商品映射表
+
+#### 1. Google Play Console 官方三级商品结构 vs 客户端商品映射表
+在开发收银台与支付前，必须先在 Google Play Console 登记商品，并在客户端/服务端建立**商品映射表（Product Mapping Matrix）**以抹平业务权益与官方 SKU 的差异：
+
+\`\`\`diagram
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        Google Play Console 官方三级商品体系                              │
+│                                                                                        │
+│  [ Product ID ] (唯一商品标识，如 "sub_vip_monthly", "coins_pack_100")                  │
+│        │                                                                               │
+│        ├── In-App (单次购买) ──▶ [ 单次消耗品 Consumable ] / [ 永久非消耗 Non-Consumable ]│
+│        │                                                                               │
+│        └── Subscription (订阅 v6+)                                                      │
+│                 │                                                                      │
+│                 └── [ BasePlan ID ] (计费周期: P1M月度 / P1Y年度 / 预付费 PrePaid)         │
+│                           │                                                            │
+│                           └── [ Offer ID ] (优惠阶梯: 免费试用 / 折扣价) ──▶ [ offerToken ]│
+└────────────────────────────────────────────────────────────────────────────────────────┘
+                                            │
+                                业务映射对齐 ▼
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                  客户端核心商品映射表 (Product Catalog Mapping Matrix)                   │
+│                                                                                        │
+│  {                                                                                     │
+│    "productId":       "sub_vip_monthly",         // 1. Google Play Console 唯一商品 ID  │
+│    "productType":     "SUBS",                    // 2. SUBS / CONSUMABLE / NON_CONSUM   │
+│    "basePlanId":      "p1m-base",                // 3. 目标 BasePlan ID (订阅必填)       │
+│    "offerId":         "free-trial-7d",           // 4. 目标 Offer ID (促销方案，可选)     │
+│    "entitlementKey":  "vip_premium",             // 5. 业务侧权益标识 (发货赋权凭证)      │
+│    "settleAction":    "ACKNOWLEDGE",             // 6. 终态路由: ACKNOWLEDGE / CONSUME  │
+│    "fallbackPrice":   "$9.99",                   // 7. 弱网/无网时的保底本地化价格展示   │
+│    "uiBadge":         "HOT_SALE",                // 8. 运营促销角标 ("立省50%" / "推荐") │
+│    "coinsAmount":     0                          // 9. 充值虚拟币数量 (消耗品专用)       │
+│  }                                                                                     │
+│                                                                                        │
+│  ★ 映射表获取渠道分流：                                                                 │
+│    • 架构一 (无服务器): 打包于 APK 内 assets/products_map.json (离线静态只读)            │
+│    • 架构二/三 (有服务器): 商业化中台 API 动态分发 (支持 AB 实验与地域定价，本地 Assets 兜底) │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+\`\`\`
+
+---
 
 ### 1. 无服务器架构（纯客户端单机模式）
 
@@ -6118,47 +6166,57 @@ final class RealtimeCameraFilterPipeline {
 \`\`\`mermaid
 sequenceDiagram
     autonumber
+    actor Dev as "开发者"
     actor User as "用户"
     participant App as "客户端 App"
     participant GP as "Google Play 商店"
-    participant Local as "本地持久化 (DataStore)"
+    participant Local as "本地存储 / Assets"
 
-    User->>App: 1. 点击购买订阅或内购
-    App->>GP: 2. launchBillingFlow(ProductDetails)
-    GP->>User: 3. 弹出半屏收银台
-    User->>GP: 4. 确认支付并完成密码/生物扣款
-    GP-->>App: 5. 回调 onPurchasesUpdated(PURCHASED)
-    Note over App: 本地弱校验阶段 (安全脆弱点)
-    App->>App: 6. 读取 APK 打包的 Base64 公钥，执行 Security.verifyPurchase
-    App->>Local: 7. 写入本地账本与权益 (isVip = true)
-    Note over App,GP: 72小时内核销闭环
-    App->>GP: 8. billingClient.acknowledgePurchase(token)
-    GP-->>App: 9. 确认成功回调
-    App->>User: 10. 刷新界面呈现会员特权
-    Note over App,GP: 断网掉单自愈 (无服务器兜底)
-    Note over App: 若步骤 8 因断网/杀进程未执行，App 必须在 72 小时内<br/>通过 queryPurchasesAsync 重新补调 acknowledge<br/>超时 Google 将强制全额退款并废除订单！
+    Note over Dev,GP: 【阶段零：控制台配置与静态映射表打包】
+    Dev->>GP: 1. Console 登记商品 ID、BasePlan (P1M) 与 Offer
+    Dev->>Local: 2. 将商品映射表写入 assets/products_map.json
+
+    Note over User,GP: 【阶段一：查价与收银台渲染】
+    User->>App: 3. 打开会员充值页
+    App->>Local: 4. 读取 assets 获取映射表 (productId, 类型, basePlanId)
+    App->>GP: 5. queryProductDetailsAsync(productId 列表)
+    GP-->>App: 6. 返回 ProductDetails (含本地货币价格、offerToken)
+    App->>User: 7. 渲染收银台 UI (展示真实国家价格与促销角标)
+
+    Note over User,GP: 【阶段二：调起支付与本地弱验签】
+    User->>App: 8. 点击购买
+    App->>GP: 9. launchBillingFlow(指定 offerToken)
+    GP->>User: 10. 弹出官方半屏收银台，用户输入密码/指纹扣款
+    GP-->>App: 11. onPurchasesUpdated(PURCHASED, purchaseToken)
+    App->>App: 12. 本地 Base64 公钥验证签名 (容易被 Hook 破解)
+    App->>Local: 13. 依据映射表匹配 entitlementKey，写入本地账本 (isVip = true)
+    
+    Note over App,GP: 【阶段三：依据映射表类型路由终态确认】
+    alt 订阅 / 非消耗品 (productType == SUBS)
+        App->>GP: 14a. billingClient.acknowledgePurchase(token)
+    else 消耗品 (productType == CONSUMABLE)
+        App->>GP: 14b. billingClient.consumePurchase(token)
+    end
+    GP-->>App: 15. 确认成功，订单闭环
+    App->>User: 16. UI 激活会员或金币到账
+    Note over App: ⚠️ 断网掉单风险：若 14 步因断网未送达，须在 72h 内通过 queryPurchasesAsync 自愈补调，超时 Google 强制退款！
 \`\`\`
 
-#### 核心链路与执行细节
-1. **客户端直连查价与调起**：调用 \`startConnection\` 绑定系统 Google Play 进程，通过 \`queryProductDetailsAsync\` 获取对应 BasePlan 的合法 \`offerToken\`，直接调起官方半屏收银台；
-2. **本地公钥弱校验**：通过 \`PurchasesUpdatedListener\` 接收 \`Purchase\` 对象，读取打包在 APK 内部的 Google Play Base64 开发者公钥执行 RSA 验签；
-3. **本地入账与端侧确认**：先将状态落盘到本地持久化存储（\`DataStore\` / \`MMKV\`），然后客户端直接调用 \`billingClient.acknowledgePurchase\`（订阅/非消耗品）或 \`consumePurchase\`（消耗品）；
-4. **订阅生命周期管理（被动盲盒）**：
-   - **无法接入 RTDN**：无服务器无法接收 Google Cloud Pub/Sub 的实时 Webhook 推送；
-   - **状态感知严重滞后**：用户在 Google Play 商店后台续费成功、卡内余额不足进入宽限期（Grace Period）、暂停（Paused）或申请退款，应用完全不知情；
-   - **唯一同步手段**：只能在用户每次冷启动或切回前台时，调用 \`queryPurchasesAsync\` 查询当前有效列表，若返回结果中不再包含该订阅，端侧才将本地 VIP 状态翻转为 \`false\`；
-5. **断网掉单与自愈机制**：
-   - 依赖四大自愈切面：应用冷启动首屏、\`ProcessLifecycleOwner\` 切回前台、网络重连广播监听、以及“恢复购买”按钮主动触发；
-   - **致命陷阱**：若用户支付完成后因断网卸载应用、清空数据、或 72 小时内未打开 App，Google 官方将自动执行退款并作废订单；
-   - **黑产风险**：客户端属于不可信环境，本地验签代码极易被 Frida、Xposed、LuckyPatcher 动态 Hook 返回 \`true\`，发生无成本批量白嫖。
+#### 极简要点
+- **映射表来源**：直接打包于 APK \`assets/products_map.json\`，无法动态调整价格与促销策略；
+- **生命周期追踪**：无 RTDN 接入，完全靠本地与启动时 \`queryPurchasesAsync\` 被动轮询；
+- **安全短板**：本地公钥校验极易被 Frida / LuckyPatcher 内存 Hook 一键白嫖。
+
+---
 
 ### 2. 有服务器无用户体系（设备指纹与单据驱动模式）
 
-适合不需要强制用户注册登录、但对防作弊、防盗刷与退款监控有刚性要求的工具类出海产品（如 VPN、扫描仪、相机滤镜、系统清理）。
+适合不强制用户注册、但对防作弊、防盗刷与退款监控有刚性要求的商业工具（如 VPN、扫描仪、相机滤镜）。
 
 \`\`\`mermaid
 sequenceDiagram
     autonumber
+    actor Dev as "开发者"
     actor User as "用户"
     participant App as "客户端 App"
     participant GP as "Google Play 商店"
@@ -6166,104 +6224,114 @@ sequenceDiagram
     participant GAPI as "Google Developer API"
     participant PubSub as "Cloud Pub/Sub (RTDN)"
 
-    User->>App: 1. 点击购买
-    App->>GP: 2. launchBillingFlow(携带匿名 deviceId)
-    GP->>User: 3. 唤起官方收银台完成扣款
-    GP-->>App: 4. 回调 onPurchasesUpdated(PURCHASED)
-    App->>Server: 5. 上报 purchaseToken + deviceId
+    Note over Dev,GP: 【阶段零：控制台配置与中台录入】
+    Dev->>GP: 1. Console 登记商品 ID、BasePlan 与 Offer 价格矩阵
+    Dev->>Server: 2. 运营中台配置商品映射表 (类型、BasePlan、权益键)
+
+    Note over User,GP: 【阶段一：动态映射表获取与查价】
+    User->>App: 3. 进入收银台
+    App->>Server: 4. 请求商品配置 GET /api/products (带设备指纹/国家)
+    Server-->>App: 5. 动态下发商品映射表 (支持 AB 实验/角标，断网读本地 Assets 兜底)
+    App->>GP: 6. queryProductDetailsAsync(productId 列表)
+    GP-->>App: 7. 返回设备本地格式化价格与合法 offerToken
+    App->>User: 8. 呈现个性化定价收银台
+
+    Note over User,GP: 【阶段二：调起与官方权威验单】
+    User->>App: 9. 点击购买
+    App->>GP: 10. launchBillingFlow(指定 offerToken)
+    GP->>User: 11. 官方收银台完成扣款
+    GP-->>App: 12. onPurchasesUpdated(PURCHASED, purchaseToken)
+    App->>Server: 13. 上报 purchaseToken + deviceId + productId
     rect rgb(240, 248, 255)
-    Note over Server,GAPI: 官方服务端权威验单
-    Server->>GAPI: 6. purchases.subscriptionsv2.get(token)
-    GAPI-->>Server: 7. 返回官方权威订单状态与真实扣款凭据
-    Server->>Server: 8. 校验订单有效性，绑定 deviceId 入库
+    Server->>GAPI: 14. purchases.subscriptionsv2.get(purchaseToken)
+    GAPI-->>Server: 15. 返回官方权威扣款状态 (彻底杜绝端侧 Hook 作弊)
+    Server->>Server: 16. 查询映射表匹配 entitlementKey，绑定 deviceId 入库
     end
-    alt 服务端直接确认 (推荐)
-        Server->>GAPI: 9a. purchases.subscriptionsv2.acknowledge
-        Server-->>App: 10a. 返回发货成功，下发授权 Token
-    else 客户端确认
-        Server-->>App: 9b. 验单成功，授权端侧确认
-        App->>GP: 10b. billingClient.acknowledgePurchase(token)
+
+    Note over Server,GP: 【阶段三：依据映射表路由确认与发货】
+    alt 订阅 (SUBS) / 非消耗品
+        Server->>GAPI: 17a. subscriptionsv2.acknowledge(token) (服务端单向闭环)
+    else 消耗品 (CONSUMABLE)
+        Server->>GAPI: 17b. products.consume(token)
     end
-    App->>User: 11. 激活会员特权
-    Note over PubSub,Server: 周期性订阅自动运维 (无需打开 App)
-    GP->>PubSub: 自动续费成功 / 进入宽限期 / 退款
-    PubSub-->>Server: 实时 Webhook 推送订阅状态变更
-    Server->>Server: 更新数据库中该 deviceId 的订阅到期时间
+    Server-->>App: 18. 发货成功，下发设备 VIP Token / 金币点数
+    App->>User: 19. 点亮特权
+
+    Note over PubSub,Server: 【阶段四：RTDN 订阅全生命周期自动维护】
+    GP->>PubSub: 次月续费成功 / 扣费失败进宽限期 / 用户申请退款
+    PubSub-->>Server: 实时 Webhook 派发消息
+    Server->>Server: 按 purchaseToken 自动展期或吊销该 deviceId 权益
 \`\`\`
 
-#### 核心链路与执行细节
-1. **匿名设备身份绑定**：客户端生成唯一设备指纹（如 UUID / Android ID 并混淆），发起支付拿到 \`purchaseToken\` 后，将 Token 与 \`deviceId\` 打包上传自建服务器；
-2. **官方权威双向验单（彻底防破解）**：
-   - 废弃客户端本地公钥校验。服务端持有 Google Cloud IAM 服务账号密钥，调用官方 REST API：\`purchases.subscriptionsv2.get\`；
-   - 官方权威核验订单真实扣款状态（\`paymentState\`），彻底粉碎客户端 Frida / 内存 Hook 伪造收据攻击；
-3. **接入 RTDN 掌控订阅全生命周期**：
-   - 服务端接入 Google Cloud Pub/Sub，订阅官方实时开发者通知（RTDN）；
-   - **自动续费**：次月自动扣款成功时，Google 主动将续约事件推送至后端 Webhook，后端自动为该 \`deviceId\` 展期；
-   - **宽限期与冻结**：扣款失败进入 \`SUBSCRIPTION_IN_GRACE_PERIOD\` 或 \`SUBSCRIPTION_ON_HOLD\`，后端即时更新状态并在设备请求时下发“请更新支付方式”提示；
-   - **恶意退款拦截**：用户向 Google 申请退款成功后，后端秒级收到 \`SUBSCRIPTION_REVOKED\`，立即在数据库吊销该设备特权，杜绝白嫖；
-4. **断网掉单双向自愈兜底**：
-   - **正向补偿**：若客户端上报后端瞬间断网，后续通过多切面主动扫单（冷启动/切前台）将滞留 Token 再次补报；
-   - **反向补偿（RTDN 预入账）**：即使客户端掉电或一直无网，Google Pub/Sub 也会先于客户端通知后端。后端根据 Token 预先建立有效账本，待设备下一次连网握手时直接返回 VIP 已激活；
-5. **局限与权衡**：
-   - **换机“恢复购买”冲突**：用户换新手机后，新手机具有新的 \`deviceId\`，必须通过“恢复购买”将旧 Token 重新绑定到新设备；若风控逻辑不严，易被黑产在多台设备间轮流撞单盗刷；
-   - **无法跨平台共享**：无法与 iOS 或 Web 端的账号体系互通。
+#### 极简要点
+- **映射表来源**：由业务服务端动态分发，支持实时促销实验，端侧保留 Assets 兜底文件；
+- **权威验单**：服务端使用 Google Cloud IAM 密钥调用 REST API 核验真实扣款，杜绝客户端作弊；
+- **实时生命周期**：接入 Cloud Pub/Sub (RTDN)，续约、宽限期、退款由后端全自动实时维护。
+
+---
 
 ### 3. 有服务器与完整用户体系（工业级商业闭环模式）
 
-适合流媒体（Netflix/Spotify 模式）、中重度游戏、跨端 SaaS、高价值内容订阅等具备自建用户账号体系的成熟商业平台。
+适合流媒体（Netflix/Spotify 模式）、游戏、跨端 SaaS 等拥有统一账户体系的商业平台。
 
 \`\`\`mermaid
 sequenceDiagram
     autonumber
+    actor Dev as "开发者"
     actor User as "用户"
     participant App as "客户端 App"
     participant GP as "Google Play 商店"
-    participant Server as "业务中台 (含用户系统)"
+    participant Server as "业务中台 (用户/计费)"
     participant GAPI as "Google Developer API"
     participant PubSub as "Cloud Pub/Sub (RTDN)"
 
-    User->>App: 1. 点击购买订阅
-    Note over App: 强绑定当前登录账号 (防盗刷核心)
-    App->>GP: 2. launchBillingFlow(注入 setObfuscatedAccountId(UID))
-    GP->>User: 3. 唤起收银台完成扣款
-    GP-->>App: 4. 回调 onPurchasesUpdated (携带 purchaseToken)
-    App->>Server: 5. 上报 purchaseToken + 登录态 UID
+    Note over Dev,GP: 【阶段零：控制台配置与计费中台映射】
+    Dev->>GP: 1. Console 登记商品 ID、BasePlan 与 Offer
+    Dev->>Server: 2. 计费中台配置商品映射字典 (含权限等级、多端权益)
+
+    Note over User,GP: 【阶段一：中台精准下发与设备查价】
+    User->>App: 3. 用户登录 (持有全局 UID) 并打开会员中心
+    App->>Server: 4. 请求商品列表 GET /api/v2/products (携带 UID/画像)
+    Server-->>App: 5. 下发专属定价映射表 (含 AB 促销角标、BasePlanId、类型)
+    App->>GP: 6. queryProductDetailsAsync(productId 列表)
+    GP-->>App: 7. 返回设备对应国家货币价格与合法 offerToken
+    App->>User: 8. 渲染精准营销收银台
+
+    Note over User,GP: 【阶段二：强绑定 UID 购买与双向鉴权】
+    User->>App: 9. 点击购买
+    Note over App: 核心防盗刷：注入混淆哈希 UID
+    App->>GP: 10. launchBillingFlow(注入 setObfuscatedAccountId(hash(UID)) + offerToken)
+    GP->>User: 11. 唤起收银台完成扣款
+    GP-->>App: 12. 回调 PURCHASED (携带 purchaseToken)
+    App->>Server: 13. 上报 purchaseToken + 登录态 UID + productId
+
     rect rgb(235, 245, 255)
     Note over Server,GAPI: 双向归属验签与两阶段事务
-    Server->>GAPI: 6. purchases.subscriptionsv2.get(token)
-    GAPI-->>Server: 7. 返回订单详情 (含 obfuscatedExternalAccountId)
-    Server->>Server: 8. 严格核验: Google返回混淆UID == 登录UID<br/>核验: Token 在全局账本中未被重放使用
-    Server->>Server: 9. 开启 DB 事务: 写入用户资产表 (更新 VIP 到期时间)
+    Server->>GAPI: 14. purchases.subscriptionsv2.get(purchaseToken)
+    GAPI-->>Server: 15. 返回订单详情 (包含 obfuscatedExternalAccountId)
+    Server->>Server: 16. 严格核验: Google返回混淆UID == 当前登录UID (防跨账号盗充)<br/>核验: Token 全局未被重放使用
+    Server->>Server: 17. 依据映射表匹配 entitlementKey，开启 DB 事务更新用户资产
     end
-    Note over Server,GAPI: 10. 服务端单向闭环确认 (彻底摆脱移动端弱网影响)
-    Server->>GAPI: 11. purchases.subscriptionsv2.acknowledge(token)
-    Server-->>App: 12. 响应发货成功
-    App->>User: 13. UI 实时刷新会员特权
-    Note over PubSub,Server: 14. 订阅全生命周期异步驱动
-    GP->>PubSub: 次月自动续费 / 扣款失败进宽限期 / 用户退款
-    PubSub-->>Server: RTDN 纳秒级通知，按 UID 自动展期或风控止损
-    Note over Server,App: 15. 跨端漫游: iOS / Web 登录同一 UID 秒级同步享用特权
+
+    Note over Server,GAPI: 【阶段三：服务端直接单向闭环确认】
+    alt 订阅 (SUBS) / 非消耗品
+        Server->>GAPI: 18a. subscriptionsv2.acknowledge(purchaseToken)
+    else 消耗品 (CONSUMABLE)
+        Server->>GAPI: 18b. products.consume(purchaseToken)
+    end
+    Server-->>App: 19. 响应发货成功
+    App->>User: 20. 界面秒级刷新 VIP
+
+    Note over PubSub,Server: 【阶段四：全生命周期异步运维与多端漫游】
+    GP->>PubSub: 次月续费 / 进入宽限期 Grace Period / 恶意退款
+    PubSub-->>Server: RTDN 纳秒级 Webhook，自动延展 UID 资产或触发退款封号
+    Note over Server,App: 跨端漫游：用户在 iOS 或 Web 登录同一 UID，权益 100% 共享秒开
 \`\`\`
 
-#### 核心链路与执行细节
-1. **发起支付时强绑定 UID（核心防盗刷基石）**：
-   - 调用 \`launchBillingFlow\` 时，必须通过 \`setObfuscatedAccountId(hashSha256(currentUid))\` 将自建用户账号注入官方订单参数；
-   - Google 将该哈希后的混淆账户 ID 永久持久化在交易底账中；
-2. **防盗刷双向核验与防重放机制**：
-   - 服务端调用 \`purchases.subscriptionsv2.get\` 后，比对返回的 \`obfuscatedExternalAccountId\` 是否与当前请求发货的登录用户一致；
-   - **杜绝跨账号盗充**：即使黑产截获了合法付费用户的真实 \`purchaseToken\`，企图将其上传到自己的黑产账号刷单，服务端校验 UID 不匹配立即拒绝发货并告警；
-   - **全局订单幂等性**：数据库通过唯一索引保证每个 \`purchaseToken\` 只能核销入账一次，杜绝并发重放攻击；
-3. **服务端单向闭环确认（彻底杜绝 72 小时掉单）**：
-   - 确认（\`acknowledge\`）与核销（\`consume\`）**完全由服务端调用官方 REST API 直接完成**，不假手移动端脆弱的网络环境；
-   - 客户端只要成功送达一次请求，后续所有事务均在数据中心高可用内网完成；
-4. **订阅全生命周期与用户资产中台解耦联动**：
-   - 结合 Google Cloud Pub/Sub (RTDN)，订阅状态流转完全自动化：
-     - \`SUBSCRIPTION_RENEWED\` ➔ 服务端直接将对应 UID 的 VIP 截止时间顺延一个周期；
-     - \`SUBSCRIPTION_IN_GRACE_PERIOD\` ➔ 给用户打上“宽限期”标签，App 端内推送催款横幅；
-     - \`SUBSCRIPTION_REVOKED\`（退款） ➔ 数据库立即清空权益，若涉及消耗品刷币则自动扣减钻石并触发冻结风控；
-5. **跨平台多端无缝漫游**：
-   - 用户在 Android 设备购买的会员权益直接入库挂载至全局 UID；
-   - 用户换用 iPhone、iPad 或登录 Web 官网时，权益 100% 同步秒开，真正实现跨端商业化闭环。`,
+#### 极简要点
+- **防盗刷杀手锏**：发起支付时注入 \`setObfuscatedAccountId(hashSha256(uid))\`，服务端核验官方返回的 \`obfuscatedExternalAccountId\` 归属，杜绝跨账号盗充；
+- **服务端单向确认**：发货与确认完全在数据中心内网单向调用完成，彻底免除客户端弱网掉单；
+- **全生态漫游**：资产挂载于用户全局 UID，支持跨 Android、iOS、Web 多端秒级共享。`,
         caseStudy: `### 实战问题一：用户扣款成功但发货瞬间断网/闪退，导致“掉单投诉”或“重复发货被薅羊毛”
 
 **业务场景痛点**：
