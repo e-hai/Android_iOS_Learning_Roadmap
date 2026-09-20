@@ -4374,7 +4374,6 @@ class MyApplication : Application() {
         title: '现代设计模式实战：单例模式（三大形态）、高阶函数策略与责任链',
         sectionTitles: {
           explanation: '设计模式在现代语言中的重塑与单例三大工业级形态',
-          caseStudy: '带参单例的并发安全陷阱（!! 符号辨析、内存屏障与 Context 泄漏防御）',
         },
         explanation: `### 一、 第一性原理：现代移动端中设计模式的“内建与降维”
 
@@ -4514,100 +4513,6 @@ val profile = UserManager.getInstance(context).getUserProfile()
 | **\`object\` 声明** | 原生 \`object\` | 类首次加载时 | JVM 类加载器原子锁 | ❌ 否 | 网络客户端、无参工具类、路由表 |
 | **\`by lazy\` 委托** | 属性代理 \`by lazy\` | 首次读取属性时 | 库函数级 DCL 同步锁 | ❌ 否 | 耗时无参解析器、重型配置缓存 |
 | **\`SingletonHolder\`** | 伴生对象继承通用基类 | 首次调用 \`getInstance(arg)\` 时 | \`@Volatile\` + DCL 同步锁 |  是 | 数据库（Room）、存储库、依赖 \`Context\` 的组件 |`,
-        caseStudy: `### 深度剖析一：带参单例中的 \`!!\` 强转真的安全吗？JMM 内存模型推演
-
-在早期版本的 \`SingletonHolder\` 中，社区常见实现直接书写：
-\`\`\`kotlin
-val created = creator!!(arg)
-instance = created
-creator = null
-\`\`\`
-很多开发者会对这里的 \`!!\`（非空断言）产生安全疑虑：**在多线程高并发竞争下，此处真的绝不会抛出 \`KotlinNullPointerException\` 吗？**
-
-#### 1. 锁内单向状态机证明
-- **初始状态**：类被加载时，\`creator\` 为构造函数注入的非空函数对象，\`instance = null\`。
-- **锁内内存可见性**：所有读写 \`creator\` 与 \`instance\` 的代码均严格处于 \`synchronized(this)\` 监视器块内部。根据 **Java 内存模型（JMM）** 规范：
-  - \`monitorenter\` 指令会强制将 CPU 工作内存中的变量无效化，从主内存重新读取最新值；
-  - \`monitorexit\` 指令会强制将工作内存的所有写入立即刷回主内存。
-- **单向不可逆跃迁**：\`creator = null\` 是在 \`instance = created\` 完成后执行的。这意味着：**一旦 \`creator\` 被置为空，\`instance\` 必定已被成功赋值且非空！**
-- **互斥短路防御**：后续任何并发线程（或重试调用）进入 \`synchronized\` 块时，首先执行第一行检查：
-  \`\`\`kotlin
-  val checkAgain = instance
-  if (checkAgain != null) return checkAgain
-  \`\`\`
-  由于 \`checkAgain\` 必定非空，代码直接在 \`if\` 分支返回，**绝不可能再次进入 \`else\` 分支执行 \`creator!!(arg)\`！**
-- **结论**：在逻辑与并发数学推导上，\`else\` 分支在进程生命周期内**有且仅被执行一次**，执行时 \`creator\` 绝不可能为 null，因此绝不会发生 NPE。
-
-#### 2. 为什么 Kotlin 编译器依然强迫开发者处理可空性？
-因为 \`creator\` 在类中声明为可变成员属性 \`private var creator: ((A) -> T)?\`。
-Kotlin 编译器的静态代码分析（Smart Cast）出于保守安全原则，**无法跨成员方法或多线程作用域推导类成员 \`var\` 的不可变性**，因此强制开发者进行显式空安全处理。
-
-#### 3. 商业级生产优化：用 \`checkNotNull\` 消除静态代码扫描告警
-在严苛的商业级规范中，静态代码检查工具（如 Detekt / Android Lint）通常会直接将 \`!!\` 拦截并判定为代码坏味道（Code Smell）。
-**推荐重构方案**：
-\`\`\`kotlin
-val factory = checkNotNull(creator) {
-    "SingletonHolder error: creator was released before instance was initialized"
-}
-val created = factory(arg)
-\`\`\`
-此写法不仅彻底消除了 \`!!\` 告警，即使未来发生极端破坏性的反射攻击或字节码插桩异常，也能抛出具备明确上下文语义的诊断信息。
-
----
-
-### 深度剖析二：AOSP 系统源码中的孪生架构：\`android.util.Singleton<T>\`
-
-在 Android 官方系统源码（AOSP）框架层中，Google 早在 Android 1.0 时期便抽象出了同等设计思想的内部基类 **\`android.util.Singleton<T>\`**（被标记为 \`@hide\`）。
-
-系统级核心跨进程 Binder 服务（如 \`ActivityManager\`、\`WindowManager\`、\`InputMethodManager\`）全面依托该机制进行懒加载缓存：
-
-\`\`\`java
-// AOSP 官方源码: frameworks/base/core/java/android/util/Singleton.java
-public abstract class Singleton<T> {
-    private T mInstance;
-
-    protected abstract T create();
-
-    public final T get() {
-        synchronized (this) {
-            if (mInstance == null) {
-                mInstance = create();
-            }
-            return mInstance;
-        }
-    }
-}
-\`\`\`
-
-在 \`ActivityManager.java\` 中向应用进程提供 AMS 通信入口时：
-\`\`\`java
-private static final Singleton<IActivityManager> IActivityManagerSingleton =
-    new Singleton<IActivityManager>() {
-        @Override
-        protected IActivityManager create() {
-            final IBinder b = ServiceManager.getService(Context.ACTIVITY_SERVICE);
-            return IActivityManager.Stub.asInterface(b);
-        }
-    };
-
-public static IActivityManager getService() {
-    return IActivityManagerSingleton.get();
-}
-\`\`\`
-
----
-
-### 深度剖析三：带参单例的两大内存泄漏致命死穴
-
-#### 1. 隐蔽的 Context 泄漏
-- **错误写法**：直接在单例内部持有传入的 \`context\` 引用：\`private val mContext = context\`。
-- **爆雷场景**：如果在 Activity 或 Fragment 中调用 \`UserManager.getInstance(this)\`，此时传入的是 Activity 的实例上下文。一旦该单例被初始化，它将作为静态对象（GC Roots）永久驻留在 JVM 堆内存中，使得该 Activity 在 finish 销毁后无法被 GC 回收，导致整个页面的 View 树与 Window 泄露（数百 KB 到数 MB 显存溢出）。
-- **防御法则**：必须在单例类的构造入口强制转换：\`private val appContext = context.applicationContext\`。由于 Application 的生命周期与整个进程一致，因此持有其引用绝对安全。
-
-#### 2. Lambda 闭包捕获泄漏
-在 \`SingletonHolder\` 的构造函数中传入了一个函数对象 \`creator: (A) -> T\`。
-在 JVM 底层，高阶函数编译为一个匿名类 \`Function1\`。如果外部传入的构造引用隐式捕获了外部对象，该闭包对象将一直存活。
-通过在实例化成功后立即执行 **\`creator = null\`**，将闭包指针从成员属性中解除引用，使底层的匿名函数对象可以被垃圾回收器及时回收，达到绝对的零泄漏保障。`,
       },
     ],
     ios: [
