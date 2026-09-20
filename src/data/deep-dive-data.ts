@@ -4369,6 +4369,246 @@ class MyApplication : Application() {
 | **增量编译耗时** | 修改 \`UserActivity\` 触发依赖它的所有模块全量重新编译 | 修改 \`UserActivity\` 仅增量重编 \`user:impl\`，其他模块秒级跳过（UP-TO-DATE） |
 | **循环依赖风险** | 模块多时极易出现 \`A ➔ B ➔ A\` 循环依赖，项目无法编译 | 严格遵循 \`api\` 单向树状依赖，物理目录层彻底杜绝循环依赖 |`,
       },
+      {
+        tag: '设计模式',
+        title: '现代设计模式实战：单例模式（三大形态）、高阶函数策略与责任链',
+        sectionTitles: {
+          explanation: '设计模式在现代语言中的重塑与单例三大工业级形态',
+          caseStudy: '带参单例的并发安全陷阱（!! 符号辨析、内存屏障与 Context 泄漏防御）',
+        },
+        explanation: `### 一、 第一性原理：现代移动端中设计模式的“内建与降维”
+
+经典 GoF 23 种设计模式诞生于 20 世纪 90 年代（C++ 与早期 Java 时代）。在缺乏一等公民函数、闭包、扩展函数与属性委托的语言环境中，开发者必须通过创建大量的抽象接口与派生子类来实现解耦与变体扩展。
+
+进入现代语言（Kotlin / Swift）时代后，**设计模式并未消亡，而是被现代语法特性内建消化与降维重塑**：
+- **策略模式 (Strategy)** ➔ 直接被**高阶函数与 Lambda 表达式**降维。算法即函数，直接以参数形式传递，无需为每种策略机械式地新建一个接口与实现类；
+- **委托模式 (Delegation)** ➔ 成为语言一等公民，Kotlin 通过 \`by\` 关键字原生支持类委托（接口实现转发）与属性委托（\`by lazy\`、\`by Delegates.observable\`、自定义读写拦截）；
+- **观察者模式 (Observer)** ➔ 演进为响应式状态流（\`StateFlow\` / \`SharedFlow\`），从根本上终结了手动维护观察者列表、忘记反注册导致的内存泄漏与主子线程调度撕裂；
+- **责任链模式 (Chain of Responsibility)** ➔ 成为网络库与横切关注点治理的灵魂基石（如 OkHttp \`Interceptor.Chain\`），实现了开闭原则（OCP）的极致应用。
+
+在移动端基础框架与 SDK 封装中，**单例模式（Singleton Pattern）**是使用频次最高、但也最容易因并发竞态引发半初始化对象崩溃、或因生命周期失控引发内存泄漏的模式。在 Kotlin 中，经过工业界实践沉淀，**真正高频且实用的单例实现方式主要收敛为以下三种形态**：
+
+---
+
+### 二、 Kotlin 单例模式的三大高频实战形态
+
+#### 1. 最简形态：\`object\` 声明（无参全局单例）
+
+适用于 **80% 无需动态传入初始化参数**的通用管理器、数据格式化器或纯工具类。
+
+\`\`\`kotlin
+object NetworkManager {
+    private val client = OkHttpClient.Builder().build()
+
+    fun execute(request: Request): Response {
+        return client.newCall(request).execute()
+    }
+}
+
+// 业务调用端：
+NetworkManager.execute(request)
+\`\`\`
+
+- **底层机制（反编译为 Java）**：
+  Kotlin 编译器将其编译为 \`public final class NetworkManager\`，并在内部生成一个 \`public static final NetworkManager INSTANCE\` 静态常量，在类构造器 \`<clinit>\` 静态代码块中完成初始化。
+- **线程安全性**：由 **JVM 类加载机制（Class Loader）**在加载并链接类时原生保证绝对的互斥性与内存可见性。**零加锁开销、零样板代码**。
+- **局限性**：无法传递运行时构造参数（例如无法传入 Android \`Context\`）。
+
+---
+
+#### 2. 懒加载形态：\`by lazy\` 委托单例（无参延迟初始化）
+
+适用于 **初始化开销极大、需优化 App 冷启动耗时**，但同样不需要传入参数的场景。
+
+\`\`\`kotlin
+class DataRepository private constructor() {
+    init {
+        // 模拟耗时初始化：加载本地大文件或预热密集配置
+        Thread.sleep(100)
+    }
+
+    companion object {
+        // 默认模式即为 LazyThreadSafetyMode.SYNCHRONIZED
+        val instance: DataRepository by lazy { 
+            DataRepository() 
+        }
+    }
+
+    fun loadData() { /* ... */ }
+}
+
+// 业务调用端：
+DataRepository.instance.loadData()
+\`\`\`
+
+- **底层机制**：Kotlin 标准库提供的 \`by lazy\` 默认采用 \`LazyThreadSafetyMode.SYNCHRONIZED\`，其内部对一个内部锁对象进行了双重检查（Double-Checked Locking），确保多线程并发访问时有且仅有一个线程执行初始化闭包。
+- **核心价值**：只有在首次访问 \`instance\` 属性时才触发类实例化，避免在 Application 启动时集中抢占 CPU 与内存。
+
+---
+
+#### 3. 工业级带参形态：\`SingletonHolder\` 通用封装（参数注入与防泄漏）
+
+在 Android 实际开发中，90% 以上的全局管理器（如本地数据库 Room、偏好存储 MMKV、设备管理器）**必须依赖 \`Context\`**。
+若强行使用 \`object\`，则必须提供一个 \`init(context)\` 方法，极易在团队协作中由于未调用 \`init\` 直接访问而引发空指针崩溃（NPE），或多次调用引发状态不一致。
+
+Google 官方推荐的通用**泛型单例封装器**方案：
+
+\`\`\`kotlin
+/**
+ * 封装带 1 个参数的通用双重检查锁（DCL）单例基类
+ * @param T 单例类型 (强制为非空引用类型)
+ * @param A 初始化参数类型 (如 Context 或配置对象)
+ */
+open class SingletonHolder<out T : Any, in A>(creator: (A) -> T) {
+    private var creator: ((A) -> T)? = creator
+    @Volatile
+    private var instance: T? = null
+
+    fun getInstance(arg: A): T {
+        val checkInstance = instance
+        if (checkInstance != null) return checkInstance
+
+        return synchronized(this) {
+            val checkAgain = instance
+            if (checkAgain != null) {
+                checkAgain
+            } else {
+                // 使用 checkNotNull 提供清晰语义，杜绝直接用 !! 产生不安全代码坏味道
+                val factory = checkNotNull(creator) {
+                    "SingletonHolder error: creator was released before instance was initialized"
+                }
+                val created = factory(arg)
+                instance = created
+                creator = null // ⚡ 关键：实例化完成后立即释放函数引用，斩断潜在的外部持有强引用链！
+                created
+            }
+        }
+    }
+}
+\`\`\`
+
+**业务类接入实战（仅需继承基类，一行代码声明伴生对象）**：
+
+\`\`\`kotlin
+class UserManager private constructor(context: Context) {
+    // 强制转换为 ApplicationContext，彻底防范外部误传 Activity 导致内存泄漏！
+    private val appContext: Context = context.applicationContext
+
+    companion object : SingletonHolder<UserManager, Context>(::UserManager)
+
+    fun getUserProfile(): UserProfile {
+        return UserProfile(userId = "10001", name = "Antigravity")
+    }
+}
+
+// 业务调用端（任意地方直接调用，首次传入 Context 完成初始化，后续直接命中单例缓存）：
+val profile = UserManager.getInstance(context).getUserProfile()
+\`\`\`
+
+---
+
+### 三、 三大单例形态选型法则
+
+| 单例形态 | 语法核心 | 初始化时机 | 线程安全保障 | 是否支持传参 | 最佳应用场景 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **\`object\` 声明** | 原生 \`object\` | 类首次加载时 | JVM 类加载器原子锁 | ❌ 否 | 网络客户端、无参工具类、路由表 |
+| **\`by lazy\` 委托** | 属性代理 \`by lazy\` | 首次读取属性时 | 库函数级 DCL 同步锁 | ❌ 否 | 耗时无参解析器、重型配置缓存 |
+| **\`SingletonHolder\`** | 伴生对象继承通用基类 | 首次调用 \`getInstance(arg)\` 时 | \`@Volatile\` + DCL 同步锁 |  是 | 数据库（Room）、存储库、依赖 \`Context\` 的组件 |`,
+        caseStudy: `### 深度剖析一：带参单例中的 \`!!\` 强转真的安全吗？JMM 内存模型推演
+
+在早期版本的 \`SingletonHolder\` 中，社区常见实现直接书写：
+\`\`\`kotlin
+val created = creator!!(arg)
+instance = created
+creator = null
+\`\`\`
+很多开发者会对这里的 \`!!\`（非空断言）产生安全疑虑：**在多线程高并发竞争下，此处真的绝不会抛出 \`KotlinNullPointerException\` 吗？**
+
+#### 1. 锁内单向状态机证明
+- **初始状态**：类被加载时，\`creator\` 为构造函数注入的非空函数对象，\`instance = null\`。
+- **锁内内存可见性**：所有读写 \`creator\` 与 \`instance\` 的代码均严格处于 \`synchronized(this)\` 监视器块内部。根据 **Java 内存模型（JMM）** 规范：
+  - \`monitorenter\` 指令会强制将 CPU 工作内存中的变量无效化，从主内存重新读取最新值；
+  - \`monitorexit\` 指令会强制将工作内存的所有写入立即刷回主内存。
+- **单向不可逆跃迁**：\`creator = null\` 是在 \`instance = created\` 完成后执行的。这意味着：**一旦 \`creator\` 被置为空，\`instance\` 必定已被成功赋值且非空！**
+- **互斥短路防御**：后续任何并发线程（或重试调用）进入 \`synchronized\` 块时，首先执行第一行检查：
+  \`\`\`kotlin
+  val checkAgain = instance
+  if (checkAgain != null) return checkAgain
+  \`\`\`
+  由于 \`checkAgain\` 必定非空，代码直接在 \`if\` 分支返回，**绝不可能再次进入 \`else\` 分支执行 \`creator!!(arg)\`！**
+- **结论**：在逻辑与并发数学推导上，\`else\` 分支在进程生命周期内**有且仅被执行一次**，执行时 \`creator\` 绝不可能为 null，因此绝不会发生 NPE。
+
+#### 2. 为什么 Kotlin 编译器依然强迫开发者处理可空性？
+因为 \`creator\` 在类中声明为可变成员属性 \`private var creator: ((A) -> T)?\`。
+Kotlin 编译器的静态代码分析（Smart Cast）出于保守安全原则，**无法跨成员方法或多线程作用域推导类成员 \`var\` 的不可变性**，因此强制开发者进行显式空安全处理。
+
+#### 3. 商业级生产优化：用 \`checkNotNull\` 消除静态代码扫描告警
+在严苛的商业级规范中，静态代码检查工具（如 Detekt / Android Lint）通常会直接将 \`!!\` 拦截并判定为代码坏味道（Code Smell）。
+**推荐重构方案**：
+\`\`\`kotlin
+val factory = checkNotNull(creator) {
+    "SingletonHolder error: creator was released before instance was initialized"
+}
+val created = factory(arg)
+\`\`\`
+此写法不仅彻底消除了 \`!!\` 告警，即使未来发生极端破坏性的反射攻击或字节码插桩异常，也能抛出具备明确上下文语义的诊断信息。
+
+---
+
+### 深度剖析二：AOSP 系统源码中的孪生架构：\`android.util.Singleton<T>\`
+
+在 Android 官方系统源码（AOSP）框架层中，Google 早在 Android 1.0 时期便抽象出了同等设计思想的内部基类 **\`android.util.Singleton<T>\`**（被标记为 \`@hide\`）。
+
+系统级核心跨进程 Binder 服务（如 \`ActivityManager\`、\`WindowManager\`、\`InputMethodManager\`）全面依托该机制进行懒加载缓存：
+
+\`\`\`java
+// AOSP 官方源码: frameworks/base/core/java/android/util/Singleton.java
+public abstract class Singleton<T> {
+    private T mInstance;
+
+    protected abstract T create();
+
+    public final T get() {
+        synchronized (this) {
+            if (mInstance == null) {
+                mInstance = create();
+            }
+            return mInstance;
+        }
+    }
+}
+\`\`\`
+
+在 \`ActivityManager.java\` 中向应用进程提供 AMS 通信入口时：
+\`\`\`java
+private static final Singleton<IActivityManager> IActivityManagerSingleton =
+    new Singleton<IActivityManager>() {
+        @Override
+        protected IActivityManager create() {
+            final IBinder b = ServiceManager.getService(Context.ACTIVITY_SERVICE);
+            return IActivityManager.Stub.asInterface(b);
+        }
+    };
+
+public static IActivityManager getService() {
+    return IActivityManagerSingleton.get();
+}
+\`\`\`
+
+---
+
+### 深度剖析三：带参单例的两大内存泄漏致命死穴
+
+#### 1. 隐蔽的 Context 泄漏
+- **错误写法**：直接在单例内部持有传入的 \`context\` 引用：\`private val mContext = context\`。
+- **爆雷场景**：如果在 Activity 或 Fragment 中调用 \`UserManager.getInstance(this)\`，此时传入的是 Activity 的实例上下文。一旦该单例被初始化，它将作为静态对象（GC Roots）永久驻留在 JVM 堆内存中，使得该 Activity 在 finish 销毁后无法被 GC 回收，导致整个页面的 View 树与 Window 泄露（数百 KB 到数 MB 显存溢出）。
+- **防御法则**：必须在单例类的构造入口强制转换：\`private val appContext = context.applicationContext\`。由于 Application 的生命周期与整个进程一致，因此持有其引用绝对安全。
+
+#### 2. Lambda 闭包捕获泄漏
+在 \`SingletonHolder\` 的构造函数中传入了一个函数对象 \`creator: (A) -> T\`。
+在 JVM 底层，高阶函数编译为一个匿名类 \`Function1\`。如果外部传入的构造引用隐式捕获了外部对象，该闭包对象将一直存活。
+通过在实例化成功后立即执行 **\`creator = null\`**，将闭包指针从成员属性中解除引用，使底层的匿名函数对象可以被垃圾回收器及时回收，达到绝对的零泄漏保障。`,
+      },
     ],
     ios: [
       {
@@ -4759,6 +4999,229 @@ enum AppEnvironment {
         #endif
     }
 }
+\`\`\``,
+      },
+      {
+        tag: '设计模式',
+        title: 'Swift 现代设计模式实战：单例安全（static let）、Delegate 弱引用与责任链',
+        sectionTitles: {
+          explanation: 'POP 协议导向下的设计模式重塑与 Swift 单例三大机制',
+          caseStudy: 'Weak Delegate 内存泄漏破除与基于闭包的 URLSession 拦截器实战',
+        },
+        explanation: `### 一、 第一性原理：协议导向编程 (POP) 对经典设计模式的重塑
+
+在 iOS 与 Swift 工程体系中，经典面向对象（OOP）继承树被**面向协议编程（Protocol-Oriented Programming, POP）**彻底重构。
+Swift 通过协议（Protocol）、扩展（Extension）、一等公民闭包（Closures）以及现代并发（Actors），将大量传统设计模式解构为轻量级语言惯用语法：
+
+- **策略模式 (Strategy)** ➔ 闭包作为一等公民，直接作为高阶函数参数传递（如 \`items.sorted(by: { $0.price < $1.price })\`），无需为每个算法单独定义类；
+- **装饰器模式 (Decorator)** ➔ 利用 Swift 扩展（\`extension\`）与 SwiftUI \`ViewModifier\`，实现无侵入式的链式能力附加；
+- **适配器模式 (Adapter)** ➔ 通过协议扩展实现“逆向建模”（Retroactive Modeling），使已有第三方类无需修改源码即可直接遵循自身业务协议；
+- **委托模式 (Delegation)** ➔ iOS 架构的统治级模式，贯穿 \`UIKit\`、\`AVFoundation\` 与 \`WebKit\` 的底层事件分发。
+
+在系统级服务与基础库中，**单例模式（Singleton）**同样是最基础也最容易引发数据竞争的模式。Swift 从语言与运行时底层对单例进行了专门的原生优化。
+
+---
+
+### 二、 Swift 单例模式的三大现代实战形态
+
+#### 1. 最简官方推荐：\`static let\` 单例（原生原子锁与按需懒加载）
+
+适用于绝大多数无参、全局唯一的服务（如网络客户端、配置读取、音视频路由）：
+
+\`\`\`swift
+final class NetworkManager {
+    // 1. static let 全局唯一实例
+    static let shared = NetworkManager()
+
+    // 2. 必须私有化构造函数，彻底杜绝外部随意 init() 创建第二份实例！
+    private init() {
+        // 执行初始化网络会话配置
+    }
+
+    func request(url: URL) async throws -> Data {
+        let (data, _) = try await URLSession.shared.data(from: url)
+        return data
+    }
+}
+
+// 业务调用端：
+let data = try await NetworkManager.shared.request(url: apiUrl)
+\`\`\`
+
+- **底层机制（\`swift_once\`）**：
+  在 Swift 底层，所有全局变量与结构体/类的 \`static let\` 属性，均由编译器在 SIL 阶段自动包裹 **\`swift_once\`** 调用（基于底层平台原生的 \`dispatch_once\` 机制）。
+- **核心保障**：
+  1. **原子级线程安全**：无论多少个线程同时访问 \`NetworkManager.shared\`，底层的原子谓词保证初始化闭包仅被执行一次；
+  2. **绝对懒加载（Lazy Initialization）**：该对象在首次被代码读取时才会触发分配内存与初始化，无需显式书写 \`lazy\` 关键字；
+  3. **零锁竞争开销**：初始化完成后，后续所有线程的读取均降级为对静态内存地址的直接指针解引用。
+
+---
+
+#### 2. 闭包配置形态：带复杂启动装配的懒加载单例
+
+当单例需要多步骤装配、读取本地 Plist 或依赖不同环境配置时：
+
+\`\`\`swift
+final class AnalyticsService {
+    static let shared: AnalyticsService = {
+        let service = AnalyticsService()
+        // 从 Info.plist 读取上报端点与采样率
+        let endpoint = Bundle.main.object(forInfoDictionaryKey: "AnalyticsEndpoint") as? String ?? ""
+        service.configure(endpoint: endpoint, flushInterval: 30)
+        return service
+    }()
+
+    private init() {}
+
+    private func configure(endpoint: String, flushInterval: TimeInterval) {
+        // 执行内部定时器与上报队列预热
+    }
+}
+\`\`\`
+
+---
+
+#### 3. 现代并发形态：Actor 线程安全单例（彻底消除数据竞争）
+
+**传统 \`static let\` 的隐蔽死穴**：
+\`static let\` 只能保证**单例对象本身的创建过程**是线程安全的；如果单例内部包含可变状态（如 \`var token: String?\` 或可变数组），在多线程并发读写时，仍会直接触发底层内存崩溃（EXC_BAD_ACCESS）或严重的数据竞争（Data Race）！
+
+Swift 5.5+ 引入的 **Actor 单例** 从编译期根除这一隐患：
+
+\`\`\`swift
+// 将单例声明为 actor，内部所有状态自动获得运行时隔离保护！
+actor AccountManager {
+    static let shared = AccountManager()
+
+    private var authToken: String?
+    private var loginTimestamp: Date?
+
+    private init() {}
+
+    func updateToken(_ token: String) {
+        self.authToken = token
+        self.loginTimestamp = Date()
+    }
+
+    func getToken() -> String? {
+        return authToken
+    }
+}
+
+// 业务调用端（编译器强制要求使用 await，自动在协作线程池中安全串行化）：
+await AccountManager.shared.updateToken("jwt_token_xxxx")
+let currentToken = await AccountManager.shared.getToken()
+\`\`\`
+
+---
+
+### 三、 经典委托模式 (Delegation) 的标准工业级范式
+
+委托模式通过将“事件发生的通知”或“部分决策权”移交给外部对象，实现了极致的松耦合：
+
+\`\`\`swift
+// 1. 协议必须显式继承 AnyObject，限制其仅能被类遵循（值类型无法被弱引用）
+protocol DownloadTaskDelegate: AnyObject {
+    func downloadTaskDidUpdateProgress(_ task: DownloadTask, progress: Float)
+    func downloadTask(_ task: DownloadTask, didFailWith error: Error)
+}
+
+final class DownloadTask {
+    // 2. 必须使用 weak 关键字修饰 delegate，彻底斩断与 Controller 之间的强引用环！
+    weak var delegate: DownloadTaskDelegate?
+
+    func execute() {
+        // 模拟下载推进
+        delegate?.downloadTaskDidUpdateProgress(self, progress: 0.5)
+    }
+}
+
+// 3. 控制器遵循协议并挂载代理
+final class MediaViewController: UIViewController, DownloadTaskDelegate {
+    private let task = DownloadTask()
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        task.delegate = self // 挂载弱引用委托
+        task.execute()
+    }
+
+    func downloadTaskDidUpdateProgress(_ task: DownloadTask, progress: Float) {
+        print("Progress: \\(progress)")
+    }
+
+    func downloadTask(_ task: DownloadTask, didFailWith error: Error) {
+        print("Failed: \\(error)")
+    }
+}
+\`\`\``,
+        caseStudy: `### 深度剖析一：为什么 Swift 委托协议必须显式声明 \`: AnyObject\`？
+
+很多初学者经常遇到编译器报错：\`'weak' must not be applied to non-class-bound 'MyDelegate'\`。
+
+#### 1. 值类型与引用类型的本质冲突
+- Swift 的 \`struct\`（结构体）与 \`enum\`（枚举）属于**值类型（Value Types）**。值类型在赋值与传参时发生按值深拷贝（Copy-on-write），其内存分配在栈上或内联于宿主结构体中，**在底层根本没有引用计数（Reference Count）机制**；
+- \`weak\`（弱引用）是 ARC（自动引用计数）体系的产物。弱引用的本质是：在底层 Runtime 的副表（Side Table）中注册一个弱引用指针条目，当目标堆对象引用计数归零被释放时，由 Runtime 自动将该弱指针置为 \`nil\`；
+- 如果协议未继承 \`AnyObject\`，意味着任何 \`struct\` 都可以遵守该协议。编译器无法允许一个结构体被声明为 \`weak\`，因为结构体压根无法置为 \`nil\` 且没有生命周期回收通知。
+
+#### 2. 缺少 \`weak\` 引发的 Retain Cycle 内存泄漏
+- 如果忘记写 \`weak\`：\`MediaViewController\` 强持有 \`DownloadTask\`，而 \`DownloadTask\` 内部的 \`delegate\` 又强持有 \`MediaViewController\`；
+- 当用户在界面上点击返回按钮退出页面时，该 ViewController 实例的引用计数依然为 1，**导致整个 UI 视图树与控制器对象永久驻留内存**，Instruments Allocations 工具中直接表现为控制器泄漏。
+
+---
+
+### 深度剖析二：基于闭包责任链模式重构 URLSession 拦截器
+
+在 iOS 网络层开发中，业务经常需要依次执行：**添加通用 Header ➔ 注入防重放签名 ➔ 校验 Auth Token 过期刷新 ➔ 记录请求耗时**。利用高阶闭包构建的责任链，代码优雅程度远超传统的类继承：
+
+\`\`\`swift
+// 1. 定义拦截器抽象：接收 Request 与后续处理闭包，返回最终 Response
+typealias HTTPHandler = (URLRequest) async throws -> (Data, HTTPURLResponse)
+typealias HTTPInterceptor = (URLRequest, @escaping HTTPHandler) async throws -> (Data, HTTPURLResponse)
+
+// 2. 链式组装管道
+final class HTTPPipeline {
+    private var interceptors: [HTTPInterceptor] = []
+
+    func use(_ interceptor: @escaping HTTPInterceptor) -> HTTPPipeline {
+        interceptors.append(interceptor)
+        return self
+    }
+
+    func execute(request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        // 构建终点：底层的真实网络调用
+        let baseHandler: HTTPHandler = { req in
+            let (data, response) = try await URLSession.shared.data(for: req)
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw URLError(.badServerResponse)
+            }
+            return (data, httpResponse)
+        }
+
+        // 从后往前逆向包裹，构建洋葱模型责任链
+        let chainedHandler = interceptors.reversed().reduce(baseHandler) { nextHandler, currentInterceptor in
+            return { req in
+                try await currentInterceptor(req, nextHandler)
+            }
+        }
+
+        return try await chainedHandler(request)
+    }
+}
+
+// 3. 业务拦截器插拔：日志拦截器 + Token 注入拦截器
+let pipeline = HTTPPipeline()
+    .use { req, next in
+        let start = Date()
+        let result = try await next(req)
+        print("HTTP \\(req.url?.path ?? "") 耗时: \\(Date().timeIntervalSince(start))s")
+        return result
+    }
+    .use { mutReq, next in
+        var signedReq = mutReq
+        signedReq.setValue("Bearer eyJhbGciOi...", forHTTPHeaderField: "Authorization")
+        return try await next(signedReq)
+    }
 \`\`\``,
       },
     ],
