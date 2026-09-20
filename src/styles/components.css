@@ -7604,19 +7604,31 @@ input:focus-visible,
    ========================================================================== */
 
 .mermaid-container {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 16px 0 24px 0;
-  padding: 20px;
+  margin: 18px 0 26px 0;
+  padding: 24px 20px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
   overflow-x: auto;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.mermaid-container.mermaid-interactive {
+  cursor: zoom-in;
+}
+
+.mermaid-container.mermaid-interactive:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
 .mermaid-container svg {
+  min-width: min(100%, 760px);
   max-width: 100%;
   height: auto;
 }
@@ -7628,6 +7640,244 @@ input:focus-visible,
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Floating zoom trigger button on diagrams */
+.diagram-zoom-trigger-btn {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--color-surface-glass, rgba(255, 255, 255, 0.88));
+  color: var(--color-ink-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all var(--transition-fast);
+  z-index: 5;
+  opacity: 0.88;
+}
+
+.diagram-zoom-trigger-btn:hover {
+  opacity: 1;
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-surface);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.layer-diagram-wrapper {
+  position: relative;
+  margin: 16px 0 24px 0;
+  cursor: zoom-in;
+}
+
+.layer-diagram-wrapper:hover .layer-diagram-box {
+  border-color: var(--color-accent);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+.layer-diagram-wrapper .diagram-zoom-trigger-btn {
+  top: 8px;
+  right: 10px;
+}
+
+/* ==========================================================================
+   Diagram Zoom Modal Lightbox Dialog
+   ========================================================================== */
+
+.diagram-zoom-dialog {
+  width: 95vw;
+  max-width: 1550px;
+  height: 92vh;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-modal);
+  padding: 0;
+  margin: auto;
+  overflow: hidden;
+}
+
+.diagram-zoom-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  animation: diagramFadeIn 0.2s ease-out;
+}
+
+.diagram-zoom-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.diagram-zoom-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: var(--color-surface-raised);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.diagram-zoom-title-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.diagram-zoom-icon {
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+
+.diagram-zoom-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.diagram-zoom-hint {
+  font-size: 12px;
+  color: var(--color-ink-muted);
+  background: var(--color-surface-sunken);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.diagram-zoom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.zoom-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  transition: all var(--transition-fast);
+}
+
+.zoom-btn:hover {
+  color: var(--color-ink);
+  border-color: var(--color-accent);
+  background: var(--color-surface-sunken);
+}
+
+.zoom-scale-badge {
+  min-width: 40px;
+  text-align: center;
+}
+
+.zoom-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--color-border);
+  margin: 0 4px;
+}
+
+.zoom-btn-close {
+  background: var(--color-surface-sunken);
+  color: var(--color-ink-muted);
+}
+
+.zoom-btn-close:hover {
+  background: var(--color-surface-raised);
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
+.diagram-zoom-viewport {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background: var(--color-bg);
+  cursor: grab;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.diagram-zoom-viewport.is-dragging {
+  cursor: grabbing;
+}
+
+.diagram-zoom-canvas {
+  transform-origin: center center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+  transition: transform 0.05s ease-out;
+  padding: 40px;
+}
+
+.diagram-zoom-canvas svg {
+  max-width: none !important;
+  max-height: none !important;
+  width: auto !important;
+  height: auto !important;
+  display: block;
+  margin: auto;
+}
+
+.diagram-zoom-ascii-content {
+  font-family: var(--font-mono);
+  font-size: 14.5px;
+  line-height: 1.55;
+  background: var(--color-surface-raised);
+  color: var(--color-ink);
+  padding: 30px 40px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  white-space: pre;
+  box-shadow: var(--shadow-md);
+}
+
+@keyframes diagramFadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 768px) {
+  .diagram-zoom-hint {
+    display: none;
+  }
+  .diagram-zoom-dialog {
+    width: 100vw;
+    height: 100vh;
+    border-radius: 0;
+    max-width: none;
+  }
 }
 
 
