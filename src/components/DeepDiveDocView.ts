@@ -7,7 +7,6 @@ import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
 import { renderSuspensionVisual } from './SuspensionVisual';
-import { setupDiagramZoomTriggers } from './DiagramZoomModal';
 
 export function renderDeepDiveDocView(
   currentStageId: string,
@@ -380,9 +379,6 @@ function renderSingleChapterView(
  * Adheres to AGENTS.md zero heavy UI upfront requirement via code splitting.
  */
 async function hydrateMermaid(root: HTMLElement) {
-  // Attach zoom triggers to any ASCII diagram boxes immediately
-  setupDiagramZoomTriggers(root);
-
   const nodes = root.querySelectorAll<HTMLElement>('.mermaid-container:not([data-rendered])');
   if (nodes.length === 0) return;
 
@@ -411,9 +407,6 @@ async function hydrateMermaid(root: HTMLElement) {
         node.innerHTML = `<pre class="layer-code-box"><code>${escapeHtml(code)}</code></pre>`;
       }
     }
-
-    // Attach zoom triggers to newly rendered Mermaid SVGs
-    setupDiagramZoomTriggers(root);
   } catch (err) {
     console.error('Failed to load mermaid dynamically:', err);
   }
