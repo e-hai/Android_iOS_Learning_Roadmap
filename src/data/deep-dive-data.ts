@@ -6133,10 +6133,6 @@ final class RealtimeCameraFilterPipeline {
 │  • basePlanId:      订阅基础方案 (如 p1m)                   │
 │  • offerId:         促销优惠方案 (如 free_trial_7d)         │
 │  • entitlementKey:  业务权益标识 (决定给用户发什么特权)       │
-│  • settleAction:    终态核销动作 (Acknowledge 确认 / Consume 消费)
-│  • fallbackPrice:   离线/弱网保底展示价格 (如 $9.99)        │
-│  • uiBadge:         运营促销角标 (如 "立省50%" / "热门推荐")  │
-│  • coinsAmount:     虚拟货币充值额度 (消耗型专用)             │
 │                                                             │
 │  ★ 获取方式：无服务器写死在 assets；有服务器由中台动态下发    │
 └─────────────────────────────────────────────────────────────┘
