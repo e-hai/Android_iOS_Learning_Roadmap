@@ -5,211 +5,388 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
     android: [
       {
         tag: '现代语言',
-        title: 'Kotlin 核心特性：泛型、委托、扩展与内联具现化',
+        title: 'Kotlin 六大特性：从“为什么需要”讲起',
         sectionTitles: {
-          explanation: '核心原理解析与设计哲学',
-          diagram: '六大特性的设计哲学与工程破局卡片',
-          caseStudy: '三、详细的使用例子',
+          explanation: 'Kotlin 六大特性：从“为什么需要”讲起',
         },
-        explanation: `### 1. 语法糖背后的工程本质：少写样板与零开销抽象
-Kotlin 的现代语言特性并非单纯的“语法杂耍”，其核心设计哲学是**消除 Java 历史包袱中的防御性样板代码**，并在编译期通过静态推导将高级抽象抹平为高性能字节码：
+        explanation: `先看全局
 
-- **泛型（Generics）**：本质是参数化类型（Parameterized Types）。最初为了解决老旧集合只能存 \`Object\` 导致取值强制类型转换频繁抛出 \`ClassCastException\` 运行时崩溃，以及为不同类型重复手写专用容器的代码冗余。其后在现代演进中，Kotlin 通过上界约束与声明处型变（\`out\` 协变 / \`in\` 逆变）彻底攻克面向对象类型继承与容器安全赋值之间的矛盾，消除 Java 通配符在调用点反复声明的心智负担。
-- **属性与类委托（Delegation）**：以约定胜于配置（Convention）的原则，通过 \`by\` 关键字将访问器转发给独立状态机，将模板逻辑（延迟加载、持久化、生命周期感知）彻底解耦抽离。
-- **扩展（Extensions）**：在无继承、无装饰器样板的前提下对已有封闭类注入专属领域语义，从根源上终结各类反模式的 \`XxxUtils\` 静态工具类堆砌。
-- **内联生态与具现化（Inline & Reified）**：攻克高阶函数 Lambda 闭包对象分配的堆内存损耗，并结合静态内联在编译期将泛型类型元数据内嵌至调用点，彻底打破 JVM 泛型类型擦除（Type Erasure）的铁律枷锁。`,
-        diagram: 'kotlin-features',
-        caseStudy: `### 泛型：约束、型变与星号投影实战
+| # | 特性 | 一句话 |
+| :--- | :--- | :--- |
+| **1** | **泛型 \`<T>\`** | 一套代码适配多种类型，类型错误在编译期就报出来 |
+| **2** | **委托 \`by\`** | 把活转交给另一个对象去干 |
+| **3** | **扩展函数** | 不改原来的类，也能给它"加"方法 |
+| **4** | **带接收者的 Lambda** | 大括号里的 this 换成目标对象，省掉前缀 |
+| **5** | **\`inline\`** | 编译时把函数"复制粘贴"到调用处，省开销 |
+| **6** | **\`reified\`** | 配合 inline，运行时也能知道泛型 T 到底是什么 |
+
+> **怎么记**：1～4 让代码写起来更简洁；5～6 让高阶函数跑得更快，并突破泛型擦除的限制。
+
+### 1. 泛型
+
+#### 没有它会怎样
+早期的集合只能存 Object，取出来要自己强转：
+
+\`\`\`java
+List list = new ArrayList();
+list.add("hello");
+Integer n = (Integer) list.get(0);   // 编译通过，运行时崩溃：ClassCastException
+\`\`\`
+
+#### 泛型怎么解决
+告诉编译器"这个列表只装 String"，放错类型直接编译报错：
+
 \`\`\`kotlin
-// 1. 泛型上界与多重约束：限定 T 必须同时满足多个接口协议
-fun <T> copyGreater(list: List<T>, threshold: T): List<T>
-    where T : Comparable<T>, T : Cloneable {
-    return list.filter { it > threshold }
-}
+val list: List<String> = listOf("hello")
+// val n: Int = list[0]   // 编译期就报错，不会等到线上崩
+\`\`\`
 
-// 2. 声明处协变 out：生产者（只读不写），天然支持子类泛型赋给父类泛型
-interface DataSource<out T> {
-    fun fetch(): T // 合法：T 仅作为输出返回值
-    // fun save(item: T) // 编译报错：T 不能出现在 in 位置，避免向苹果容器写入香蕉
-}
+#### 基本写法
+\`\`\`kotlin
+class Box<T>(val value: T)                       // 泛型类
 
-fun printData(source: DataSource<Any>) {
-    println(source.fetch())
-}
+fun <T> firstOf(list: List<T>): T = list.first() // 泛型函数
 
-val stringSource: DataSource<String> = object : DataSource<String> { override fun fetch() = "Hello" }
-printData(stringSource) // 安全协变转换，无需繁琐的 ? extends Any
+// 上界：T 必须能比较大小
+fun <T : Comparable<T>> bigger(a: T, b: T): T = if (a > b) a else b
 
-// 3. 声明处逆变 in：消费者（只进不出），允许父类比较器直接用于子类
-interface Comparator<in T> {
-    fun compare(a: T, b: T): Int // T 仅作为入参消费
-}
-
-val anyComparator: Comparator<Any> = object : Comparator<Any> {
-    override fun compare(a: Any, b: Any) = a.hashCode() - b.hashCode()
-}
-val strComparator: Comparator<String> = anyComparator // 安全逆变赋值
-
-// 4. 使用处投影与星号投影 <*>：对未知或可变容器限制读写边界
-fun copyArray(from: Array<out Any>, to: Array<Any>) {
-    for (i in from.indices) to[i] = from[i] // from[i] 只能读取，禁止写入
-}
-
-fun printListSize(list: List<*>) {
-    println(list.size) // 不关心具体类型，安全访问集合公共只读属性
+// 多个上界：T 既要能关闭，又要能比较
+fun <T> closeAndCompare(a: T, b: T) where T : AutoCloseable, T : Comparable<T> {
+    a.close()
+    println(a > b)
 }
 \`\`\`
 
-### 属性委托：生命周期感知与延迟加载
+#### 型变：泛型里最难的部分
+先想一个问题：Cola（可乐）是 Beverage（饮料）的子类，那么 \`List<Cola>\` 能当 \`List<Beverage>\` 用吗？
+
+- **只读列表：可以**。取出来的每个 Cola 当然也是 Beverage。
+- **可变列表：不行**。如果允许，别人拿着 \`List<Beverage>\` 就能 \`add(Coffee())\`，而原主人以为里面全是可乐，取出来就出错了。
+
+> **所以**：能不能"放宽"类型，取决于 \`T\` 在这个类里只是被取出，还是只是被放入。
+
+| 写法 | 名字 | T 的角色 | 效果 | 典型例子 |
+| :--- | :--- | :--- | :--- | :--- |
+| **\`<T>\`** | **不变** | 既进又出 | 类型必须完全一致 | \`MutableList<T>\` |
+| **\`<out T>\`** | **协变** | 只出（生产者） | \`Box<Cola>\` 可当 \`Box<Beverage>\` 用 | \`List<out E>\` |
+| **\`<in T>\`** | **逆变** | 只进（消费者） | \`Box<Beverage>\` 可当 \`Box<Cola>\` 用 | \`Comparator<in T>\` |
+
+> **口诀**：\`out\` = 只往外给；\`in\` = 只往里收。
+> 
+> **生活隐喻（自助餐厅顾客视角）**：
+> - **调料罐（可舀可放，两头通 \`<T>\`）** ➔ **死守标签不串用（不变性）**，防止白糖混进盐罐引发业务崩溃；
+> - **自动饮料机（只能按键接取，只出不进 \`<out T>\`）** ➔ **贴可乐直接当饮料喝（协变）**，单向只读放行子类赋给父类；
+> - **餐盘垃圾桶（吃完只能往里扔，只进不出 \`<in T>\`）** ➔ **大垃圾桶通吃具体小垃圾（逆变）**，单向只写放行父类赋给子类。
+
+##### out 例子（生产者）：
+
 \`\`\`kotlin
-// 1. 标准属性委托：线程安全懒加载
-val databaseHelper by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-    DatabaseHelper.create(appContext)
+interface Source<out T> {
+    fun next(): T              // ✅ T 只作为返回值
+    // fun put(x: T)           // ❌ 编译报错：out 的 T 不能出现在参数位置
 }
 
-// 2. 自定义生命周期感知属性委托：Fragment ViewBinding 自动解绑防泄漏
-class AutoClearedValue<T : Any>(val fragment: Fragment) : ReadWriteProperty<Fragment, T> {
-    private var _value: T? = null
+val strings: Source<String> = ...
+val anys: Source<Any> = strings   // ✅ 只会取出 String，把它当 Any 用是安全的
+\`\`\`
 
-    init {
-        fragment.lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onCreate(owner: LifecycleOwner) {
-                fragment.viewLifecycleOwnerLiveData.observe(fragment) { viewOwner ->
-                    viewOwner?.lifecycle?.addObserver(object : DefaultLifecycleObserver {
-                        override fun onDestroy(owner: LifecycleOwner) {
-                            _value = null // 视图销毁瞬间自动将 binding 置空，断开引用链防泄漏
-                        }
-                    })
-                }
-            }
-        })
-    }
+> **疑问**："只出不进"，数据从哪来？  
+> **答**：构造时传入（如 \`listOf(1, 2, 3)\`），或者对象内部自己产生。"不进"指的是对外不提供写入口。
 
-    override fun getValue(thisRef: Fragment, property: KProperty<*>): T =
-        _value ?: throw IllegalStateException("视图已销毁或尚未创建，禁止访问 binding")
+##### in 例子（消费者）：
 
-    override fun setValue(thisRef: Fragment, property: KProperty<*>, value: T) {
-        _value = value
-    }
+\`\`\`kotlin
+interface Consumer<in T> {
+    fun accept(x: T)           // ✅ T 只作为参数
 }
 
-// 外部使用：仅需一行声明，彻底解耦生命周期样板
-class HomeFragment : Fragment() {
-    private var binding by AutoClearedValue<FragmentHomeBinding>(this)
+val anyConsumer: Consumer<Any> = ...
+val strConsumer: Consumer<String> = anyConsumer   // ✅ 能处理任何东西的，当然能处理 String
+\`\`\`
+
+> **直觉**：能比较任意对象的比较器，当然也能比较字符串。
+
+##### 星号投影 \`<*>\`
+"我不关心元素类型是什么"。只能读（读出来是 \`Any?\`），不能写。
+
+\`\`\`kotlin
+fun printSize(list: List<*>) {
+    println(list.size)
+    val first: Any? = list.firstOrNull()
 }
 \`\`\`
 
-### 类委托：接口零样板装饰器与切面拦截
-\`\`\`kotlin
-// 1. 传统装饰器需要手动转发上百个方法；Kotlin 类委托一行实现组合代理
-class SecurityWindowCallback(
-    private val origin: Window.Callback
-) : Window.Callback by origin { // 其余所有方法由 origin 自动代理转发
+##### 使用处型变
+类本身是不变的，但在某个函数里只想读，可以临时加 \`out\`：
 
-    // 仅覆写真正关心的目标方法：注入防连续快速点击安全拦截
-    override fun dispatchTouchEvent(event: MotionEvent?): Boolean {
-        if (event?.action == MotionEvent.ACTION_DOWN) {
-            if (ClickThrottle.isFastDoubleClick()) return true // 拦截恶意连续快击
-        }
-        return origin.dispatchTouchEvent(event) // 正常放行
+\`\`\`kotlin
+fun copy(from: Array<out Any>, to: Array<Any>) {
+    for (i in from.indices) to[i] = from[i]   // from 只读，不能写
+}
+\`\`\`
+
+### 2. 委托 by
+
+**核心想法**：这件事我自己不干，交给别人干。分两种。
+
+#### 2.1 属性委托
+
+- **没有它会怎样**：懒加载要自己写缓存变量、判空、加锁，每个属性都重复一遍。
+
+\`\`\`kotlin
+val db by lazy { DatabaseHelper() }   // 第一次访问才创建，之后复用，且线程安全
+\`\`\`
+
+- **原理**：\`by\` 后面的对象只要提供 \`getValue\`（\`var\` 还要 \`setValue\`），读写属性时编译器就会转调它们。
+
+自己写一个最小的委托，读写时打印日志：
+
+\`\`\`kotlin
+class Logged<T>(private var value: T) : ReadWriteProperty<Any?, T> {
+    override fun getValue(thisRef: Any?, property: KProperty<*>): T {
+        println("读取 \${property.name}")
+        return value
+    }
+    override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
+        println("写入 \${property.name} = \$value")
+        this.value = value
     }
 }
 
-// 2. 零样板列表包装打点器
-class ObservableList<T>(
-    private val inner: MutableList<T>,
-    private val onModified: (item: T) -> Unit
-) : MutableList<T> by inner {
+var name by Logged("小明")
+println(name)     // 打印：读取 name → 小明
+name = "小红"      // 打印：写入 name = 小红
+\`\`\`
+
+> **Android 中常见**：\`by viewModels()\`、\`by lazy\`。
+
+#### 2.2 类委托
+
+- **没有它会怎样**：装饰器模式里，只想改一个方法，却要手写几十个转发方法。
+
+\`\`\`kotlin
+class LoggedList<T>(private val inner: MutableList<T>) : MutableList<T> by inner {
     override fun add(element: T): Boolean {
-        onModified(element) // 插入时触发回调通知
+        println("添加 \$element")
         return inner.add(element)
     }
 }
 \`\`\`
 
-### 扩展函数与计算属性：非侵入式业务注入
+\` : MutableList<T> by inner\` 的意思是：接口里的所有方法，编译器自动帮我转发给 \`inner\`，我只重写关心的那个。
+
+> ⚠️ **常见坑**：转发后，\`inner\` 内部方法之间的互相调用，不会回到你的重写方法。例如 \`addAll\` 内部调用的是 \`inner.add\`，而不是你的 \`add\`，所以 \`addAll\` 不会触发你的日志。
+
+### 3. 扩展函数
+
+#### 没有它会怎样
+系统类（如 Android 的 \`View\`）我们改不了，于是只能写工具类：
+
+\`\`\`java
+ViewUtils.gone(view)     // 读起来像"工具类去操作按钮"，主谓倒置
+                         // 输入 view. 时 IDE 也提示不出来
+\`\`\`
+
+#### 扩展函数怎么解决
+
 \`\`\`kotlin
-// 1. 扩展函数：消除 ViewUtils 垃圾桶类，恢复自然的主谓调用
-fun View.visibleOrGone(visible: Boolean) {
-    visibility = if (visible) View.VISIBLE else View.GONE
-}
+fun View.gone() { visibility = View.GONE }
 
-// 2. 扩展计算属性：不占额外内存（无 backing field），每次访问动态计算
-val Context.isNetworkAvailable: Boolean
-    get() = (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager)
-        .activeNetworkInfo?.isConnectedOrConnecting == true
+view.gone()              // 用起来像 View 自带的方法，IDE 也能补全
+\`\`\`
 
+#### 扩展属性
+没有 backing field（没有存储空间），只能写 \`get()\`，每次访问都重新计算：
+
+\`\`\`kotlin
 val String.isEmail: Boolean
     get() = Regex("^[A-Za-z0-9+_.-]+@(.+)\$").matches(this)
 
-// 3. 伴生对象扩展：为系统类注入工厂构建方法
-fun Intent.Companion.createDetail(context: Context, id: Long): Intent =
-    Intent(context, DetailActivity::class.java).apply { putExtra("EXTRA_ID", id) }
-
-// 调用端体验：与原生 API 毫无二致，IDE 智能补全极度流畅
-submitButton.visibleOrGone(context.isNetworkAvailable)
-val intent = Intent.createDetail(context, 1001)
+"a@b.com".isEmail   // true
 \`\`\`
 
-### 带接收者 Lambda：优雅声明式 DSL 与树形配置
+#### 原理
+编译后就是一个普通静态函数，"被扩展的对象"变成第一个参数：
+
+\`\`\`java
+public static final void gone(View \$this) { ... }
+\`\`\`
+
+#### 三个限制（必须知道）
+1. **只能访问公开成员**，碰不到原类的 \`private\` 成员。
+2. **静态解析，不能被重写**：调用哪个扩展，看变量的声明类型，不看运行时的真实类型。
+3. **成员函数优先**：类里已有同名同参数的方法时，扩展永远不会被调用。
+
+### 4. 带接收者的 Lambda
+
+#### 先看两种 Lambda 的区别
+
 \`\`\`kotlin
-// 1. 定义配置上下文实体
+// 普通 Lambda：对象是参数，要用 it. 访问
+fun config1(block: (Config) -> Unit) { ... }
+config1 { it.url = "..."; it.timeout = 3000 }
+
+// 带接收者的 Lambda：对象是 this，直接写属性
+fun config2(block: Config.() -> Unit) { ... }
+config2 { url = "..."; timeout = 3000 }
+\`\`\`
+
+> **最好理解的方式**：\`Config.() -> Unit\` 就是**“匿名的扩展函数”**。函数体里的 \`this\` 就是 \`Config\`，所以前缀可以全部省掉。
+
+#### 完整例子：写一个简单的配置 DSL
+
+\`\`\`kotlin
 class HttpConfig {
     var url: String = ""
     var timeout: Long = 5000L
     private val headers = mutableMapOf<String, String>()
 
     fun header(key: String, value: String) { headers[key] = value }
-    fun build(): Request = Request(url, timeout, headers)
+    fun build() = Request(url, timeout, headers)
 }
 
-// 2. 核心：形参使用带接收者闭包 Config.() -> Unit
 fun httpClient(block: HttpConfig.() -> Unit): Request {
     val config = HttpConfig()
-    config.block() // 在 config 上下文内运行，闭包内 this 隐式指向 config
+    config.block()          // 在 config 身上执行 block，block 里的 this 就是 config
     return config.build()
 }
 
-// 3. 调用端：完全省去重复的 config. / it. 前缀，天然呈现声明式层次结构
+// 使用：像写配置文件一样清爽
 val request = httpClient {
     url = "https://api.example.com/v1/user"
     timeout = 3000L
     header("Authorization", "Bearer token_abc")
-    header("Accept", "application/json")
 }
 \`\`\`
 
-### 内联与泛型具现化：零开销打点与类型穿透
+#### 你其实早就用过
+标准库的 \`apply\`、\`with\`、\`run\`，Jetpack Compose 的组件树，Gradle 的 Kotlin 脚本，都是这个机制。
+
+### 5. inline
+
+#### 背景
+Kotlin 里可以把函数当参数传（高阶函数）：
+
 \`\`\`kotlin
-// 1. inline 消除高阶函数 Lambda 临时对象的堆内存分配与 GC 抖动
-inline fun <T> measureTime(tag: String, block: () -> T): T {
+fun measureTime(block: () -> Unit) { ... }
+\`\`\`
+
+但 JVM 没有"函数"这种东西，lambda 需要被包装成对象，调用时还要多走一层函数调用。如果 lambda 还捕获了外部变量，往往每次调用都会创建新对象。在高频循环里，这些开销会累积。
+
+#### inline 怎么解决
+编译时，把函数体和你传的 lambda 内容，直接复制到调用的地方。
+
+\`\`\`kotlin
+inline fun <T> measureTime(block: () -> T): T {
     val start = System.nanoTime()
-    try {
-        return block()
-    } finally {
-        Log.d("PERF", "\$tag 耗时: \${(System.nanoTime() - start) / 1_000_000.0} ms")
+    val result = block()
+    println("耗时 \${System.nanoTime() - start} ns")
+    return result
+}
+
+// 你写的：
+measureTime { loadUser() }
+
+// 编译后大致等价于（没有函数调用，没有 lambda 对象）：
+val start = System.nanoTime()
+val result = loadUser()
+println("耗时 \${System.nanoTime() - start} ns")
+\`\`\`
+
+#### 两个好处
+1. **省掉 lambda 对象和函数调用的开销**。
+2. **lambda 里可以直接 return 外层函数（非局部返回）**：
+
+\`\`\`kotlin
+fun findUser(list: List<User>): User? {
+    list.forEach {                       // forEach 是 inline 的
+        if (it.id == 1) return it        // 直接从 findUser 返回，普通 lambda 做不到
     }
+    return null
 }
+\`\`\`
 
-// 2. inline + reified 突破 JVM 泛型擦除：免传 Class<T> 参数
-inline fun <reified T : Activity> Context.start(noinline block: (Intent.() -> Unit)? = null) {
-    val intent = Intent(this, T::class.java) // 运行时精准读取真实 Class
-    block?.let { intent.it() }
-    startActivity(intent)
+#### noinline 和 crossinline
+一个 inline 函数有多个 lambda 参数时，可以单独控制：
+
+| 修饰符 | 含义 | 什么时候用 |
+| :--- | :--- | :--- |
+| **\`noinline\`** | 这个 lambda 不内联，保留为对象 | 需要把它存起来，或传给别的非 inline 函数 |
+| **\`crossinline\`** | 仍然内联，但禁止里面写非局部 return | lambda 会在别的上下文里执行（如另一个线程、另一个对象里） |
+
+#### 什么时候该用
+- ✅ **推荐**：函数接收 lambda 参数，而且函数体很短（\`forEach\`、\`map\`、\`let\`、\`synchronized\` 都是）。
+- ❌ **不推荐**：函数体很大，或者根本没有 lambda 参数：加了没收益，还会让每个调用处的代码膨胀。
+
+### 6. reified（具现化泛型）
+
+#### 背景：类型擦除
+JVM 的泛型只在编译期存在，运行时 \`List<String>\` 和 \`List<Int>\` 都只是 \`List\`。所以下面这些都不行：
+
+\`\`\`kotlin
+fun <T> isType(x: Any) = x is T       // ❌ 编译报错：运行时不知道 T 是什么
+fun <T> nameOf() = T::class.java      // ❌ 同理
+\`\`\`
+
+老办法是多传一个参数 \`clazz: Class<T>\`，调用时很啰嗦。
+
+#### reified 怎么解决
+回忆 inline：**函数体会被复制到调用处**。那么在调用处，\`T\` 具体是什么类型，编译器是清楚的，于是它直接把真实类型写进复制出来的代码里。
+
+\`\`\`kotlin
+inline fun <reified T> Any.isType() = this is T     // ✅ 可以用了
+
+"abc".isType<String>()   // true
+"abc".isType<Int>()      // false
+\`\`\`
+
+编译后，调用处相当于直接写了 \`"abc" is String\`。
+
+#### 实用例子
+
+\`\`\`kotlin
+// 1. 页面跳转，不用再传 DetailActivity::class.java
+inline fun <reified T : Activity> Context.start() {
+    startActivity(Intent(this, T::class.java))
 }
+context.start<DetailActivity>()
 
-// 3. 泛型安全提取与 JSON 反序列化
-inline fun <reified T> List<Any>.filterType(): List<T> =
-    filterIsInstance<T>() // 运行时直接执行 is T 类型检查
+// 2. 从混合列表中筛出某种类型（标准库自带的就是这个）
+val dogs: List<Dog> = animals.filterIsInstance<Dog>()
 
+// 3. JSON 解析，自动带上完整泛型信息
 inline fun <reified T> Gson.fromJson(json: String): T =
-    fromJson(json, object : TypeToken<T>() {}.type) // 自动补全泛型 TypeToken
+    fromJson(json, object : TypeToken<T>() {}.type)
 
-// 调用端：极致简洁
-measureTime("LOAD_USER") {
-    context.start<DetailActivity> { putExtra("USER_ID", 999) }
-    val strings: List<String> = mixedList.filterType()
-}
+val users: List<User> = gson.fromJson(json)
+\`\`\`
+
+#### 限制
+1. \`reified\` 只能用在 \`inline\` 函数上（因为要靠"复制到调用处"才知道真实类型）。
+2. 从 Java 代码里无法调用带 \`reified\` 的函数。
+
+### 7. 总结：遇到什么需求，用哪个特性
+
+| 你想做的事 | 用这个 |
+| :--- | :--- |
+| 写一个适用于多种类型的类/函数 | **泛型** |
+| 只读容器要能子类当父类用 / 只写容器要能父类当子类用 | **\`out\` / \`in\`** |
+| 把属性的读写逻辑、接口的实现转交给别人 | **委托 \`by\`** |
+| 给别人的类加方法，又不想继承或写工具类 | **扩展函数** |
+| 写声明式的配置、DSL | **带接收者的 Lambda** |
+| 高阶函数在热点路径上想省开销 | **\`inline\`** |
+| 泛型函数里需要 \`is T\` / \`T::class\` | **\`inline + reified\`** |
+
+#### 一图看懂它们的关系
+
+\`\`\`diagram
+泛型 ──(运行时被擦除)──▶ 想在运行时用 T？
+                              │
+高阶函数 ──(有对象开销)──▶ inline ──▶ 顺便让 T 可知 ──▶ reified
+
+扩展函数 ──(变成"匿名扩展")──▶ 带接收者的 Lambda ──▶ DSL
+
+委托 by：独立的一条线，"转交"这个动作本身
 \`\`\``,
       },
       {
