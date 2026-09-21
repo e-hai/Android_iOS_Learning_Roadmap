@@ -5,9 +5,9 @@ export const deepDivesData: Record<string, PlatformDeepDive> = {
     android: [
       {
         tag: '现代语言',
-        title: 'Kotlin 六大特性：从“为什么需要”讲起',
+        title: 'Kotlin 六大特性',
         sectionTitles: {
-          explanation: 'Kotlin 六大特性：从“为什么需要”讲起',
+          explanation: 'Kotlin 六大特性',
         },
         explanation: `先看全局
 
