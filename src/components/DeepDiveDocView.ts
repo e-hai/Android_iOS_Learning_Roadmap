@@ -8,6 +8,7 @@ import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
 import { renderSuspensionVisual } from './SuspensionVisual';
 import { renderCoroutineTopologyVisual } from './CoroutineTopologyVisual';
+import { renderSwiftTopologyVisual } from './SwiftTopologyVisual';
 
 export function renderDeepDiveDocView(
   currentStageId: string,
@@ -884,6 +885,8 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
         contentHtml += renderSuspensionVisual();
       } else if (lang === 'coroutine-flowchart' || lang === 'coroutine-topology' || lang === 'coroutine-tree' || code.includes('CoroutineScope(context).launch')) {
         contentHtml += renderCoroutineTopologyVisual();
+      } else if (lang === 'swift-flowchart' || lang === 'swift-topology' || code.includes('Task { @MainActor in }')) {
+        contentHtml += renderSwiftTopologyVisual();
       } else if (lang === 'diagram' || lang === 'ascii' || lang === 'text') {
         contentHtml += `<pre class="layer-diagram-box"><code>${escapeHtml(code)}</code></pre>`;
       } else {
@@ -1030,6 +1033,8 @@ function formatCaseStudyBody(rawText: string): string {
           html += renderSuspensionVisual();
         } else if (currentCodeLang === 'coroutine-flowchart' || currentCodeLang === 'coroutine-topology' || currentCodeLang === 'coroutine-tree' || codeTrimmed.includes('CoroutineScope(context).launch')) {
           html += renderCoroutineTopologyVisual();
+        } else if (currentCodeLang === 'swift-flowchart' || currentCodeLang === 'swift-topology' || codeTrimmed.includes('Task { @MainActor in }')) {
+          html += renderSwiftTopologyVisual();
         } else {
           html += `<pre class="layer-code-box case-code-box"><code>${escapeHtml(codeTrimmed)}</code></pre>`;
         }

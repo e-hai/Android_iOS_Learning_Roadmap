@@ -2654,7 +2654,7 @@ struct UserProfileEndpoint: AuthorizedEndpoint {
           explanation: '核心原理解析与设计哲学',
           diagram: 'Swift 并发 4 级全景架构与执行时序',
           diagramCaption: 'Swift 并发 4 级执行与调度全景拓扑',
-          theoryFaq: '原理的解惑 · 编译器切片、协作线程池、Actor 重入与 Sendable 深度剖析',
+          theoryFaq: '原理的解惑',
           caseStudy: '详细的使用例子',
         },
         diagram: `========================================================================================
@@ -2884,149 +2884,68 @@ actor SafeStore {
     func deposit(_ amount: Double) { balance += amount }
 }
 \`\`\``,
-        theoryFaq: `### 一、编译器变形全景：Swift async/await 的底层机制（Partial Functions、Async Frame 堆分配与 Continuation ABI）
+        theoryFaq: `### Swift 并发任务节点与分支拓扑图
 
-在底层机器码与运行时层面，Swift \`async/await\` 并不是简单的语法糖，**而是编译器在 SIL（Swift Intermediate Language）阶段对控制流进行切片重构，并与底层的原生 Concurrency ABI 紧密咬合的高性能协作系统**。
-
-#### 1. 与 Kotlin 状态机的本质差异：堆化状态机 vs 原生切片函数（Partial Functions）
-- **Kotlin（JVM 托管运行时）**：通过 CPS（Continuation-Passing Style）变换，将整个函数体搬迁进一个继承自 \`ContinuationImpl\` 的匿名类中，内部用一个巨大的 \`switch(label)\` 状态机在同一方法体内做步进跳转。
-- **Swift（LLVM 原生系统编译）**：编译器将包含挂起点（\`await\`）的异步函数**物理切割为多个独立的原生函数切片（Partial Functions）**！
-  - 入口到第 1 个 \`await\` 是一个独立的函数指针（Function Pointer）；
-  - 第 1 个 \`await\` 到第 2 个 \`await\` 是另一个切片函数指针；
-  - 每个切片都是完全独立的机器码基本块（Basic Block），函数退出时直接通过 CPU 的 \`ret\` 指令将物理线程交还给调度器。
-
-#### 2. Async Frame（异步调用栈帧）：调用栈如何在挂起时让出物理工位？
-- **传统物理栈（Call Stack）**：C/Swift 同步函数在物理线程栈上按栈指针（SP）分配连续栈帧。如果函数不返回，栈帧就死锁在线程栈上，线程根本无法被他人复用。
-- **Async Frame（异步堆栈帧）**：Swift 编译器为每个异步调用在堆（Heap）上分配轻量的 \`Async Frame\`。
-  1. **现场暂存**：跨越 \`await\` 挂起点仍然存活的局部变量、上下文指针全部保存在 Async Frame 中；
-  2. **延续凭证（Resume Continuation）**：Async Frame 内置了**指向下一个切片函数指针的直接寻址引用**与上层父调用的 Async Frame 指针（以单向链表结构在堆上完美复刻了逻辑调用栈）；
-  3. **物理栈清空**：一旦执行到挂起点，所有切片局部临时变量弹栈，切片函数直接 \`ret\` 原生返回，**物理线程栈瞬间清空归零**，线程立刻去执行其他就绪切片。
-
-#### 3. Native ABI 与寄存器约定（Register Calling Convention）
-Swift 5.5+ 专门在机器码层面为 Concurrency 制定了全新的系统调用 ABI：
-- 在 ARM64 架构下，**\`x22\` 寄存器被专门保留作为当前并发任务（Task Pointer）的上下文载体**，**\`x21\` 寄存器常驻作为当前 \`Async Frame Pointer\`**；
-- 当异步 I/O 或计时器完成时，调度器只需从堆上取出 Async Frame，恢复 \`x21\` 与 \`x22\` 寄存器，并执行一个 \`br\`（Branch）跳转指令直接杀入下一个切片函数入口，**全程零状态机分支判断开销，达到近乎纯 C 语言函数跳转的物理极致性能**！
-
-\`\`\`diagram
- [ 物理线程栈 (Thread Stack) ]         [ 堆内存 (Heap Allocation) ]
-┌──────────────────────────────┐     ┌────────────────────────────────────┐
-│ 运行切片 1: prepareData()     │ ──▶ │ Async Frame (堆化上下文)           │
-│ 遇到 await fetchRemote()     │     │ - 跨挂起局部变量: userId, retryCount│
-│ (切片 1 原生 ret 弹栈退出)    │     │ - 下一个切片函数指针: &processData │
-│ 物理线程立即空闲，去跑 Task 2!│     │ - 父级 Frame 指针 (逻辑调用栈链表)  │
-└──────────────────────────────┘     └────────────────────────────────────┘
-                                                       │ (异步网络响应触发)
-                                                       ▼
-                                     [ 协作线程池分配任意可用空闲 Worker ]
-                                     恢复 x21/x22 寄存器 ──▶ br &processData (切片 2)
+\`\`\`swift-flowchart
+                                  ┌─────────────────────────────────────────┐
+                                  │         Task { @MainActor in }          │
+                                  └────────────────────┬────────────────────┘
+                                        │              │              │
+                     - - - - - - - - - -               │               - - - - - - - - - -
+                    ▼                                  ▼                                  ▼
+         ┌───────────────────┐               ┌───────────────────┐              ┌───────────────────┐
+         │    async let c    │               │withTaskGroup { }  │              │ taskB = Task { }  │
+         └─────────┬─────────┘               └─────────┬─────────┘              └─────────┬─────────┘
+                   :                                   ▼                                  :
+                   :                         ┌───────────────────┐                        :
+                   :                         │withThrowingTaskGrp│                        :
+                   :                         └─────────┬─────────┘                        :
+                   :                                   ▼                                  :
+                   :                         ┌───────────────────┐                        :
+                   :                         │await actor.method │                        :
+                   :                         └─────────┬─────────┘                        :
+                   :                                   ▼                                  :
+                   :                         ┌───────────────────┐                        :
+                   :                         │ normal async fun()│                        :
+                   :                         └─────────┬─────────┘                        :
+                   :                                   ▼                                  :
+                   :                         ┌───────────────────┐                        :
+                   :                         │ await taskB.value │ ◀·······················
+                   :                         └─────────┬─────────┘
+                   :                                   ▼
+                   :                         ┌───────────────────┐
+                   ·························▶│      await c      │
+                                             └───────────────────┘
 \`\`\`
 
----
+### 六大主题核心结论
 
-### 二、协作式线程池机制：为什么彻底抛弃 GCD 弹性池？Worker 数严格等于 CPU 物理核心数
+| 主题 | 核心结论 |
+| :--- | :--- |
+| **切片函数编译** | async = LLVM 切片函数（Partial Functions）+ Async Frame 堆化；编译器在每个 await 处断开控制流，跨挂起点变量提升到堆上 Async Frame 链表，靠 CPU ret 弹栈释放物理线程，不是全局一个大状态机 |
+| **Task 树 vs 堆帧链** | Task { } / Task.detached 开新 Task（挂入 Task 树）；withTaskGroup / withThrowingTaskGroup 开临时结构化父子节点；await actor / 普通 async fun 不开 Task，留在同一条 Task 的 Async Frame 调用链上 |
+| **调度器 vs 身份** | 协作线程池 Worker 数严格等于 CPU 物理核数，只管单次切片函数的执行，没有"协程"概念，挂起恢复时发生**线程跳跃（Thread Hopping）**；Task 才是贯穿生命周期与优先级的真正身份 |
+| **task.value / await** | 不是 completion 回调链接，是在目标 Task 上注册的"完成时唤醒"，只让调用方当前执行流切出一个新的 Partial Function（Async Frame 增加一个挂起点切片） |
+| **取消与异常传播** | 结构化并发（withTaskGroup / async let）：子任务抛异常自动向上传播并级联取消同组兄弟任务；Task.detached / 独立 Task 互不连累，必须协作式轮询 Task.isCancelled 或调用 try Task.checkCancellation() 响应退出 |
+| **try/catch 生效位置** | 只对挂起并可能抛出异常的函数调用（withThrowingTaskGroup / try await task.value / try await c / 普通 async throws fun）有效；对 Task { } 闭包创建调用本身无效，得包进闭包体内部或通过 task.result 提取 |
 
-#### 1. GCD 弹性池的历史硬伤：线程爆炸（Thread Explosion）与调度沉没成本
-- 在传统的 GCD \`DispatchQueue.global()\` 架构中，系统采用弹性膨胀模型：
-  - 如果开发者派发了 100 个阻塞任务（如执行阻塞磁盘 I/O 或使用 \`dispatch_semaphore_wait\` 死等信号量），GCD 发现工作线程全卡在 \`BLOCKED\` 状态，为了维持吞吐量，系统会**不断派生新的 POSIX 物理线程**！
-  - 每一个线程默认瓜分 512KB ~ 1MB 物理栈内存，几百个线程瞬间吃掉几百兆内存；更致命的是，数百个物理线程在少量 CPU 核心上高频轮转，引发剧烈的 **CPU 上下文切换（Context Switching）风暴与 CPU L1/L2 缓存击穿**，最终引发整机卡死与看门狗超时崩溃（Watchdog 0x8badf00d）。
+### 运行期原语分类与底层编译实现对照
 
-#### 2. Swift 协作式线程池（Cooperative Thread Pool）的物理定律
-- Swift Concurrency 确立了不可动摇的物理上限：**全局工作线程数严格等于 CPU 物理核心数（例如 6 核 A 系列芯片上严格只有 6 个 Worker 线程）**！
-- **核心心智：物理工位恒定，人走茶凉出让工位**。所有的异步任务必须在 \`await\` 处挂起自己并归还线程，线程立刻被调度去执行其他就绪的切片，将 CPU 核心利用率推向 100%，同时把上下文切换开销降到物理极限。
+#### 1. 运行期特征分类
 
-#### 3. 致命陷阱：阻塞 I/O 击穿线程池与全局线程饥饿（Global Thread Starvation）
-如果开发者在 Swift 现代并发体系中，在协作线程池上调用了**未经异步改造的阻塞同步代码**（例如 \`Thread.sleep(5)\`、POSIX 原生 \`read()\`、或者在 \`Task\` 中使用 \`NSLock.lock()\` 阻塞等待）：
-- **灾难现场**：因为协作线程池总共只有 6 个 Worker 线程，若有 6 个 Task 同时执行了阻塞调用，这 6 个物理工位瞬间全部被焊死！
-- **全局瘫痪**：此时整机上所有的 \`Task\`、\`async let\`、\`actor\`，即便它们只是想在挂起完成后恢复执行一个仅需 1 微秒的算术运算，也再没有任何物理线程可以分配给它们运行！整个 App 的并发引擎直接陷入**全局线程饥饿（Thread Starvation）与伪死锁**！
+| 情况 | 开不开新 Task | 调用处的续延链 / Async Frame 会不会多切一个挂起点 | 例子 |
+| :--- | :--- | :--- | :--- |
+| **① 纯切片 / Frame** | 不开 | 会（在当前 Task 链上分配子 Frame，切出新 Partial Function） | 普通 async fun、Task.yield()、Task.sleep()、跨 Actor await、单独的 await task.value / await c |
+| **② 纯子任务** | 开，持久 | 不会——调用处不挂起，立刻往下走 | Task { }、Task.detached { } |
+| **③ 两者都是** | 开，临时 / 结构化 | 会——因为它把"开子任务"和"等待排空所有子任务"焊在了同一次作用域调用里 | withTaskGroup { }、withThrowingTaskGroup { }、async let（声明时派离子任务，消费时挂起汇合） |
 
-#### 4. 救赎规范
-1. **严禁阻塞**：所有延迟与 I/O 必须全面使用 \`Task.sleep\` 和 \`URLSession\` 等真挂起接口；
-2. **遗留阻塞代码隔离**：历史遗留的阻塞型 C 库（如旧版 SQLite 原生操作、同步大文件压缩），必须显式派发到专用的传统 GCD 串行队列（如 \`DispatchQueue(label: "legacy.io")\`）中运行，再通过 \`withCheckedContinuation\` 挂起桥接回 Swift Concurrency！
+#### 2. 编译后底层代码与包装类对照
 
----
-
-### 三、Actor 隔离域与“Actor 重入（Actor Reentrancy）”的幽灵陷阱
-
-#### 1. 概念矫正：Actor 不是互斥锁（Mutex），而是带邮箱的单线程轮转系统
-很多开发者以为给类加上 \`actor\` 关键字后，就像给整个对象加了一把 \`NSLock\`：只要一个方法进去了，必须等这个方法所有代码执行完毕外界才能进。**这是极其危险的认知误区！**
-- **Actor 的承诺边界**：Actor 保证的仅仅是——**在任何一个不含挂起点（\`await\`）的连续同步时间片段内，严格只有一个任务能独占执行并修改内部数据**。
-- **重入触发点**：一旦 Actor 内部的方法执行到了 \`await\` 挂起点，**该任务就主动放下了对 Actor 邮箱的独占权**！
-
-#### 2. Actor 重入现场与状态撕裂（State Tear）实录
-考虑一个网购账户扣款 Actor：
-
-\`\`\`swift
-actor BankAccount {
-    private var balance: Double = 1000.0
-
-    func withdraw(amount: Double) async -> Bool {
-        // ① 阶段一：检查余额（此时 balance = 1000，充足！）
-        guard balance >= amount else { return false }
-
-        // ② 挂起点：调用远程服务记录流水（主动放弃 Actor 锁，任务挂起！）
-        await auditLogger.logTransaction(amount)
-
-        // ③ 阶段二：恢复执行扣款（注意：③ 阶段恢复时，balance 可能已被别人扣光了！）
-        balance -= amount
-        return true
-    }
-}
-\`\`\`
-
-- **灾难推演**：
-  1. 任务 A 调用 \`withdraw(1000)\`，进入方法，检查余额满足条件（1000 >= 1000）；
-  2. 任务 A 执行到 \`await auditLogger...\`，任务挂起，**任务 A 主动释放了 BankAccount 的执行权**；
-  3. 此时任务 B 也调用了 \`withdraw(1000)\`，由于 Actor 邮箱空闲，任务 B 立即进场！此时任务 A 尚未扣款，任务 B 检查 \`balance >= 1000\` 同样通过！
-  4. 任务 B 同样在 \`await\` 处挂起释放 Actor；
-  5. 任务 A 网络日志记录完毕，恢复执行：\`balance -= 1000\`（余额变为 0）；
-  6. 任务 B 紧接着恢复执行：再次执行 \`balance -= 1000\`（**余额透支变为 -1000！**发生经典的状态撕裂与超额提款事故！）。
-
-#### 3. 避坑黄金法则
-1. **跨挂起点绝不假设前置状态依旧成立（Never Assume Invariants Hold Across Await）**：跨过 \`await\` 之后，前序的一切前提假设可能已被他人篡改；
-2. **状态扣减前置模式（Update State Before Await）**：优先在同步阶段完成状态预扣除，跨域 \`await\` 失败时再执行回滚补偿；
-3. **避免在核心业务临界区内穿插耗时挂起点**。
-
----
-
-### 四、Swift 6 终极演进：Sendable 协议、值语义隔离边界与编译期静态数据竞态消除
-
-#### 1. 为什么需要 Sendable？
-在传统并发模型中，多线程数据竞态往往只能依赖运行时工具（如 Thread Sanitizer）按概率捕获。**Swift 6 的野心是：通过类型系统的数理证明，在编译期将一切潜在的数据竞态物理阻绝！**
-
-#### 2. Sendable 的第一性原理与分类契约
-\`Sendable\` 是一个特殊的标记协议（Marker Protocol），它向编译器担保：**“该类型的值在跨越不同的并发隔离域（跨 Task、跨 Actor）传递时，绝不会引发任何数据竞态”**。
-
-编译器静态验证的三大安全阵营：
-1. **天然安全的值语义类型（Value Types with Deep Copy）**：
-   - \`Int\`、\`String\`、\`Double\`，以及内部所有属性均遵循 \`Sendable\` 的结构体（\`struct\`）和枚举（\`enum\`）。值传递时发生隐式拷贝（Copy-on-Write），各隔离域拥有独立副本，彻底没有共享可变内存。
-2. **完全不可变的引用类型（Immutable Reference Types）**：
-   - 标注为 \`final class\`，且内部所有存储属性必须全部为 \`let\` 不可变常量，且所有属性本身遵循 \`Sendable\`。只读共享，绝对并发安全。
-3. **内部自同步的引用类型（Internally Synchronized Classes）**：
-   - 标注为 \`@unchecked Sendable\` 的类。开发者向编译器立下军令状：“我内部使用了底层的 \`os_unfair_lock\` 互斥锁或专用串行队列保护了所有的读写访问”，编译器免除静态检查。
-
-#### 3. @Sendable 闭包的铁律
-传递给 \`Task { @Sendable in ... }\` 或跨隔离域调用的闭包必须标注为 \`@Sendable\`：
-- **禁止捕获外部可变变量（Cannot capture mutable local variables）**：防止闭包与外部代码同时通过指针读写同一块栈/堆内存；
-- **闭包内捕获的所有对象必须全部遵循 \`Sendable\` 协议**。
-
-#### 4. Swift 6 完全并发检查（Complete Concurrency Checking）
-在 Swift 6 模式下，以前运行时才能发现的悬挂指针、多线程读写同一全局变量、跨隔离域直接传递普通引用类等问题，**全部被提升为致命的编译期红色错误（Compile-time Errors）**。代码能够编译通过，即在数学上获得了零数据竞态（Data-race Free）的终极确定性！
-
----
-
-### 五、常见并发结构透视：Task { }、Task.detached、async let 与 withTaskGroup 的四维矩阵对比
-
-Swift 提供了 4 种最核心的并发启动方式，其背后的生命周期与上下文继承约束截然不同：
-
-| 常见并发结构 | 是否结构化并发？ | 父子生命周期与树形层级 | 优先级与 Actor 隔离继承 | 取消传播（Cancellation Propagation） | 典型适用场景 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **\`async let\`** | **是**（隐式 Child Task） | 依附当前局部代码块作用域，退出作用域前必须 \`await\` 汇合 | 自动继承调用方优先级与 Actor 隔离域 | 父 Task 取消时立即向下自动联动广播取消 | 固定数量的轻量并行任务聚合（如并行拉取 2~3 个独立接口并组合结果） |
-| **\`withTaskGroup\`** | **是**（显式 Child Tasks） | 严格受限于闭包词法作用域内，闭包退出前自动等待排空所有子任务 | 继承 Group 声明时的上下文，子任务可显式微调优先级 | 父 Task 取消广播至所有子 Task；支持动态添加与按完成顺序流式消费 | 动态同构批处理并发（如并发下载相册中的 N 张照片、批量图像滤镜渲染） |
-| **\`Task { }\`** | **否**（非结构化独立根任务） | 独立生命周期，生成新的独立 Task 树根，不阻塞当前同步代码 | **继承当前调用的 Actor 隔离域与优先级**（如在 UI 组件内则继承 MainActor） | **不随当前作用域自动取消**，必须手动持有 \`Task\` 句柄调用 \`.cancel()\` | UI 事件响应的异步入口（如 SwiftUI View 按钮点击向 MainActor 发起异步任务） |
-| **\`Task.detached\`** | **否**（完全解绑独立后台任务） | 彻底脱离任何父子关系，完全独立的游离任务 | **拒绝继承任何上下文**！脱离 Actor 隔离域，在全局协作池中执行 | 完全孤立，父级取消完全对其透明，仅支持手动句柄取消 | 耗时重型后台纯算脱钩（如音频转码、大型数据库索引重建，杜绝意外占用 MainActor） |
-
-- **结构化并发的核心哲学**：构建了严格的**有向无环任务树（DAG）**。它强制保证了“没有任何一个并发子任务能够在产生它的代码块执行完毕之后继续野蛮生长”，彻底杜绝了并发内存泄漏与悬挂野指针任务；
-- **非结构化并发的定位**：\`Task { }\` 与 \`Task.detached\` 是连接结构化现代并发与命令式传统 UI 世界（SwiftUI / UIKit）不可或缺的桥梁。`,
+| 情况 | 调用处（外层）生成什么 | block / 闭包生成什么 | 运行时底层对象 / ABI |
+| :--- | :--- | :--- | :--- |
+| **① 纯切片**（普通 async fun、yield、sleep、跨 Actor await、task.value） | 在已有函数中切出新的 Partial Function，记录下一个切片指针到 Async Frame | 没有独立的并发闭包需要单独编译 | 无独立 Task 对象，仅作为当前 Task 的堆栈切片（Async Frame 链表节点） |
+| **② 纯子任务**（Task { } / Task.detached { }） | 什么切片都不生成——普通函数调用，非 async，调用处不产生挂起点 | 闭包编译成全新的异步根函数切片（入口函数指针 + 初始 Async Frame） | Swift.Task 结构体实例（堆上分配 Native Task，分配初始堆栈空间） |
+| **③ 两者都是**（withTaskGroup / withThrowingTaskGroup / async let） | 因为它本身带 await，调用处当前函数被切出新的 Partial Function（挂起等待子任务排空） | 闭包或右值表达式编译成异步切片函数，被 TaskGroup / 运行时注册为 Child Task | TaskGroup 协调器句柄 / 挂接在父 Task 节点下的 ChildTask 节点 |`,
         caseStudy: `### 例子一：CheckedContinuation 桥接旧版 GCD/Callback 回调
 
 \`\`\`swift

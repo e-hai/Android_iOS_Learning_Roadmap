@@ -7815,6 +7815,65 @@ input:focus-visible,
   fill: #718096;
 }
 
+/* Swift Topology Specific Styles */
+.legend-badge.badge-swift-trunk {
+  background: #e0f2fe;
+  border: 1.5px solid #0284c7;
+}
+
+.legend-badge.badge-swift-rendezvous {
+  background: #e0f2fe;
+  border: 1.5px dashed #0284c7;
+}
+
+.swift-topology-svg .node-swift-trunk rect {
+  fill: #e0f2fe;
+  stroke: #38bdf8;
+  stroke-width: 1.5;
+}
+
+.swift-topology-svg .node-swift-trunk text {
+  font-size: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  fill: #0369a1;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.swift-topology-svg .arrow-line-swift-blue {
+  stroke: #0284c7;
+}
+
+/* Dark mode theme overrides for Swift topology */
+[data-theme="dark"] .legend-badge.badge-swift-trunk {
+  background: rgba(2, 132, 199, 0.25);
+  border-color: #38bdf8;
+}
+
+[data-theme="dark"] .legend-badge.badge-swift-rendezvous {
+  background: rgba(2, 132, 199, 0.25);
+  border-color: #38bdf8;
+}
+
+[data-theme="dark"] .swift-topology-svg .node-swift-trunk rect {
+  fill: rgba(2, 132, 199, 0.22);
+  stroke: #38bdf8;
+}
+
+[data-theme="dark"] .swift-topology-svg .node-swift-trunk text {
+  fill: #7dd3fc;
+}
+
+[data-theme="dark"] .swift-topology-svg .arrow-line-swift-blue {
+  stroke: #38bdf8;
+}
+
+[data-theme="dark"] .swift-topology-svg .marker-path-swift-blue {
+  fill: #38bdf8;
+}
+
+
 
 
 
