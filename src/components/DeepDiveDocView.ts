@@ -7,6 +7,7 @@ import { renderOkHttpPipelineVisual } from './OkHttpPipelineVisual';
 import { renderPerfLoopDiagram } from './PerfLoopDiagram';
 import { renderViewModelVisual } from './ViewModelVisual';
 import { renderSuspensionVisual } from './SuspensionVisual';
+import { renderCoroutineTopologyVisual } from './CoroutineTopologyVisual';
 
 export function renderDeepDiveDocView(
   currentStageId: string,
@@ -557,6 +558,8 @@ function formatInlineText(text: string): string {
   res = res.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
   // Support inline code: `code`
   res = res.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+  // Support line break: <br>
+  res = res.replace(/&lt;br\s*\/?&gt;/gi, '<br>');
   return res;
 }
 
@@ -879,6 +882,8 @@ function formatExtendedDeepDiveHtml(rawText: string): string {
         contentHtml += renderViewModelVisual(code);
       } else if (lang === 'suspension-diagram' || code.includes('挂起点 (Suspension Point) 全景本质认知')) {
         contentHtml += renderSuspensionVisual();
+      } else if (lang === 'coroutine-flowchart' || lang === 'coroutine-topology' || lang === 'coroutine-tree' || code.includes('CoroutineScope(context).launch')) {
+        contentHtml += renderCoroutineTopologyVisual();
       } else if (lang === 'diagram' || lang === 'ascii' || lang === 'text') {
         contentHtml += `<pre class="layer-diagram-box"><code>${escapeHtml(code)}</code></pre>`;
       } else {
@@ -1023,6 +1028,8 @@ function formatCaseStudyBody(rawText: string): string {
           html += renderViewModelVisual(codeTrimmed);
         } else if (currentCodeLang === 'suspension-diagram' || codeTrimmed.includes('挂起点 (Suspension Point) 全景本质认知')) {
           html += renderSuspensionVisual();
+        } else if (currentCodeLang === 'coroutine-flowchart' || currentCodeLang === 'coroutine-topology' || currentCodeLang === 'coroutine-tree' || codeTrimmed.includes('CoroutineScope(context).launch')) {
+          html += renderCoroutineTopologyVisual();
         } else {
           html += `<pre class="layer-code-box case-code-box"><code>${escapeHtml(codeTrimmed)}</code></pre>`;
         }

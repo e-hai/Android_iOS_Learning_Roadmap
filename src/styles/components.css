@@ -7630,6 +7630,192 @@ input:focus-visible,
   gap: 8px;
 }
 
+/* ==========================================================================
+   CoroutineTopologyVisual Component Styles
+   ========================================================================== */
+
+.coroutine-topology-container {
+  display: flex;
+  flex-direction: column;
+  margin: 16px 0 28px 0;
+  font-family: var(--font-sans);
+}
+
+.coroutine-topology-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 22px 24px;
+  box-shadow: var(--shadow-xs);
+  overflow-x: auto;
+}
+
+.coroutine-topology-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  font-size: 12.5px;
+  color: var(--color-ink-muted);
+}
+
+.coroutine-topology-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.coroutine-topology-legend .legend-badge {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.legend-badge.badge-trunk {
+  background: #e1f5ee;
+  border: 1.5px solid #53a98b;
+}
+
+.legend-badge.badge-branch {
+  background: #faeedc;
+  border: 1.5px solid #d9a362;
+}
+
+.legend-badge.badge-rendezvous {
+  background: #e1effe;
+  border: 1.5px dashed #124d8f;
+}
+
+.coroutine-topology-svg-wrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.coroutine-topology-svg {
+  width: 100%;
+  height: auto;
+  max-width: 860px;
+  display: block;
+}
+
+.coroutine-topology-svg .node-trunk rect {
+  fill: #e1f5ee;
+  stroke: #53a98b;
+  stroke-width: 1.5;
+}
+
+.coroutine-topology-svg .node-trunk text {
+  font-size: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  fill: #0c4a3e;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.coroutine-topology-svg .node-async rect {
+  fill: #faeedc;
+  stroke: #d9a362;
+  stroke-width: 1.5;
+}
+
+.coroutine-topology-svg .node-async text {
+  font-size: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  fill: #7a3f05;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.coroutine-topology-svg .node-launch rect {
+  fill: #faece7;
+  stroke: #db8476;
+  stroke-width: 1.5;
+}
+
+.coroutine-topology-svg .node-launch text {
+  font-size: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-weight: 500;
+  fill: #7e2b1f;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+/* Dark mode theme overrides */
+[data-theme="dark"] .legend-badge.badge-trunk {
+  background: rgba(46, 125, 50, 0.25);
+  border-color: #409176;
+}
+
+[data-theme="dark"] .legend-badge.badge-branch {
+  background: rgba(230, 81, 0, 0.25);
+  border-color: #d99b4e;
+}
+
+[data-theme="dark"] .legend-badge.badge-rendezvous {
+  background: rgba(30, 64, 175, 0.25);
+  border-color: #60a5fa;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .node-trunk rect {
+  fill: rgba(46, 125, 50, 0.22);
+  stroke: #409176;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .node-trunk text {
+  fill: #a3e9d2;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .node-async rect {
+  fill: rgba(217, 119, 6, 0.22);
+  stroke: #d99b4e;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .node-async text {
+  fill: #fcd34d;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .node-launch rect {
+  fill: rgba(220, 38, 38, 0.22);
+  stroke: #e06c60;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .node-launch text {
+  fill: #fca5a5;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .arrow-line-gray {
+  stroke: #718096;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .arrow-line-fork {
+  stroke: #718096;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .arrow-line-blue {
+  stroke: #60a5fa;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .marker-path-blue {
+  fill: #60a5fa;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .marker-path-gray {
+  fill: #718096;
+}
+
+[data-theme="dark"] .coroutine-topology-svg .marker-path-fork {
+  fill: #718096;
+}
+
+
 
 
 
