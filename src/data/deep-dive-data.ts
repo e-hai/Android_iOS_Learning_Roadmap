@@ -3048,57 +3048,130 @@ actor ImageCacheManager {
       },
       {
         tag: '声明式 UI',
-        title: 'SwiftUI 运行时机制：AttributeGraph 依赖追踪与状态局部无效化',
-        sectionTitles: {
-          explanation: '四大核心机制与渲染底层',
-          caseStudy: '详细的使用例子',
+        title: 'SwiftUI',
+        metaphor: {
+          title: '不可变值类型蓝图与属性图拓扑求值',
+          formula: 'UI = f(State) + AttributeGraph.DAG',
+          metaphorDesc: 'SwiftUI 与 Compose 核心哲学同源（UI = f(State)）。区别在于底层引擎：Compose 靠编译器注入 Composer 与平铺插槽表（Slot Table）通过快照系统标记重组范围；而 SwiftUI 将 View 建模为栈上纯值结构体，底层借由 C++ 有向无环图引擎（AttributeGraph）追踪属性读写，实现节点级别的局部无效化与毫秒级求值。',
         },
-        explanation: `### 核心机制一：View 纯值类型与声明式渲染管线
+        sectionTitles: {
+          explanation: '五大核心机制与底层架构（深度对照 Jetpack Compose）',
+          caseStudy: '实战场景与双端对齐',
+        },
+        explanation: `### 全景对照：SwiftUI ⟷ Jetpack Compose 核心架构与底层机制全景矩阵
 
-**历史问题**：
-UIKit 时代采用重量级引用类型（\`UIView\` / \`UIViewController\`），视图持有复杂可变状态与树状层级关系。开发者必须手动调用 \`addSubview\`、编写自动布局约束、监听事件并手动修改子视图属性（如 \`label.text = @"new"\`）。当多线程或复杂异步回调交织时，UI 视图与数据源极易脱节，引发图层重叠、状态错乱等 Bug。
+| 维度 / 机制 | SwiftUI (iOS) | Jetpack Compose (Android) | 底层机制与心智模型对齐 |
+| :--- | :--- | :--- | :--- |
+| **范式与核心公式** | \`UI = f(State)\`，纯函数计算属性 \`var body: some View\` | \`UI = f(State)\`，无返回值函数 \`@Composable fun Content()\` | 均为现代响应式声明式 UI，状态为自变量，UI 为因变量 |
+| **视图载体与开销** | \`struct View\`（栈上轻量不可变纯值类型，仅为渲染蓝图） | \`@Composable\` 函数切片（由 Kotlin 编译器重写注入参数） | 均彻底抛弃重量级命令式视图（\`UIView\` / \`android.view.View\`），视图构建与销毁几乎零堆分配开销 |
+| **底层运行时拓扑** | **AttributeGraph (DAG)**（C++ 编写的高性能有向无环依赖图） | **Slot Table (Gap Buffer)**（平铺数组连续内存插槽表）+ **Composer** | SwiftUI 借图拓扑精准定位失效节点；Compose 靠线性插槽表记录调用树与参数缓存 |
+| **局部刷新 / 无效化单位** | **节点局部无效化**：以 View 节点的 \`body\` 为最小求值单位 | **Smart Recomposition（智能重组）**：以 Composable 的 \`RecomposeScope\` 为重组单位 | 均只重绘真正读取了改变状态的代码块，绝不遍历整棵树 |
+| **组件私有可变状态** | \`@State private var count: Int\`（托管在外部 AttributeGraph 堆槽） | \`remember { mutableStateOf(0) }\`（Slot Table 槽位缓存 + 快照系统） | 跨视图重建持久化单一数据，通过属性包装器 / 委托拦截读写 |
+| **双向绑定 vs 状态提升** | \`@Binding var count: Int\`（Getter / Setter 双向读写代理闭包） | 显式解耦：\`count: Int\` + \`onCountChange: (Int) -> Unit\`（状态提升） | Compose 强制单向数据流；SwiftUI 提供 \`@Binding\`（\`$count\`）作为状态提升的语法糖引用 |
+| **复杂对象细粒度观察** | \`@Observable\` 宏（ObservationRegistrar 字段级拦截）/ 旧 \`ObservableObject\` | \`@Stable\` / \`@Immutable\` 数据类 + \`State<T>\` 或 \`snapshotFlow\` | 均从旧的粗粒度全量广播（Combine / LiveData）进化为编译期或快照级别的属性级微观按需监听 |
+| **高频衍生状态收敛** | 计算属性 / 依赖图自动收敛（或手写过滤） | \`remember { derivedStateOf { ... } }\` | 将高频变动（如滚动像素索引）收敛为低频状态（如布尔开关），杜绝高频刷新风暴 |
+| **视图身份标识与销毁** | **结构标识**（\`_ConditionalContent\`）与 **显式标识**（\`.id()\`） | **位置标识**（Positional Memoization）与 **显式键**（\`key()\`） | 分支判断时若身份改变，两端均会导致内部状态彻底重置回收 |
+| **异步任务与生命周期副作用** | \`.task(id:)\`（绑定 Task 树，进树启动、Key变重启、离树自动 Cancel） | \`LaunchedEffect(key)\`（绑定协程 Job，进树启动、Key变重启、离树自动 Cancel） | 1:1 完全对等！均利用底层结构化并发自动绑定视图可见性生命周期 |
+| **成对资源挂载与注销** | \`.onAppear\` / \`.onDisappear\` | \`DisposableEffect(key) { onDispose { } }\` | 用于非异步的借还资源配对（如注册 / 注销传感器、广播监听器） |
+| **树状依赖隐式穿透** | \`@Environment(\\.key)\` / \`EnvironmentValues\` | \`CompositionLocalProvider\` / \`LocalXxx.current\` | 隐式向下穿透整棵组件树，规避多层嵌套 Props Drilling，支持子树局部覆盖 |
+| **列表性能与虚拟化** | \`LazyVStack\` (延迟加载) / \`List\` (底层映射 \`UICollectionView\` 池化复用) | \`LazyColumn\` (SubcomposeLayout 动态测量 + 节点槽位复用) | 视口滑动视界虚拟化，超出可视区域不生成/复用底层渲染节点 |
 
-**设计思路**：
-SwiftUI 将 \`View\` 抽象为不可变轻量纯值类型结构体（\`struct\`）。\`body\` 计算属性是当前状态到视图界面的纯函数映射（\`UI = f(State)\`）。当状态改变时，SwiftUI 不是命令式修改现有的视图对象，而是以微秒级耗时在栈上重新计算生成新的 View 结构体描述，交由底层引擎与旧树做差异比对。
+### 核心机制一：View 纯值类型与声明式渲染管线
 
-**底层实现**：
-SwiftUI View 并非真正的渲染载体，它只是一份轻量级的“布局蓝图”。底层由 C++ 编写的渲染系统将 View 结构体转化为底层的 RenderNode，最终映射为 CoreAnimation 的 \`CALayer\`。因为 struct 分配在栈上，创建与销毁代价微乎其微，即便每一帧重新生成 View 实例也不会导致堆内存分配抖动。
+#### 1. 是什么（本质定义）
+SwiftUI 的 \`View\` 不是屏幕上真正绘制的物理图层，而是一个**不可变的纯值类型结构体（\`struct\`）**。它只是一份轻量级的**无状态渲染蓝图（Layout Blueprint）**；其 \`body\` 计算属性是当前状态到视图界面的纯函数映射：\`UI = f(State)\`。
+
+#### 2. 最初为了解决什么问题（根源动机与原始痛点）
+UIKit 时代采用重量级引用类型（\`UIView\` / \`UIViewController\`），每个视图都在堆上分配，内部持有复杂可变状态与庞大的树状层级关系。开发者必须手动调用 \`addSubview\`、编写自动布局约束、监听事件并手动修改子视图属性（如 \`label.text = @"new"\`）。当多线程或复杂异步回调交织时，UI 视图与数据源极易脱节，引发图层重叠、数据不一致以及多线程数据竞态等疑难崩溃。
+
+#### 3. 现代演进与底层实现
+SwiftUI 将 \`View\` 抽象为不可变轻量纯值类型。因为 \`struct\` 分配在栈上，其创建与销毁代价趋近于零，即使每秒重新生成成千上万次 View 蓝图也不会引发堆内存垃圾抖动。底层由 C++ 编写的渲染系统将 View 结构体转化为内部的 \`RenderNode\`，最终映射并挂载为 CoreAnimation 的 \`CALayer\` 进行硬件加速渲染。
+
+> 💡 **深度对照 Jetpack Compose**：
+> - **视图载体**：Compose 走得更彻底——甚至舍弃了 \`struct\`，直接使用 Kotlin 的**无返回值函数** \`@Composable fun\`！
+> - **编译期代码转换**：SwiftUI 借助 Swift 泛型与 \`@ViewBuilder\`（通过 \`buildBlock\`、\`buildEither\` 将子视图打包成嵌套元组类型如 \`TupleView<(Text, Button)>\`）；Compose 则借助 Kotlin 编译器插件为每个 Composable 注入 \`$composer: Composer\` 与 \`$changed: Int\` 参数，将函数调用记录在平铺的**插槽表（Slot Table）** 中。
+> - **渲染后端**：SwiftUI 最终生成 RenderNode 映射到系统 \`CALayer\`；Compose 在 Android 上由 \`LayoutNode\` 树直接调用 Skia 绘制，彻底摆脱了传统 Android \`View\` / \`ViewGroup\` 体系。
 
 ### 核心机制二：AttributeGraph 属性依赖图与局部无效化
 
-**历史问题**：
-在声明式框架中，如果每当状态改变就粗暴遍历并重新执行整棵组件树的 \`body\`，随着页面层级加深，CPU 算力将迅速耗尽，引发严重的掉帧与卡顿。
+#### 1. 是什么（本质定义）
+**AttributeGraph** 是 SwiftUI 运行时的核心引擎，一个由 C++ 编写的**高性能有向无环依赖图（DAG）**。它在视图节点的 \`body\` 求值与状态属性之间建立动态依赖边，是驱动 SwiftUI 实现**精准局部无效化（Selective Invalidation）** 的核心大脑。
 
-**设计思路**：
-SwiftUI 内部构建了一套基于有向无环图（DAG）的高性能依赖图引擎——**AttributeGraph**。当某个 View 的 \`body\` 在求值执行时，所有被其读取的状态属性（如 \`@State\`、\`@Binding\` 或 \`@Observable\` 字段）会被自动注册为该 View 节点的上游依赖。只有当上游节点的值真正发生变化时，AttributeGraph 才会精准标记该叶子节点为无效（Invalidated），仅触发该特定节点的 \`body\` 重新求值。
+#### 2. 最初为了解决什么问题（根源动机与原始痛点）
+声明式 UI 最大的性能杀手是“全量重绘风暴”。如果任何微小状态变动都粗暴地从根节点递归重新求值所有子视图的 \`body\`，随着页面复杂度增加，CPU 算力将瞬间耗尽，造成肉眼可见的严重卡顿掉帧。框架必须能以极微小的开销精确识别：“哪个属性变了？它到底连向了屏幕上的哪个具体 View 节点？”
 
-**底层实现**：
-AttributeGraph 运行在底层 C++ 运行时层。每个属性被封装为 Graph Node，求值时通过 TLS（线程局部存储）维护一个当前的求值上下文栈（Evaluation Context）。当调用状态属性的 \`get\` 访问器时，该属性节点与当前栈顶 View 节点建立一条有向依赖边。状态修改触发 \`AttributeGraph.invalidate()\`，引擎在下一个 VSYNC 垂直同步信号到来时沿 DAG 拓扑排序更新，消除无谓计算。
+#### 3. 底层运行机制（TLS 上下文栈与 DAG 拓扑排序）
+- **动态依赖边收集**：当某个 View 节点的 \`body\` 求值执行时，AttributeGraph 通过 TLS（线程局部存储）维护当前求值上下文栈。任何在执行期间被访问的状态属性（如 \`@State\`、\`@Binding\`），其内部的 \`get\` 访问器都会向 AttributeGraph 注册一条有向边：\`状态节点 ──▶ View 节点\`。
+- **局部无效化求值**：当状态属性被修改（\`set\`）时，触发 \`AttributeGraph.invalidate()\`，引擎仅仅将下游直接依赖的 View 节点标记为“脏（Dirty）”。在下一个 VSYNC 垂直同步信号到来时，引擎沿 DAG 进行拓扑排序求值，未依赖该属性的父视图与兄弟节点被 100% 剪枝跳过。
 
-### 核心机制三：@State、@Binding 与 @Observable 宏的订阅差异
+> 💡 **深度对照 Jetpack Compose**：
+> - **依赖图 vs 快照系统**：SwiftUI 依赖 **AttributeGraph（C++ DAG 拓扑图）**；Compose 则依赖 **快照系统（Snapshot System）+ Composer**。
+> - **观察者注册机制**：Compose 在读取 \`mutableStateOf\` 时，快照系统的全局读观察器（\`Snapshot.registerInputObservation\`）自动将该状态与当前的 \`RecomposeScope\`（重组作用域）绑定；状态写入时触发写观察器，将受影响的 \`RecomposeScope\` 标记为待重组（Invalidated）。
+> - **最小刷新单元**：SwiftUI 的最小刷新单元是 View 结构体的 \`body\` 计算属性；Compose 的最小刷新单元是包含状态读取的最近一段 Composable 函数切片（\`RecomposeScope\`）。两端殊途同归，均实现了**智能跳过（Smart Recomposition）**。
 
-**历史问题**：
-在 Swift 5.9 之前，复杂状态管理依赖 Combine 框架的 \`ObservableObject\` 与 \`@Published\`。其最大缺陷是粒度过粗：只要 Class 内任何一个 \`@Published\` 属性变化，\`objectWillChange\` 发射信号，所有订阅该对象的 View 哪怕只读取了无关字段，也会被迫全量重绘刷新。
+### 核心机制三：@State、@Binding 与 @Observable 状态体系
 
-**设计思路**：
-Swift 5.9 引入 **Observation 框架**（基于宏 \`@Observable\`）。不再依赖 Combine Publisher，而是在编译期通过宏展开为每个可观察属性注入属性访问拦截。当 View 的 \`body\` 读取 \`vm.title\` 时，系统仅建立 View 对 \`title\` 单一属性的精确订阅。若后续只修改了 \`vm.subtitle\`，读取了 \`title\` 的 View 绝不会发生重组刷新，真正做到了属性级别的细粒度感知。
+#### 1. 是什么（本质定义）
+SwiftUI 的三大核心状态原语构成了声明式 UI 的数据驱动闭环：
+- \`@State\`：组件私有的单一真实数据源，实际存储托管在外部 AttributeGraph 堆节点中；
+- \`@Binding\`：状态引用的双向读写代理闭包，实现跨层级组件数据共享而不产生副本；
+- \`@Observable\`（Swift 5.9+）：宏驱动的微观字段级依赖监听，彻底淘汰粗粒度的 Publisher。
 
-**底层实现**：
-\`@Observable\` 宏在底层自动插入一个 \`ObservationRegistrar\` 实例。在属性的 \`get\` 访问器中调用 \`registrar.access(self, keyPath: \\.title)\`，在 \`set\` 中调用 \`registrar.withMutation(of: keyPath)\`。在 SwiftUI 渲染求值期间，\`withObservationTracking\` 作用域捕获执行期读取的所有 KeyPath，实现属性维度的微观依赖图绑定。
+#### 2. 最初为了解决什么问题（根源动机与历史痛点）
+- **\`@State\` 的动机**：由于 View 是不可变结构体，每次 \`body\` 求值都会被重新实例化，必须将可变状态“抽离”并持久保存在 View 结构体外部；
+- **\`@Observable\` 的动机**：在 Swift 5.9 之前，复杂业务模型依赖 Combine 框架的 \`ObservableObject\` + \`@Published\`。其最大缺陷是**订阅粒度过粗**——只要 Class 内任意一个 \`@Published\` 字段变更，\`objectWillChange\` 就会向外广播，导致所有订阅了该对象的 View 哪怕只读取了无关字段，也会被迫全量重绘刷新！
+
+#### 3. 现代演进（@Observable 宏底层拦截机制）
+Swift 5.9 引入 Observation 框架。\`@Observable\` 宏在编译期为 Class 自动注入 \`ObservationRegistrar\` 实例。在每个属性的 \`get\` 中注入 \`registrar.access(self, keyPath: \\.field)\`，在 \`set\` 中注入 \`registrar.withMutation(of: keyPath)\`。在 SwiftUI 执行期，\`withObservationTracking\` 作用域精准捕获所读取的 KeyPath，实现精确到微观属性维度的按需订阅。
+
+> 💡 **深度对照 Jetpack Compose**：
+> - **\`@State\` ⟷ \`remember { mutableStateOf() }\`**：
+>   SwiftUI 的 \`@State\` 借助属性包装器将数据存入 AttributeGraph 内存槽；Compose 借助 \`remember\` 将 \`MutableState\` 存入 Slot Table 插槽，借助 \`mutableStateOf\` 接入快照监听。
+> - **\`@Binding\` ⟷ 状态提升与双向解耦**：
+>   Compose 坚持严格的**单向数据流（UDF）**，不提供类似 \`@Binding\` 的自动双向代理，而是显式要求状态提升（\`value: T\` + \`onValueChange: (T) -> Unit\`）；SwiftUI 的 \`$count\` 语法糖本质是编译器自动生成 \`Binding(get: { count }, set: { count = $0 })\`。
+> - **\`@Observable\` ⟷ Compose 稳定性契约（\`@Stable\`）与字段级状态**：
+>   Compose 要求数据类满足稳定性（\`@Immutable\` / \`@Stable\`）才能命中 Smart Recomposition 跳过重组；若需字段级监听，Compose 通常直接在类中定义多个 \`mutableStateOf\` 字段。Swift 5.9 的 \`@Observable\` 宏则将这一拦截过程全自动化，心智体验高度对齐。
 
 ### 核心机制四：结构标识（Structural Identity）与状态重置防坑
 
-**历史问题**：
-开发者常常遇到奇怪的 UI 现象：在使用 \`if-else\` 条件分支展示不同子视图时，输入框内的文本被意外清空，或者动画出现瞬移跳变。根本原因是开发者混淆了“显式标识”与“结构标识”。
+#### 1. 是什么（本质定义）
+SwiftUI 识别视图节点有两大机制：
+- **显式标识（Explicit Identity）**：开发者显式指定的唯一 ID（如 \`.id(uuid)\` 或 \`ForEach(items, id: \\.id)\`）；
+- **结构标识（Structural Identity）**：框架根据视图在代码语法树中的静态类型位置推导出的拓扑路径。
 
-**设计思路**：
-SwiftUI 视图定位依赖两种标识：
-1. **显式标识（Explicit Identity）**：通过 \`.id(uuid)\` 或 \`ForEach(items, id: \\.id)\` 显式分配唯一标识符；
-2. **结构标识（Structural Identity）**：在 \`if-else\` 条件语句中，SwiftUI 编译器将分支解析为 \`_ConditionalContent<TrueView, FalseView>\`。尽管两个分支可能返回相同的视图组件，但在类型系统拓扑中它们属于两个完全不同的层级分支。当条件切换时，旧分支节点被彻底销毁（其内部的 \`@State\` 随之销毁重置），新分支从头初始化。
+#### 2. 最初为了解决什么问题（根源动机与踩坑排错）
+开发者常遇到奇怪的 UI 现象：在使用 \`if-else\` 条件分支展示不同子视图时，输入框内的文本被意外清空、滚动列表位置丢失，或者转场动画出现瞬移跳变。根本原因是开发者误以为“两个分支写了相同的 View 就会复用”，而实际上它们在框架内部被视为了完全不同的视图实例。
 
-**底层实现**：
-AttributeGraph 沿视图层次结构的静态代码类型结构为每个节点生成一个唯一的拓扑路径（Hierarchy Path）。只有当相同路径上的节点类型保持不变时，AttributeGraph 才会将其匹配为同一个视图实例并保留其底层关联的 State 内存存储块；一旦路径或结构类型改变，旧存储立即回收。`,
+#### 3. 底层实现（_ConditionalContent 类型分支）
+在 \`if-else\` 结构中，SwiftUI 的 \`@ViewBuilder\` 将其编译为静态包装类型 \`_ConditionalContent<TrueView, FalseView>\`。AttributeGraph 为每个节点分配由层次结构决定的唯一拓扑路径（Hierarchy Path）。当条件翻转时，类型路径彻底断开，旧分支节点被连根拔起销毁（其内部绑定的 \`@State\` 存储槽全部被物理释放），新分支被重新初始化分配。
+
+> 💡 **深度对照 Jetpack Compose**：
+> - **结构标识 ⟷ Positional Memoization（位置记忆）**：
+>   Compose 的 Slot Table 依赖 Composable 在代码中的**调用顺序与物理位置**定位数据。在 \`if-else\` 条件分支中，Compose 编译器会为各个分支生成不同的控制流 Group 标记。条件变化切换到新分支时，旧 Group 的插槽数据被彻底清空，其内部的 \`remember\` 状态同样会被完全重置！
+> - **显式标识 ⟷ \`key(...) { }\` 辅助定位**：
+>   - SwiftUI：使用 \`.id(item.id)\` 或 \`ForEach(items, id: \\.id)\`；
+>   - Compose：使用 \`key(item.id) { ... }\` 或 \`items(items, key = { it.id })\`；
+>   - **核心使命 100% 对齐**：显式重写默认的结构/位置标识，强制框架跨越分支或列表重排时精准复用既有的状态槽与底层节点。
+
+### 核心机制五：副作用与生命周期对齐（.task / .onAppear 深度对照 Compose）
+
+#### 1. 是什么（本质定义）
+副作用 API 是在不可变的纯函数渲染世界与外部异步世界（网络 I/O、生命周期广播、传感器监听）之间搭建的安全隔离通道。
+
+#### 2. 最初为了解决什么问题（根源动机与并发协同）
+若在 \`body\` 求值期间直接发起网络请求或更新状态，将导致无限重绘死循环；若视图销毁离开屏幕后后台任务仍在运行，会造成严重的内存泄漏与 CPU 空耗。必须将异步任务与视图的“挂载入树”和“从树上卸载”严格生命周期联动。
+
+#### 3. 双端核心 API 对齐与机制深度对照
+- **\`.task(id:)\` ⟷ \`LaunchedEffect(key)\`（异步生命周期绑定）**：
+  - **运行契约**：视图首次挂载入树时启动异步任务；绑定的 \`id\` / \`key\` 变化时，框架先自动取消旧任务再启动新任务；视图移出层级（或页面退栈销毁）时，自动级联取消关联的任务（SwiftUI 取消底层的 Swift Task，Compose 取消绑定的协程 Job）。
+- **\`.onAppear / .onDisappear\` ⟷ \`DisposableEffect(key) { onDispose { } }\`（成对资源管理）**：
+  - **借还对称性**：Compose 借助 \`DisposableEffect\` 将“注册监听”与“注销反注册”强行限制在同一代码块中，避免遗漏；SwiftUI 则分别通过 \`.onAppear\` 与 \`.onDisappear\` 挂接可见性事件。
+- **\`@Environment(\\.key)\` ⟷ \`CompositionLocal\`（隐式树状依赖穿透）**：
+  - **跨组件穿透**：两者均提供优雅的树状穿透能力，避免多层嵌套的属性逐级传递（Props Drilling）。SwiftUI 使用 \`EnvironmentKey\` + \`EnvironmentValues\`，Compose 使用 \`compositionLocalOf\` + \`CompositionLocalProvider\`，均支持在子树节点上局部覆盖配置。`,
         caseStudy: `### 例子一：基于 @Observable 实现毫秒级局部刷新与状态解耦
+
+- **场景解释**：页面包含两个独立子组件，分别依赖同一个数据源的不同字段。在 Swift 5.9+ 下，通过 \`@Observable\` 宏实现属性级精准追踪，彻底避免子组件与父容器的无谓重绘。
+- **💡 对照 Jetpack Compose**：等价于 Compose 中使用 \`@Stable\` / \`@Immutable\` 数据类，或在 ViewModel 中声明独立的 \`MutableStateFlow\` / \`mutableStateOf\` 字段。在 Compose 中只有读取了变化字段的子 Composable 的 \`RecomposeScope\` 才会重组，父容器同样零开销跳过。
 
 \`\`\`swift
 import SwiftUI
@@ -3116,7 +3189,7 @@ struct CounterAView: View {
     let state: DashboardState
     var body: some View {
         // 关键：修改 counterB 绝不会触发该 View 的 body 重新求值！
-        let _ = Self._printChanges() // 运行时控制台打印重绘原因
+        let _ = Self._printChanges() // 运行时控制台打印重绘原因（iOS 15+ 调试利器）
         Button("A: \\(state.counterA)") {
             state.counterA += 1
         }
@@ -3148,6 +3221,9 @@ struct DashboardContainerView: View {
 
 ### 例子二：自定义 Layout 协议实现高性能流式标签布局
 
+- **场景解释**：实现类似热搜流式标签（FlowLayout）时，若使用嵌套的 \`HStack\` + \`VStack\` 会产生大量中间虚拟容器。通过实现 SwiftUI 提供的 \`Layout\` 协议，接管测量与定位，消除嵌套性能损耗。
+- **💡 对照 Jetpack Compose**：1:1 对等 Compose 的自定义 \`Layout\` Composable 与 \`MeasurePolicy\`！SwiftUI 的 \`sizeThatFits\` 对标 Compose 的 \`measure(measurables, constraints)\`；SwiftUI 的 \`placeSubviews\` 对标 Compose 的 \`layout(width, height) { placeRelative() }\`。
+
 \`\`\`swift
 import SwiftUI
 
@@ -3155,7 +3231,7 @@ import SwiftUI
 struct FlowLayout: Layout {
     var spacing: CGFloat = 8
 
-    // 1. 测量整个容器所需的理想尺寸
+    // 1. 测量整个容器所需的理想尺寸（对标 Compose 的 MeasurePolicy 测量阶段）
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         let maxWidth = proposal.width ?? .infinity
         var currentX: CGFloat = 0
@@ -3175,7 +3251,7 @@ struct FlowLayout: Layout {
         return CGSize(width: maxWidth, height: currentY + lineHeight)
     }
 
-    // 2. 为每个子视图排版绝对位置
+    // 2. 为每个子视图排版绝对位置（对标 Compose 的 layout { placeRelative() } 排版阶段）
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
         var x = bounds.minX
         var y = bounds.minY
@@ -3198,6 +3274,9 @@ struct FlowLayout: Layout {
 
 ### 例子三：自定义 EnvironmentKey 跨组件树安全注入全局服务
 
+- **场景解释**：跨越 10+ 层深层嵌套组件传递全局埋点分析器（AnalyticsService），避免逐层参数透传地狱（Props Drilling）。
+- **💡 对照 Jetpack Compose**：1:1 对等 Compose 的 \`CompositionLocal\`！SwiftUI 的 \`EnvironmentKey\` 相当于 Compose 的 \`staticCompositionLocalOf\`；SwiftUI 的 \`.environment(\\.analytics, service)\` 相当于 Compose 的 \`CompositionLocalProvider(LocalAnalytics provides service)\`；叶子读取 \`@Environment(\\.analytics)\` 相当于 \`LocalAnalytics.current\`。
+
 \`\`\`swift
 import SwiftUI
 
@@ -3210,12 +3289,12 @@ struct DefaultAnalyticsService: AnalyticsServiceProtocol {
     func track(event: String) { print("[Track]: \\(event)") }
 }
 
-// 2. 声明 EnvironmentKey
+// 2. 声明 EnvironmentKey（对标 Compose 的 staticCompositionLocalOf）
 private struct AnalyticsServiceKey: EnvironmentKey {
     static let defaultValue: AnalyticsServiceProtocol = DefaultAnalyticsService()
 }
 
-// 3. 扩展 EnvironmentValues
+// 3. 扩展 EnvironmentValues 提供类型安全的访问路径
 extension EnvironmentValues {
     var analytics: AnalyticsServiceProtocol {
         get { self[AnalyticsServiceKey.self] }
@@ -3223,7 +3302,7 @@ extension EnvironmentValues {
     }
 }
 
-// 4. 深层子组件直接无缝读取
+// 4. 深层子组件直接无缝读取（对标 Compose 的 LocalAnalytics.current）
 struct DetailActionView: View {
     @Environment(\\.analytics) private var analytics
 
