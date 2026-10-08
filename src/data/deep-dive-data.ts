@@ -1644,21 +1644,21 @@ fun NativeVideoPlayer(
 }
 \`\`\`
 
-### 十、现代类型安全路由：Navigation 3 (1.2.0-alpha06 最新演进规范)
+### 十、现代类型安全路由：Navigation 3 (1.2.0 正式版落地规范)
 
-- **版本定位**：基于官方最新发布的 \`androidx.navigation3:1.2.0-alpha06\`，彻底摒弃旧版 Navigation 2.x 的字符串路径拼接（\`"detail/{id}"\`）与沉重黑盒 \`NavController\`，转向**纯数据驱动（State as SSOT）**与**声明式场景投影（NavDisplay）**。
-- **1.2.0-alpha06 核心突破与设计哲学**：
+- **版本定位**：基于官方发布的正式版 \`androidx.navigation3:1.2.0\`（GA 稳定版），彻底摒弃旧版 Navigation 2.x 的字符串路径拼接（\`"detail/{id}"\`）与沉重黑盒 \`NavController\`，转向**纯数据驱动（State as SSOT）**与**声明式场景投影（NavDisplay）**，成为官方首推的现代 Compose 路由架构标准。
+- **1.2.0 正式版核心突破与设计哲学**：
   1. **强类型路由契约（NavKey）**：所有页面路由均声明为实现 \`NavKey\` 的 Kotlin \`@Serializable\` 数据类/对象，参数空安全与类型系统由编译器强制约束；
-  2. **entryProvider 泛型 DSL 架构**：从初期的 \`when(route)\` 表达式升级为现代 \`entryProvider { entry<T> { ... } }\` 模式，支持按路由 Class 模块化独立注册，杜绝巨型单文件路由表；
+  2. **entryProvider 泛型 DSL 架构**：从初期的 \`when(route)\` 表达式升级为正式版 \`entryProvider { entry<T> { ... } }\` 模式，支持按路由 Class 模块化独立注册，杜绝巨型单文件路由表；
   3. **纯数据驱动状态栈**：回退栈退化为由 \`rememberNavBackStack(initialKey)\` 托管的响应式列表，跳转即 \`add()\`，返回即 \`pop()\`，清栈即直接切片，与 iOS SwiftUI \`NavigationStack(path: \$path)\` 架构完全对齐；
-  4. **原生多层 Overlay 与预测性返回手势**：1.2.0 重点重构了 \`SceneState\` 与 \`OverlayScene\`，彻底修复了模态底部弹窗（\`ModalBottomSheet\`）在多层嵌套快速返回时动画残留与状态复用异常，无缝契合 Android 14/15 预测性返回；
+  4. **原生多层 Overlay 与预测性返回手势**：1.2.0 正式版重构了 \`SceneState\` 与 \`OverlayScene\`，彻底修复了模态底部弹窗（\`ModalBottomSheet\`）在多层嵌套快速返回时的动画残留与状态复用异常，原生适配 Android 14/15 预测性返回系统手势；
   5. **最新官方结果回传体系（ResultEventBus）**：彻底废弃旧版 \`previousBackStackEntry.savedStateHandle\`，通过 \`rememberResultEventBusNavEntryDecorator()\` 挂载装饰器，发送端调用 \`LocalResultEventBus.current.sendResult(data)\`，接收端通过 \`ResultEffect<T>\` 声明式单次安全消费。
 
 \`\`\`kotlin
 // 1. Gradle 依赖配置 (模块级 build.gradle.kts)
 dependencies {
-    implementation("androidx.navigation3:navigation3-runtime:1.2.0-alpha06")
-    implementation("androidx.navigation3:navigation3-ui:1.2.0-alpha06")
+    implementation("androidx.navigation3:navigation3-runtime:1.2.0")
+    implementation("androidx.navigation3:navigation3-ui:1.2.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.1")
 }
 
@@ -1680,7 +1680,7 @@ sealed interface AppRoute : NavKey {
 @Serializable
 data class SelectedCoupon(val id: String, val name: String, val discountPrice: Double)
 
-// 3. 现代纯数据驱动导航架构与最新结果回传闭环 (1.2.0-alpha06 官方最新范式)
+// 3. 现代纯数据驱动导航架构与最新结果回传闭环 (1.2.0 正式版官方推荐范式)
 @Composable
 fun Nav3ModernApp() {
     // ⚡ 状态即路由栈：可持久化可观测，初始节点为商品列表
