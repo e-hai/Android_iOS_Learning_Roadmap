@@ -54,11 +54,6 @@ export const zhHans: Record<string, string> = {
   "header.switch_android": "切换为 Android 单端深度进阶",
   "header.switch_ios": "切换为 iOS 单端深度进阶",
   "header.home": "返回当前文档首页",
-  "header.view_mode": "视图模式",
-  "header.switch_3d": "切换为 3D 认知星云模式",
-  "header.switch_doc": "切换为文档模式",
-  "header.3d": "3D 星云",
-  "header.doc": "文档",
   "home.title": "Android ⟷ iOS",
   "home.mindset.title": "移动端双端互相迁移 · 三大核心心智",
   "home.mindset.01.tag": "类型与内存",
@@ -537,8 +532,5 @@ export const zhHans: Record<string, string> = {
   "web.toggle_sidebar": "展开或收起目录",
   "web.prev_stage": "上一模块",
   "web.next_stage": "下一模块",
-  "web.theme_toggle": "切换深色或浅色主题",
-  "view3d.unavailable": "当前环境无法显示 3D 星云",
-  "view3d.unavailable_desc": "浏览器未提供可用的 WebGL 图形环境，完整内容仍可在文档模式中访问。",
-  "view3d.return_doc": "返回文档模式"
+  "web.theme_toggle": "切换深色或浅色主题"
 };

@@ -16,7 +16,6 @@
    - `src/services/`：文案字典服务（`i18n.ts`）。
    - `src/components/`：轻量、无框架绑定的原生 DOM 组件。
    - `src/styles/`：Vanilla CSS 设计系统与主题令牌。
-   - `src/visuals/`：按需加载的 Three.js 场景、主题与 3D 认知星云。
 2. **零第三方重型 UI 依赖**：保持轻量、极简与高响应性能，避免引入重型 UI 组件库。
 3. **响应式与无障碍**：兼容移动端、平板与桌面宽屏，支持深色/浅色主题。
 4. **零服务器部署**：保证 `base: './'` 相对路径打包，产物直接支持 GitHub Pages、Cloudflare Pages、Vercel 等静态托管。
@@ -58,11 +57,10 @@
        4. **协作式线程池与调度（Cooperative Thread Pool & Thread Hopping）**：全局 Worker 数严格等于 CPU 物理核心数，彻底杜绝 GCD 弹性池的线程爆炸；恢复时的 Worker 线程随机指派（线程跳跃）；`@MainActor` 拦截切片投递回 RunLoop 主队列。
        5. **结构化并发（Structured Concurrency & Task Tree）**：基于 Task 树的有向无环图（DAG）生命周期，规范级联向下广播取消（协作式响应）、自动等待所有子任务排空与异常向上冒泡。
 
-## 导航与资源生命周期
+## 导航与生命周期
 
-- 路线阶段使用 `#<stage-id>`，深潜使用 `#deepdive-<domain>:<chapter>`，3D 模式使用 `#3d`。
-- 文档模式保持 Header 与 Sidebar 常驻，只替换主要内容，避免丢失侧栏滚动和焦点状态。
-- 3D 模块必须动态导入；离开 3D 模式时必须停止动画帧、移除观察器并释放 WebGL 资源。
+- 路线阶段使用 `#<stage-id>`，深潜使用 `#deepdive-<domain>:<chapter>`。
+- 页面保持 Header 与 Sidebar 常驻，只替换主要内容，避免丢失侧栏滚动和焦点状态。
 
 ## 验证命令
 

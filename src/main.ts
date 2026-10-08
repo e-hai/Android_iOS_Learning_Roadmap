@@ -1,7 +1,6 @@
 import './styles/theme.css';
 import './styles/layout.css';
 import './styles/components.css';
-import './styles/visuals.css';
 
 import { renderHeader } from './components/Header';
 import { renderHomeView } from './components/HomeView';
@@ -9,22 +8,11 @@ import { renderSidebar } from './components/Sidebar';
 import { renderStageDetail } from './components/StageDetailView';
 import { renderDeepDiveDocView } from './components/DeepDiveDocView';
 import { stages } from './data/roadmap-data';
-import { i18n } from './services/i18n';
-import { preload3DConstellation } from './visuals/preload3d';
 
 type DocMode = 'roadmap' | 'deepdive';
 type Platform = 'android' | 'ios';
 
-interface ParkedConstellation {
-  element: HTMLElement;
-  knowledgeKey: string;
-  pause: () => void;
-  resume: () => void;
-  dispose: () => void;
-}
-
 class AppController {
-  private is3DMode = false;
   private docMode: DocMode = 'roadmap';
   private deepDivePlatform: Platform = 'android';
   private currentStageId = 'home';
@@ -32,37 +20,17 @@ class AppController {
   private desktopSidebarCollapsed = false;
   private documentShellKey = '';
   private renderVersion = 0;
-  private parked3D: ParkedConstellation | null = null;
 
   constructor() {
     this.desktopSidebarCollapsed = localStorage.getItem('learning_sidebar_collapsed') === 'true';
     document.body.classList.toggle('sidebar-collapsed', this.desktopSidebarCollapsed);
     this.docMode = (localStorage.getItem('learning_cockpit_doc_mode') as DocMode) || 'roadmap';
     this.deepDivePlatform = (localStorage.getItem('learning_deepdive_platform') as Platform) || 'android';
-    this.is3DMode = localStorage.getItem('learning_cockpit_view_mode') === '3d';
 
     this.initTheme();
     this.initRouting();
     this.initGlobalShortcuts();
     void this.render();
-    this.schedule3DPreload();
-  }
-
-  /** Warm Three.js + constellation chunk after first paint / on idle. */
-  private schedule3DPreload(): void {
-    if (this.is3DMode) {
-      void preload3DConstellation();
-      return;
-    }
-    const run = () => void preload3DConstellation();
-    const ric = (window as Window & {
-      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
-    }).requestIdleCallback;
-    if (typeof ric === 'function') {
-      ric(run, { timeout: 2500 });
-    } else {
-      setTimeout(run, 1200);
-    }
   }
 
   private initTheme(): void {
@@ -74,22 +42,16 @@ class AppController {
   private initRouting(): void {
     const parseHash = () => {
       const hash = window.location.hash.slice(1).trim();
-      if (hash === '3d') {
-        this.is3DMode = true;
-      } else if (hash === 'deepdive') {
-        this.is3DMode = false;
+      if (hash === 'deepdive') {
         this.docMode = 'deepdive';
         this.currentStageId = 'all';
       } else if (hash.startsWith('deepdive-')) {
-        this.is3DMode = false;
         this.docMode = 'deepdive';
         this.currentStageId = hash.slice('deepdive-'.length);
       } else if (hash && stages.some((stage) => stage.id === hash)) {
-        this.is3DMode = false;
         this.docMode = 'roadmap';
         this.currentStageId = hash;
       } else {
-        this.is3DMode = false;
         this.currentStageId = this.docMode === 'roadmap' ? 'home' : 'all';
       }
     };
@@ -109,10 +71,7 @@ class AppController {
         this.toggleSidebar();
       } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'd') {
         event.preventDefault();
-        this.switchDocMode('roadmap');
-      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'm') {
-        event.preventDefault();
-        this.toggle3DDoc(this.is3DMode ? 'doc' : '3d');
+        this.switchDocMode(this.docMode === 'roadmap' ? 'deepdive' : 'roadmap');
       }
     });
   }
@@ -127,27 +86,17 @@ class AppController {
   }
 
   private updateHash(): void {
-    if (this.is3DMode) {
-      this.navigateToHash('3d');
-    } else if (this.docMode === 'deepdive') {
+    if (this.docMode === 'deepdive') {
       this.navigateToHash(this.currentStageId === 'all' ? 'deepdive' : `deepdive-${this.currentStageId}`);
     } else {
       this.navigateToHash(this.currentStageId === 'home' ? '' : this.currentStageId);
     }
   }
 
-  private toggle3DDoc(mode: '3d' | 'doc'): void {
-    this.is3DMode = mode === '3d';
-    localStorage.setItem('learning_cockpit_view_mode', mode);
-    this.updateHash();
-  }
-
   private switchDocMode(nextMode: DocMode): void {
     this.docMode = nextMode;
     this.currentStageId = nextMode === 'roadmap' ? 'home' : 'all';
-    this.is3DMode = false;
     localStorage.setItem('learning_cockpit_doc_mode', nextMode);
-    localStorage.setItem('learning_cockpit_view_mode', 'doc');
     this.updateHash();
   }
 
@@ -193,24 +142,7 @@ class AppController {
     return background;
   }
 
-  private constellationKey(): string {
-    return `${this.docMode}:${this.deepDivePlatform}`;
-  }
-
-  /** Pause WebGL and detach the 3D view without destroying the GPU context. */
-  private park3D(): void {
-    if (!this.parked3D) return;
-    this.parked3D.pause();
-    this.parked3D.element.remove();
-  }
-
-  private disposeParked3D(): void {
-    this.parked3D?.dispose();
-    this.parked3D = null;
-  }
-
   private createDocumentShell(app: HTMLElement): HTMLElement {
-    this.park3D();
     app.replaceChildren(this.createAtmosphere());
 
     const skipLink = document.createElement('a');
@@ -222,10 +154,8 @@ class AppController {
     const header = renderHeader(
       () => this.toggleSidebar(),
       () => this.navigateStage(this.docMode === 'roadmap' ? 'home' : 'all'),
-      false,
       this.docMode,
       this.deepDivePlatform,
-      (mode) => this.toggle3DDoc(mode),
       (platform) => this.switchPlatform(platform),
     );
     header.querySelector('#btn-sidebar-toggle')?.setAttribute(
@@ -288,65 +218,8 @@ class AppController {
   private async render(shouldFocusContent = false): Promise<void> {
     const app = document.getElementById('app');
     if (!app) return;
-    const version = ++this.renderVersion;
+    ++this.renderVersion;
 
-    if (this.is3DMode) {
-      const key = this.constellationKey();
-      if (this.parked3D?.knowledgeKey === key && this.parked3D.element.isConnected) {
-        return;
-      }
-
-      this.park3D();
-
-      if (this.parked3D && this.parked3D.knowledgeKey === key) {
-        this.documentShellKey = '';
-        app.replaceChildren(this.createAtmosphere());
-        app.appendChild(this.parked3D.element);
-        this.parked3D.resume();
-        return;
-      }
-
-      this.disposeParked3D();
-      this.documentShellKey = '';
-      app.replaceChildren(this.createAtmosphere());
-
-      const loading = document.createElement('p');
-      loading.className = 'view-loading';
-      loading.textContent = '正在加载 3D 认知星云…';
-      app.appendChild(loading);
-
-      try {
-        const { renderNeuralConstellationView } = await preload3DConstellation();
-        if (version !== this.renderVersion || !this.is3DMode) return;
-
-        const view = renderNeuralConstellationView(
-          (mode) => this.toggle3DDoc(mode),
-          this.docMode,
-          this.deepDivePlatform,
-          (platform) => this.switchPlatform(platform),
-        );
-        if (version !== this.renderVersion || !this.is3DMode) {
-          view.dispose();
-          return;
-        }
-        loading.remove();
-        app.appendChild(view.element);
-        this.parked3D = view;
-      } catch (error) {
-        if (version !== this.renderVersion || !this.is3DMode) return;
-        console.error('Unable to initialize 3D view', error);
-        loading.className = 'view-loading view-error';
-        loading.innerHTML = `
-          <strong>${i18n.t('view3d.unavailable')}</strong>
-          <span>${i18n.t('view3d.unavailable_desc')}</span>
-          <button class="btn btn-primary" type="button">${i18n.t('view3d.return_doc')}</button>
-        `;
-        loading.querySelector('button')?.addEventListener('click', () => this.toggle3DDoc('doc'));
-      }
-      return;
-    }
-
-    this.park3D();
     const shellKey = `${this.docMode}:${this.deepDivePlatform}`;
     let content = document.getElementById('main-content');
     if (this.documentShellKey !== shellKey || !(content instanceof HTMLElement)) {

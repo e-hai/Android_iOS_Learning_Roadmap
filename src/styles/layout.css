@@ -376,22 +376,6 @@
     gap: 6px;
   }
 
-  .view-mode-btn {
-    width: 34px;
-    padding-inline: 0;
-    font-size: 0;
-  }
-
-  #btn-mode-3d::before {
-    content: "🌌";
-    font-size: 15px;
-  }
-
-  #btn-mode-doc::before {
-    content: "📄";
-    font-size: 15px;
-  }
-
   .header-center {
     position: absolute;
     left: 50%;
